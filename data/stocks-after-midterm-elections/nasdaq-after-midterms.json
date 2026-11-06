@@ -1,0 +1,1 @@
+{"frame":"fan","input":"data/series/fred_NASDAQCOM.csv","params":{"base":"","base-label":"Any time","dates":"1974-11-05,1978-11-07,1982-11-02,1986-11-04,1990-11-06,1994-11-08,1998-11-03,2002-11-05,2006-11-07,2010-11-02,2014-11-04,2018-11-06,2022-11-08","label":"Midterms","title":"Nasdaq in the 26 weeks after each midterm election since 1974, versus any 26 weeks","weeks":"26"}}

@@ -1,0 +1,1 @@
+{"frame":"underwater","input":"data/series/bls_CUUR0000SEHF01.csv","params":{"deflate":"data/series/fred_CPIAUCSL.csv","lines":"0.2","title":"Household electricity prices after inflation, measured below their 1984 record"}}

@@ -1,0 +1,1 @@
+{"frame":"multiples","input":"data/series/stock_mu.csv","params":{"days":"730","threshold":"0.4","title":"Micron's falls of 40% or more since 1990, the two years after each peak"}}

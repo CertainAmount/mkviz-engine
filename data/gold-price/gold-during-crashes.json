@@ -1,0 +1,1 @@
+{"frame":"during","input":"data/series/wb_gold.csv","params":{"episodes":"data/series/fred_NASDAQCOM.csv","names":"Nasdaq fall,Gold same months,","threshold":"0.2","title":"During 14 big Nasdaq falls since 1971, gold rose in eight and fell in six","windows":"2007-10-31:2009-03-09"}}

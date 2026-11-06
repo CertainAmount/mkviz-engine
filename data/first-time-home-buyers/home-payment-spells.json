@@ -1,0 +1,1 @@
+{"frame":"spells","input":"data/series/fred_MSPUS.csv","params":{"afford":"data/series/fred_MORTGAGE30US.csv,data/series/fred_MEHOINUSA646N.csv","now":"0.292","now-label":"At this week's rate","threshold":"0.30","title":"Monthly mortgage payment on a median-priced home as a share of median household income, 1984-2026; shaded when above 30%"}}
