@@ -1,5 +1,7 @@
 # mkviz-engine
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24025690.svg)](https://doi.org/10.5281/zenodo.24025690)
+
 The calculation engine and chart data behind [MKViz](https://mkviz.com), a blog that explains money news with long-run official data.
 
 Every number in an MKViz article that comes from our own calculation is produced by this engine, and every chart's data is published here so anyone can check it.
