@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use these calculations or chart data, please cite them as below."
+title: "mkviz-engine: calculations and chart data behind MKViz"
+authors:
+  - name: "MKViz"
+    website: "https://mkviz.com"
+type: software
+license: MIT
+repository-code: "https://github.com/CertainAmount/mkviz-engine"
+url: "https://mkviz.com"
+keywords: [economics, housing, inflation, FRED, data visualization]
