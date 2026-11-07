@@ -1,12 +1,155 @@
 {
   "title": "mkviz-engine: calculations and chart data behind MKViz",
-  "description": "<p>The calculation engine and per-article chart data behind <a href=\"https://mkviz.com\">MKViz (mkviz.com)</a>, a blog that explains US money news with long-run official data from FRED, BLS and EIA. Each folder holds the inputs, settings and output of one chart published on <a href=\"https://mkviz.com\">mkviz.com</a>, with a command that reproduces it.</p>",
+  "description": "<p>The calculation engine and per-article chart data behind <a href=\"https://mkviz.com\">MKViz (mkviz.com)</a>, a blog that explains US money news with long-run official data from FRED, BLS and EIA. Each folder holds the inputs, settings and output of one chart published on <a href=\"https://mkviz.com\">mkviz.com</a>, with a command that reproduces it.</p><p>Articles with chart data in this version:</p><ul><li><a href=\"https://mkviz.com/first-time-home-buyers/\">Why First-Time Home Buyers Are Scarce: It&#x27;s the Monthly Payment</a> (<a href=\"https://github.com/CertainAmount/mkviz-engine/tree/main/data/first-time-home-buyers\">data</a>)</li><li><a href=\"https://mkviz.com/stocks-after-midterm-elections/\">Stocks After Midterm Elections: 13 Cases Since 1974</a> (<a href=\"https://github.com/CertainAmount/mkviz-engine/tree/main/data/stocks-after-midterm-elections\">data</a>)</li><li><a href=\"https://mkviz.com/nasdaq-correction-history/\">Nasdaq Correction: 31 Since 1971, and How They Ended</a> (<a href=\"https://github.com/CertainAmount/mkviz-engine/tree/main/data/nasdaq-correction-history\">data</a>)</li><li><a href=\"https://mkviz.com/dollar-weaker-2026/\">Is the Dollar Getting Weaker? What 50 Years of Dollar Falls Say</a> (<a href=\"https://github.com/CertainAmount/mkviz-engine/tree/main/data/dollar-weaker-2026\">data</a>)</li><li><a href=\"https://mkviz.com/oil-prices-falling/\">Oil Prices Are Falling. When Will Gas Prices Follow?</a> (<a href=\"https://github.com/CertainAmount/mkviz-engine/tree/main/data/oil-prices-falling\">data</a>)</li><li><a href=\"https://mkviz.com/gold-price/\">Gold Price Is Down 18% From Its Peak. How Long Gold Slumps Last</a> (<a href=\"https://github.com/CertainAmount/mkviz-engine/tree/main/data/gold-price\">data</a>)</li><li><a href=\"https://mkviz.com/ai-stocks/\">Is the AI Stock Boom a Bubble? The Nasdaq-100 Next to 1995-2000</a> (<a href=\"https://github.com/CertainAmount/mkviz-engine/tree/main/data/ai-stocks\">data</a>)</li><li><a href=\"https://mkviz.com/binance-hack/\">Binance Hack: Will Customers Get Their Money Back?</a> (<a href=\"https://github.com/CertainAmount/mkviz-engine/tree/main/data/binance-hack\">data</a>)</li><li><a href=\"https://mkviz.com/fed-interest-rates/\">Fed Rate Hikes Are Back. What the Last Six Did to Mortgage Rates</a> (<a href=\"https://github.com/CertainAmount/mkviz-engine/tree/main/data/fed-interest-rates\">data</a>)</li><li><a href=\"https://mkviz.com/fuel-prices/\">When Are Gas Prices Cheapest? 35 Years of Monthly Prices</a> (<a href=\"https://github.com/CertainAmount/mkviz-engine/tree/main/data/fuel-prices\">data</a>)</li><li><a href=\"https://mkviz.com/spacex-stock/\">SpaceX Stock After the IPO: How 9 Big Listings Did in Year One</a> (<a href=\"https://github.com/CertainAmount/mkviz-engine/tree/main/data/spacex-stock\">data</a>)</li><li><a href=\"https://mkviz.com/micron-technology-stock/\">Micron Stock Is Down 46%. What Past Memory-Chip Busts Show</a> (<a href=\"https://github.com/CertainAmount/mkviz-engine/tree/main/data/micron-technology-stock\">data</a>)</li><li><a href=\"https://mkviz.com/electricity-bills-data-centers/\">Are AI Data Centers Raising Your Electric Bill?</a> (<a href=\"https://github.com/CertainAmount/mkviz-engine/tree/main/data/electricity-bills-data-centers\">data</a>)</li></ul>",
   "upload_type": "software",
-  "creators": [{"name": "MKViz"}],
+  "creators": [
+    {
+      "name": "MKViz"
+    }
+  ],
   "license": "MIT",
-  "keywords": ["economics", "housing", "inflation", "FRED", "data visualization"],
+  "keywords": [
+    "economics",
+    "housing",
+    "inflation",
+    "FRED",
+    "data visualization"
+  ],
   "related_identifiers": [
-    {"identifier": "https://mkviz.com", "relation": "isDocumentedBy", "resource_type": "publication"},
-    {"identifier": "https://mkviz.com/editorial/", "relation": "isDescribedBy", "resource_type": "other"}
+    {
+      "identifier": "https://mkviz.com",
+      "relation": "isDocumentedBy",
+      "resource_type": "publication"
+    },
+    {
+      "identifier": "https://mkviz.com/first-time-home-buyers/",
+      "relation": "isSupplementTo",
+      "resource_type": "publication"
+    },
+    {
+      "identifier": "https://github.com/CertainAmount/mkviz-engine/tree/main/data/first-time-home-buyers",
+      "relation": "hasPart",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://mkviz.com/stocks-after-midterm-elections/",
+      "relation": "isSupplementTo",
+      "resource_type": "publication"
+    },
+    {
+      "identifier": "https://github.com/CertainAmount/mkviz-engine/tree/main/data/stocks-after-midterm-elections",
+      "relation": "hasPart",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://mkviz.com/nasdaq-correction-history/",
+      "relation": "isSupplementTo",
+      "resource_type": "publication"
+    },
+    {
+      "identifier": "https://github.com/CertainAmount/mkviz-engine/tree/main/data/nasdaq-correction-history",
+      "relation": "hasPart",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://mkviz.com/dollar-weaker-2026/",
+      "relation": "isSupplementTo",
+      "resource_type": "publication"
+    },
+    {
+      "identifier": "https://github.com/CertainAmount/mkviz-engine/tree/main/data/dollar-weaker-2026",
+      "relation": "hasPart",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://mkviz.com/oil-prices-falling/",
+      "relation": "isSupplementTo",
+      "resource_type": "publication"
+    },
+    {
+      "identifier": "https://github.com/CertainAmount/mkviz-engine/tree/main/data/oil-prices-falling",
+      "relation": "hasPart",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://mkviz.com/gold-price/",
+      "relation": "isSupplementTo",
+      "resource_type": "publication"
+    },
+    {
+      "identifier": "https://github.com/CertainAmount/mkviz-engine/tree/main/data/gold-price",
+      "relation": "hasPart",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://mkviz.com/ai-stocks/",
+      "relation": "isSupplementTo",
+      "resource_type": "publication"
+    },
+    {
+      "identifier": "https://github.com/CertainAmount/mkviz-engine/tree/main/data/ai-stocks",
+      "relation": "hasPart",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://mkviz.com/binance-hack/",
+      "relation": "isSupplementTo",
+      "resource_type": "publication"
+    },
+    {
+      "identifier": "https://github.com/CertainAmount/mkviz-engine/tree/main/data/binance-hack",
+      "relation": "hasPart",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://mkviz.com/fed-interest-rates/",
+      "relation": "isSupplementTo",
+      "resource_type": "publication"
+    },
+    {
+      "identifier": "https://github.com/CertainAmount/mkviz-engine/tree/main/data/fed-interest-rates",
+      "relation": "hasPart",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://mkviz.com/fuel-prices/",
+      "relation": "isSupplementTo",
+      "resource_type": "publication"
+    },
+    {
+      "identifier": "https://github.com/CertainAmount/mkviz-engine/tree/main/data/fuel-prices",
+      "relation": "hasPart",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://mkviz.com/spacex-stock/",
+      "relation": "isSupplementTo",
+      "resource_type": "publication"
+    },
+    {
+      "identifier": "https://github.com/CertainAmount/mkviz-engine/tree/main/data/spacex-stock",
+      "relation": "hasPart",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://mkviz.com/micron-technology-stock/",
+      "relation": "isSupplementTo",
+      "resource_type": "publication"
+    },
+    {
+      "identifier": "https://github.com/CertainAmount/mkviz-engine/tree/main/data/micron-technology-stock",
+      "relation": "hasPart",
+      "resource_type": "dataset"
+    },
+    {
+      "identifier": "https://mkviz.com/electricity-bills-data-centers/",
+      "relation": "isSupplementTo",
+      "resource_type": "publication"
+    },
+    {
+      "identifier": "https://github.com/CertainAmount/mkviz-engine/tree/main/data/electricity-bills-data-centers",
+      "relation": "hasPart",
+      "resource_type": "dataset"
+    }
   ]
 }
