@@ -24,3 +24,5 @@
 | [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [nasdaq-after-midterms](stocks-after-midterm-elections/nasdaq-after-midterms.csv) | fan | fred_NASDAQCOM.csv |
 | [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [midterm-cases](stocks-after-midterm-elections/midterm-cases.csv) | cases |  |
 | [nasdaq-correction-history](https://mkviz.com/nasdaq-correction-history/) | [nasdaq-drops-dots](nasdaq-correction-history/nasdaq-drops-dots.csv) |  |  |
+| [yield-curve-inversion](https://mkviz.com/yield-curve-inversion/) | [yc-lead](yield-curve-inversion/yc-lead.csv) | lead | fred_T10Y2Y.csv, fred_USREC.csv |
+| [yield-curve-inversion](https://mkviz.com/yield-curve-inversion/) | [yc-after](yield-curve-inversion/yc-after.csv) | lead | fred_T10Y2Y.csv, fred_USREC.csv |

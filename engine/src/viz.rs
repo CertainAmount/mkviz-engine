@@ -691,3 +691,31 @@ pub fn spells(pts: &[Point], th: f64, min_days: i64, now: Option<(f64, &str)>, t
     let _ = write!(s, "<text x=\"{L}\" y=\"{}\" fill=\"{INK}\" font-size=\"13\">{}</text><text x=\"{:.1}\" y=\"{}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{}</text></svg>", H - 6.0, &pts[0].date[..4], W - R - 34.0, H - 6.0, &l.date[..4]);
     s
 }
+
+/// 시차 그림: 신호마다 한 줄, 0(신호 시작)에서 사건 시작까지 막대와 몇 달 글자. 사건이 아직 없는 줄은 파랑 'so far'.
+/// "보통 얼마 뒤에 왔나"와 "지금은 그 범위를 넘었나"를 같은 가로축 위치로(B5).
+pub fn lead(rows: &[(String, f64, bool)], title: &str) -> String {
+    let row = 26.0;
+    let h = T + rows.len() as f64 * row + B + 8.0;
+    let max = rows.iter().map(|r| r.1).fold(12.0, f64::max);
+    let step = if max > 36.0 { 12.0 } else { 6.0 };
+    let xmax = (max / step).ceil() * step;
+    let (l, r) = (52.0, 96.0);
+    let x = |m: f64| l + m / xmax * (W - l - r);
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    let mut v = 0.0;
+    while v <= xmax + 1e-9 {
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{T}\" y2=\"{:.1}\" stroke=\"#eef2f7\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{}</text>",
+                       x(v), x(v), h - B, x(v), h - B + 16.0, match v { 0.0 => "0".into(), _ if step < 12.0 => format!("{v} mo"), 12.0 => "1 yr".into(), _ => format!("{} yrs", v / 12.0) });
+        v += step;
+    }
+    for (k, (year, m, done)) in rows.iter().enumerate() {
+        let y = T + k as f64 * row + 6.0;
+        let color = if *done { GRAY } else { BLUE };
+        let lab = match (*done, m.round()) { (false, _) => format!("{:.0} mo so far", m), (true, z) if z == 0.0 => "still inverted".into(), _ => format!("{:.0} mo", m) };
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"14\">{year}</text><rect x=\"{l}\" y=\"{y:.1}\" width=\"{:.1}\" height=\"12\" rx=\"2\" fill=\"{color}\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{}\" font-size=\"13\"{}>{lab}</text>",
+                       l - 8.0, y + 11.0, (x(*m) - l).max(2.0), x(*m) + 6.0, y + 11.0, if *done { INK } else { BLUE }, if *done { "" } else { " font-weight=\"600\"" });
+    }
+    s.push_str("</svg>");
+    s
+}

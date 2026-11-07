@@ -48,6 +48,7 @@ mod episodes;
 mod events;
 mod forward;
 mod indicators;
+mod lead;
 mod probit;
 mod series;
 mod stats;
@@ -284,6 +285,24 @@ fn spells_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String>
     Ok(format!("{{\"threshold\":{th},\"below\":{below},\"n\":{},\"spells\":[{}]}}", items.len(), items.join(",")))
 }
 
+/// lead: 신호 구간(--threshold, --below, --gap 365일 안 재진입은 한 구간) 시작 뒤 --event 계열(0/1) 사건이 시작되기까지(lead.rs)
+fn lead_rows(path: &str, o: &HashMap<String, String>) -> Result<Vec<lead::Lead>, String> {
+    let th: f64 = o.get("threshold").and_then(|v| v.parse().ok()).ok_or("--threshold 가 필요")?;
+    let gap: i64 = o.get("gap").and_then(|v| v.parse().ok()).unwrap_or(365);
+    let ev = series::load(o.get("event").ok_or("--event <0/1 계열 csv> 가 필요")?)?;
+    Ok(lead::leads(&load_with(path, o)?, th, o.contains_key("below"), gap, &ev))
+}
+
+fn lead_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    let rows = lead_rows(path, o)?;
+    let done: Vec<f64> = rows.iter().filter(|r| r.event.is_some()).map(|r| r.lead_days as f64 / 30.44).collect();
+    let items: Vec<String> = rows.iter().map(|r| format!("{{\"start\":{},\"end\":{},\"days\":{},\"event\":{},\"lead_months\":{},\"after_end_months\":{}}}",
+        s(&r.start), s(&r.end), r.days, r.event.as_deref().map(s).unwrap_or("null".into()), num(Some(r.lead_days as f64 / 30.44)),
+        num(Some((r.lead_days - r.days) as f64 / 30.44)))).collect();
+    Ok(format!("{{\"n\":{},\"followed\":{},\"median_lead_months\":{},\"min_lead_months\":{},\"max_lead_months\":{},\"episodes\":[{}]}}",
+        rows.len(), done.len(), num(stats::median(&done)), num(done.iter().cloned().reduce(f64::min)), num(done.iter().cloned().reduce(f64::max)), items.join(",")))
+}
+
 /// seasonal: 해마다 달별 월평균이 그해 평균보다 몇 % 높았나, 달별 중앙값과 높았던 해의 비율
 fn seasonal_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
     let t = seasonal::table(&monthly_avg(&load_with(path, o)?));
@@ -455,6 +474,16 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
                           rows.iter().map(|(y, d)| format!("{y},{}\n", d.iter().map(|v| format!("{v:.4}")).collect::<Vec<_>>().join(","))).collect::<String>());
             viz::calendar(&rows, &b.iter().map(|x| x.0).collect::<Vec<_>>(), opt_f(o, "scale", 0.10), &title)
         }
+        "lead" => {
+            // lead 명령과 같은 구간: 줄마다 신호 시작(0)부터 사건 시작까지 막대, 사건이 아직 없으면 파랑 'so far'
+            let rows = lead_rows(path, o)?;
+            csv = format!("signal_start,signal_end,event_start,lead_months\n{}", rows.iter().map(|r| format!("{},{},{},{:.1}\n", r.start, r.end, r.event.clone().unwrap_or_default(), r.lead_days as f64 / 30.44)).collect::<String>());
+            let min: i64 = o.get("min-days").and_then(|v| v.parse().ok()).unwrap_or(0);
+            // --from-end: 신호가 끝난 날(곡선이 다시 플러스로)부터 사건까지
+            let fe = o.contains_key("from-end");
+            viz::lead(&rows.iter().filter(|r| r.days >= min || r.event.is_none())
+                .map(|r| (r.start[..4].to_string(), (r.lead_days - if fe { r.days } else { 0 }) as f64 / 30.44, r.event.is_some())).collect::<Vec<_>>(), &title)
+        }
         "timeline" => {
             // --items "해|사건|결과|good·mixed·bad;…" (글의 주장 장부에 출처가 있는 사실만 넣는다)
             let it: Vec<(String, String, String, String)> = o.get("items").ok_or("--items 가 필요")?.split(';').filter_map(|x| {
@@ -464,7 +493,7 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             csv = format!("year,event,outcome,tone\n{}", it.iter().map(|x| format!("{},\"{}\",\"{}\",{}\n", x.0, x.1, x.2, x.3)).collect::<String>());
             viz::timeline(&it, &title)
         }
-        _ => return Err(format!("모르는 프레임: {frame} (underwater|paths|band|dots|response|fan|cases|during|pictogram|timeline|calendar|gauge|multiples|strip)")),
+        _ => return Err(format!("모르는 프레임: {frame} (underwater|paths|band|dots|response|fan|cases|during|pictogram|timeline|calendar|gauge|multiples|strip|lead)")),
     };
     let out = o.get("out").ok_or("--out <svg 파일> 이 필요")?;
     std::fs::write(out, &svg).map_err(|e| format!("{out}: {e}"))?;
@@ -677,6 +706,7 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "cycles" => "Policy-rate cycles: consecutive target-rate changes in the same direction grouped together; a new cycle starts when the direction reverses.",
         "export" => "Month-end values for the reader tool, carried forward over gaps.",
         "spells" => "Every stretch of consecutive observations at or above the threshold (or at or below it), with its first and last date, length and most extreme value; the last one may still be under way.",
+        "lead" => "Signal episodes: consecutive days at or below the threshold (or at or above it), joined when the gap between them is the gap window or less and no event started in between; days inside an event do not count as signal; lead is the time from an episode's first day to the next start of the event series (a 0-to-1 step, e.g. NBER recession months).",
         "seasonal" => "Each month's average as a percent above or below that calendar year's average, for every complete year; then the median by month and the share of years each month was above its year's average.",
         "during" => "For every fall of the threshold or more in the other series (peak to lowest close), the change in this series over the same dates.",
         "events" => "Change over each window after every event date, compared with the same-length change from all start dates (base rate).",
@@ -701,6 +731,7 @@ fn main() {
         ("position", Some(p), _) => position(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("turning", Some(p), _) => turning_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("sahm", Some(p), _) => sahm_cmd(p).map(|j| with_meta(j, cmd, p, &opt)),
+        ("lead", Some(p), _) => lead_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("spells", Some(p), _) => spells_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("seasonal", Some(p), _) => seasonal_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("during", Some(p), _) => during_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
