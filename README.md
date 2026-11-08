@@ -6,15 +6,15 @@ The calculation engine and chart data behind [MKViz](https://mkviz.com), a blog 
 
 Every number in an MKViz article that comes from our own calculation is produced by this engine, and every chart's data is published here so anyone can check it.
 
-![Is a Recession Coming? Not Yet, Say Our 3 Warning Lights](data/recession-watch/rw-board.svg)
+![Consumer Sentiment Index: Why It's Far Lower Than the Data Says](data/consumer-sentiment/sentiment-gap.svg)
 
 **Latest articles**
 
+- [Consumer Sentiment Index: Why It's Far Lower Than the Data Says](https://mkviz.com/consumer-sentiment/) · [data](data/consumer-sentiment/)
 - [Is a Recession Coming? Not Yet, Say Our 3 Warning Lights](https://mkviz.com/recession-watch/) · [data](data/recession-watch/)
 - [When Was the Last Yield Curve Inversion? What History Says](https://mkviz.com/yield-curve-inversion/) · [data](data/yield-curve-inversion/)
 - [Why First-Time Home Buyers Are Scarce: It's the Monthly Payment](https://mkviz.com/first-time-home-buyers/) · [data](data/first-time-home-buyers/)
 - [Stocks After Midterm Elections: 13 Cases Since 1974](https://mkviz.com/stocks-after-midterm-elections/) · [data](data/stocks-after-midterm-elections/)
-- [Nasdaq Correction: 31 Since 1971, and How They Ended](https://mkviz.com/nasdaq-correction-history/) · [data](data/nasdaq-correction-history/)
 
 ## What's here
 

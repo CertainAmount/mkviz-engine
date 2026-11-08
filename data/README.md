@@ -11,6 +11,7 @@
 | [ai-stocks](https://mkviz.com/ai-stocks/) | [ai-dotcom-aftermath](ai-stocks/ai-dotcom-aftermath.csv) | paths | fred_NASDAQ100.csv |
 | [ai-stocks](https://mkviz.com/ai-stocks/) | [ai-crash-pictogram](ai-stocks/ai-crash-pictogram.csv) | pictogram |  |
 | [binance-hack](https://mkviz.com/binance-hack/) | [exchange-hacks-timeline](binance-hack/exchange-hacks-timeline.csv) | timeline |  |
+| [consumer-sentiment](https://mkviz.com/consumer-sentiment/) | [sentiment-gap](consumer-sentiment/sentiment-gap.csv) | fit | fred_CPIAUCSL.csv, fred_UMCSENT.csv, fred_UNRATE.csv |
 | [dollar-weaker-2026](https://mkviz.com/dollar-weaker-2026/) | [dollar-underwater](dollar-weaker-2026/dollar-underwater.csv) | underwater | fred_DTWEXBGS.csv, fred_TWEXBMTH.csv |
 | [fed-interest-rates](https://mkviz.com/fed-interest-rates/) | [mortgage-after-first-hike](fed-interest-rates/mortgage-after-first-hike.csv) |  |  |
 | [fed-interest-rates](https://mkviz.com/fed-interest-rates/) | [mortgage-rate-band](fed-interest-rates/mortgage-rate-band.csv) |  |  |

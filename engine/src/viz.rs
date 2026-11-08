@@ -768,3 +768,50 @@ mod board_test {
         assert!(svg.contains("#ea580c\" stroke=\"#fff") && svg.contains("calm"));
     }
 }
+
+/// 예상 vs 실제 그림: 실제(진한 선)와 회귀 예상(회색 점선), 그 사이를 옅게 칠하고 끝에 두 값. 학습 기간 끝을 세로 점선으로.
+/// '조건으로 보면 이쯤이어야 하는데 실제는 여기'를 같은 축 위치로(B5).
+pub fn fit(rows: &[(String, f64, f64)], train_end: &str, labels: (&str, &str), title: &str) -> String {
+    let lo = rows.iter().flat_map(|r| [r.1, r.2]).fold(f64::MAX, f64::min);
+    let hi = rows.iter().flat_map(|r| [r.1, r.2]).fold(f64::MIN, f64::max);
+    let (lo, hi) = ((lo / 10.0).floor() * 10.0, (hi / 10.0).ceil() * 10.0);
+    let right = 92.0; // 끝 이름표 자리
+    let n = rows.len() as f64;
+    let x = |i: usize| L + i as f64 / (n - 1.0).max(1.0) * (W - L - R - right);
+    let y = |v: f64| T + (hi - v) / (hi - lo).max(1e-9) * (H - T - B);
+    let mut s = head(title);
+    let mut v = lo;
+    let step = if (hi - lo) / 20.0 > 6.0 { 40.0 } else { 20.0 };
+    while v <= hi + 1e-9 {
+        let _ = write!(s, "<line x1=\"{L}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#eef2f7\"/><text x=\"{}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{v}</text>", W - R - right, y(v), y(v), L - 6.0, y(v) + 4.0);
+        v += step;
+    }
+    // 차이 띠: 실제 → 예상 다각형
+    let up: Vec<String> = rows.iter().enumerate().map(|(i, r)| format!("{:.1},{:.1}", x(i), y(r.1))).collect();
+    let dn: Vec<String> = rows.iter().enumerate().rev().map(|(i, r)| format!("{:.1},{:.1}", x(i), y(r.2))).collect();
+    let _ = write!(s, "<polygon points=\"{} {}\" fill=\"#fed7aa\" opacity=\"0.55\"/>", up.join(" "), dn.join(" "));
+    if let Some(k) = rows.iter().position(|r| r.0.as_str() > train_end) {
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{T}\" y2=\"{:.1}\" stroke=\"{GRAY}\" stroke-dasharray=\"2 3\"/>", x(k), x(k), H - B);
+    }
+    let _ = write!(s, "<polyline points=\"{}\" fill=\"none\" stroke=\"{GRAY}\" stroke-width=\"2\" stroke-dasharray=\"5 3\"/>", dn.iter().rev().cloned().collect::<Vec<_>>().join(" "));
+    let _ = write!(s, "<polyline points=\"{}\" fill=\"none\" stroke=\"{INK}\" stroke-width=\"2\"/>", up.join(" "));
+    let l = rows.last().unwrap();
+    let xe = x(rows.len() - 1) + 7.0;
+    let (ya, ye) = (y(l.1), y(l.2));
+    let (ya, ye) = if (ya - ye).abs() < 34.0 { if ya > ye { (ye + 34.0, ye) } else { (ya, ya + 34.0) } } else { (ya, ye) };
+    let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"4\" fill=\"{BLUE}\"/><text x=\"{xe:.1}\" y=\"{:.1}\" fill=\"{BLUE}\" font-size=\"13\" font-weight=\"600\">{}</text><text x=\"{xe:.1}\" y=\"{:.1}\" fill=\"{BLUE}\" font-size=\"14\" font-weight=\"600\">{:.0}</text>", xe - 7.0, y(l.1), ya - 2.0, labels.0, ya + 14.0, l.1);
+    let _ = write!(s, "<text x=\"{xe:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">{}</text><text x=\"{xe:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"14\" font-weight=\"600\">{:.0}</text>", ye - 2.0, labels.1, ye + 14.0, l.2);
+    let _ = write!(s, "<text x=\"{L}\" y=\"{}\" fill=\"{INK}\" font-size=\"13\">{}</text><text x=\"{:.1}\" y=\"{}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{}</text></svg>", H - 6.0, &rows[0].0[..4], W - R - right, H - 6.0, &l.0[..4]);
+    s
+}
+
+#[cfg(test)]
+mod fit_tests {
+    #[test]
+    fn fit_draws_both_lines_and_end_values() {
+        let rows: Vec<(String, f64, f64)> = (0..24).map(|i| (format!("{}-{:02}", 2000 + i / 12, i % 12 + 1), 90.0 - i as f64, 92.0)).collect();
+        let s = super::fit(&rows, "2000-12", ("Actual", "Expected"), "t");
+        assert_eq!(s.matches("<polyline").count(), 2);
+        assert!(s.contains(">67<") && s.contains(">92<") && s.contains("Expected"));
+    }
+}

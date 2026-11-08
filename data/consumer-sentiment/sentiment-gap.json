@@ -1,0 +1,1 @@
+{"frame":"fit","input":"data/series/fred_UMCSENT.csv","params":{"change":",12","from":"1978-01-01","labels":"Actual,Expected","title":"Sentiment is far below what jobs and prices would predict","train-from":"1978-01","train-to":"2019-12","x":"data/series/fred_UNRATE.csv,data/series/fred_CPIAUCSL.csv"}}

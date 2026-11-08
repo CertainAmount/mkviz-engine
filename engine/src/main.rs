@@ -35,6 +35,8 @@
 //!   payment --loan 300000 --rates 6.66,7.18 [--years 30]
 //!       고정금리 대출의 월 상환액(원리금 균등: P = L·r / (1 - (1+r)^-n), r = 연이율/12).
 //!   recessions <usrec.csv> [--with <unrate.csv> --after 24 --from YYYY-MM-DD]   침체마다 길이(개월), --with 계열의 시작 직전 값 → 최고값(끝 뒤 after개월까지) 상승폭.
+//!   fit <y.csv> --x <a.csv>,<b.csv> [--change ,12 --train-from YYYY-MM --train-to YYYY-MM --from YYYY-MM]
+//!       최소제곱 회귀: 학습 기간 달들로 계수를 정하고, 달마다 예상값과 실제와의 차이(잔차). --change: x마다 n달 전 대비 변화율(빈칸은 수준).
 //!   spells <csv> --threshold x [--below]   값이 기준 이상(이하)으로 이어진 구간(시작·끝·길이·극값·진행 중).
 //!   (공통) --per <csv>: 다른 계열로 나눈 비율.
 //!   (공통) --afford <rate.csv>,<income.csv> [--down 0.2 --years 30]: 집값 계열을 월 상환액 / 월 소득으로 바꾼다.
@@ -47,6 +49,7 @@ mod seasonal;
 mod cycles;
 mod episodes;
 mod events;
+mod fit;
 mod forward;
 mod indicators;
 mod lead;
@@ -336,6 +339,43 @@ fn recessions_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, Str
     Ok(format!("{{\"n\":{},\"median_months\":{},\"median_rise\":{},\"recessions\":[{}]}}", items.len(), num(stats::median(&months)), num(stats::median(&rises)), items.join(",")))
 }
 
+/// fit: 월평균으로 맞춘 y와 x들(달이 모두 있는 달만), 학습 기간 계수, 지금 차이와 학습 기간 안 가장 큰 음·양 차이
+fn fit_rows(path: &str, o: &HashMap<String, String>) -> Result<(Vec<(String, f64, Vec<f64>)>, Vec<f64>, f64, usize), String> {
+    let y = monthly_avg(&load_with(path, o)?);
+    let xs = o.get("x").ok_or("--x <a.csv>,<b.csv> 가 필요")?;
+    let lags: Vec<usize> = o.get("change").map(|c| c.split(',').map(|v| v.parse().unwrap_or(0)).collect()).unwrap_or_default();
+    let mut cols: Vec<HashMap<String, f64>> = Vec::new();
+    for (i, f) in xs.split(',').enumerate() {
+        let pts = series::load(f)?;
+        let pts = match lags.get(i) { Some(&n) if n > 0 => series::change_over(&pts, n), _ => pts };
+        cols.push(monthly_avg(&pts).into_iter().collect());
+    }
+    let from = o.get("from").map(|d| d[..7].to_string()).unwrap_or_default();
+    let rows: Vec<(String, f64, Vec<f64>)> = y.into_iter().filter(|(d, _)| *d >= from)
+        .filter_map(|(d, v)| { let x: Option<Vec<f64>> = cols.iter().map(|c| c.get(&d).copied()).collect(); Some((d, v, x?)) }).collect();
+    let (a, b) = (o.get("train-from").map(|d| d[..7].to_string()).unwrap_or_default(), o.get("train-to").map(|d| d[..7].to_string()).unwrap_or("9999".into()));
+    let (tx, ty): (Vec<Vec<f64>>, Vec<f64>) = rows.iter().filter(|r| r.0 >= a && r.0 <= b).map(|r| (r.2.clone(), r.1)).unzip();
+    let (coef, r2) = fit::ols(&tx, &ty).ok_or("회귀를 풀 수 없음(자료 부족)")?;
+    let n = ty.len();
+    Ok((rows, coef, r2, n))
+}
+
+fn fit_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    let (rows, coef, r2, n) = fit_rows(path, o)?;
+    let (a, b) = (o.get("train-from").map(|d| d[..7].to_string()).unwrap_or_default(), o.get("train-to").map(|d| d[..7].to_string()).unwrap_or("9999".into()));
+    let gap = |r: &(String, f64, Vec<f64>)| r.1 - fit::predict(&coef, &r.2);
+    let train: Vec<&(String, f64, Vec<f64>)> = rows.iter().filter(|r| r.0 >= a && r.0 <= b).collect();
+    let lo = train.iter().min_by(|x, y| gap(x).partial_cmp(&gap(y)).unwrap()).unwrap();
+    let hi = train.iter().max_by(|x, y| gap(x).partial_cmp(&gap(y)).unwrap()).unwrap();
+    let all_lo = rows.iter().min_by(|x, y| gap(x).partial_cmp(&gap(y)).unwrap()).unwrap();
+    let l = rows.last().unwrap();
+    let below = rows.iter().filter(|r| gap(r) <= gap(l)).count();
+    Ok(format!("{{\"coef\":[{}],\"r2\":{},\"n_train\":{n},\"train\":[{},{}],\"now\":{{\"date\":{},\"actual\":{},\"expected\":{},\"gap\":{},\"x\":[{}]}},\"train_min_gap\":{{\"date\":{},\"gap\":{}}},\"train_max_gap\":{{\"date\":{},\"gap\":{}}},\"all_min_gap\":{{\"date\":{},\"gap\":{}}},\"months_at_or_below_now\":{below},\"months\":{}}}",
+        coef.iter().map(|c| num(Some(*c))).collect::<Vec<_>>().join(","), num(Some(r2)), s(&train[0].0), s(&train.last().unwrap().0),
+        s(&l.0), num(Some(l.1)), num(Some(fit::predict(&coef, &l.2))), num(Some(gap(l))), l.2.iter().map(|v| num(Some(*v))).collect::<Vec<_>>().join(","),
+        s(&lo.0), num(Some(gap(lo))), s(&hi.0), num(Some(gap(hi))), s(&all_lo.0), num(Some(gap(all_lo))), rows.len()))
+}
+
 /// seasonal: 해마다 달별 월평균이 그해 평균보다 몇 % 높았나, 달별 중앙값과 높았던 해의 비율
 fn seasonal_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
     let t = seasonal::table(&monthly_avg(&load_with(path, o)?));
@@ -515,6 +555,15 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             }).collect();
             csv = format!("signal,now,trigger,axis_max\n{}", rows.iter().map(|r| format!("{},{},{},{}\n", r.0, r.1, r.2, r.3)).collect::<String>());
             viz::board(&rows, &title)
+        }
+        "fit" => {
+            // fit 명령과 같은 회귀: 달마다 실제와 예상, --labels "Actual,Expected"
+            let (rows, coef, _, _) = fit_rows(path, o)?;
+            let r: Vec<(String, f64, f64)> = rows.iter().map(|(d, v, x)| (d.clone(), *v, fit::predict(&coef, x))).collect();
+            csv = format!("month,actual,expected\n{}", r.iter().map(|(d, a, e)| format!("{d},{a},{e:.2}\n")).collect::<String>());
+            let lab = o.get("labels").cloned().unwrap_or("Actual,Expected".into());
+            let (a, e) = lab.split_once(',').unwrap_or(("Actual", "Expected"));
+            viz::fit(&r, o.get("train-to").map(String::as_str).unwrap_or("9999"), (a, e), &title)
         }
         "lead" => {
             // lead 명령과 같은 구간: 줄마다 신호 시작(0)부터 사건 시작까지 막대, 사건이 아직 없으면 파랑 'so far'
@@ -748,6 +797,7 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "passthrough" => "For every rise or fall of the threshold or more in the leading series within the window, the later change in the following series from the day the threshold was crossed, divided by the size of the leading move (pass-through).",
         "cycles" => "Policy-rate cycles: consecutive target-rate changes in the same direction grouped together; a new cycle starts when the direction reverses.",
         "export" => "Month-end values for the reader tool, carried forward over gaps.",
+        "fit" => "Ordinary least squares on monthly averages: the coefficients come from the training months only; every month then gets the value those conditions usually went with (expected) and the actual minus expected (gap). With --change, an input is its percent change from n months earlier.",
         "spells" => "Every stretch of consecutive observations at or above the threshold (or at or below it), with its first and last date, length and most extreme value; the last one may still be under way.",
         "lead" => "Signal episodes: consecutive days at or below the threshold (or at or above it), joined when the gap between them is the gap window or less and no event started in between; days inside an event do not count as signal; lead is the time from an episode's first day to the next start of the event series (a 0-to-1 step, e.g. NBER recession months).",
         "recessions" => "Each run of months flagged 1 in the event series (NBER recession months), with its length; with a second series, its value the month before the start and its highest value from the start to the given months after the end (or to the next recession start, if sooner).",
@@ -777,6 +827,7 @@ fn main() {
         ("sahm", Some(p), _) => sahm_cmd(p).map(|j| with_meta(j, cmd, p, &opt)),
         ("lead", Some(p), _) => lead_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("recessions", Some(p), _) => recessions_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
+        ("fit", Some(p), _) => fit_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("spells", Some(p), _) => spells_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("seasonal", Some(p), _) => seasonal_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("during", Some(p), _) => during_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
