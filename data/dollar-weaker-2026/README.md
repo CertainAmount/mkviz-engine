@@ -1,4 +1,4 @@
-# [dollar-weaker-2026](https://mkviz.com/dollar-weaker-2026/)
+# [Is the Dollar Getting Weaker? What 50 Years of Dollar Falls Say](https://mkviz.com/dollar-weaker-2026/)
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
 

@@ -694,28 +694,77 @@ pub fn spells(pts: &[Point], th: f64, min_days: i64, now: Option<(f64, &str)>, t
 
 /// 시차 그림: 신호마다 한 줄, 0(신호 시작)에서 사건 시작까지 막대와 몇 달 글자. 사건이 아직 없는 줄은 파랑 'so far'.
 /// "보통 얼마 뒤에 왔나"와 "지금은 그 범위를 넘었나"를 같은 가로축 위치로(B5).
-pub fn lead(rows: &[(String, f64, bool)], title: &str) -> String {
+/// mark: 사건까지 mark개월 이하였던 막대를 주황으로(예: 1년 안에 침체가 온 신호), axis: 눈금 아래 축 이름
+pub fn lead(rows: &[(String, f64, bool)], zero: &str, mark: f64, axis: &str, title: &str) -> String {
     let row = 26.0;
-    let h = T + rows.len() as f64 * row + B + 8.0;
+    let h = T + rows.len() as f64 * row + B + 8.0 + if axis.is_empty() { 0.0 } else { 20.0 };
     let max = rows.iter().map(|r| r.1).fold(12.0, f64::max);
-    let step = if max > 36.0 { 12.0 } else { 6.0 };
+    let step = if max > 72.0 { 24.0 } else if max > 36.0 { 12.0 } else { 6.0 };
     let xmax = (max / step).ceil() * step;
     let (l, r) = (52.0, 96.0);
     let x = |m: f64| l + m / xmax * (W - l - r);
     let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    let ax = if axis.is_empty() { 0.0 } else { 20.0 };
+    if !axis.is_empty() {
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{}</text>", (l + W - r) / 2.0, h - B + 16.0, axis.replace('&', "&amp;"));
+    }
     let mut v = 0.0;
     while v <= xmax + 1e-9 {
         let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{T}\" y2=\"{:.1}\" stroke=\"#eef2f7\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{}</text>",
-                       x(v), x(v), h - B, x(v), h - B + 16.0, match v { 0.0 => "0".into(), _ if step < 12.0 => format!("{v} mo"), 12.0 => "1 yr".into(), _ => format!("{} yrs", v / 12.0) });
+                       x(v), x(v), h - B - ax, x(v), h - B - ax + 16.0, match v { 0.0 => "0".into(), _ if step < 12.0 => format!("{v} mo"), 12.0 => "1 yr".into(), _ => format!("{} yrs", v / 12.0) });
         v += step;
     }
     for (k, (year, m, done)) in rows.iter().enumerate() {
         let y = T + k as f64 * row + 6.0;
-        let color = if *done { GRAY } else { BLUE };
-        let lab = match (*done, m.round()) { (false, _) => format!("{:.0} mo so far", m), (true, z) if z == 0.0 => "still inverted".into(), _ => format!("{:.0} mo", m) };
+        let color = if !*done { BLUE } else if *m <= mark { "#ea580c" } else { GRAY };
+        let lab = match (*done, m.round()) { (false, _) => format!("{:.0} mo so far", m), (true, z) if z == 0.0 => zero.to_string(), _ => format!("{:.0} mo", m) };
         let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"14\">{year}</text><rect x=\"{l}\" y=\"{y:.1}\" width=\"{:.1}\" height=\"12\" rx=\"2\" fill=\"{color}\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{}\" font-size=\"13\"{}>{lab}</text>",
                        l - 8.0, y + 11.0, (x(*m) - l).max(2.0), x(*m) + 6.0, y + 11.0, if *done { INK } else { BLUE }, if *done { "" } else { " font-weight=\"600\"" });
     }
     s.push_str("</svg>");
     s
+}
+
+/// 신호판: 신호마다 한 줄 트랙(0~축 끝), 경고선 눈금과 '지금' 점. 경고선을 넘으면 점이 주황.
+/// 서로 다른 단위의 신호를 '경고선까지 얼마나 남았나'라는 같은 위치로 읽게(B5). 값은 엔진 결과를 넣는다.
+pub fn board(rows: &[(String, f64, f64, f64, String)], title: &str) -> String {
+    let row = 58.0;
+    let h = T + rows.len() as f64 * row + 10.0;
+    let (l, r) = (16.0, 16.0);
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    for (k, (name, now, trig, max, lab)) in rows.iter().enumerate() {
+        let y = T + k as f64 * row + 18.0;
+        let x = |v: f64| l + (v / max).clamp(0.0, 1.0) * (W - l - r);
+        let over = now >= trig;
+        let c = if over { "#ea580c" } else { BLUE };
+        let _ = write!(s, "<text x=\"{l}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"14\">{}</text>", y, name.replace('&', "&amp;"));
+        let _ = write!(s, "<rect x=\"{l}\" y=\"{:.1}\" width=\"{:.1}\" height=\"6\" rx=\"3\" fill=\"{SHADE}\"/><rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"6\" fill=\"#fed7aa\"/>",
+                       y + 12.0, W - l - r, x(*trig), y + 12.0, W - r - x(*trig));
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#ea580c\" stroke-width=\"2\"/>", x(*trig), x(*trig), y + 6.0, y + 24.0);
+        let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"7\" fill=\"{c}\" stroke=\"#fff\" stroke-width=\"2\"/>", x(*now), y + 15.0);
+        let anchor = if x(*now) > W / 2.0 { "end" } else { "start" };
+        let tx = if anchor == "end" { x(*now) - 10.0 } else { x(*now) + 10.0 };
+        let _ = write!(s, "<text x=\"{tx:.1}\" y=\"{:.1}\" text-anchor=\"{anchor}\" fill=\"{c}\" font-size=\"13\" font-weight=\"600\">{}</text>", y + 38.0, lab.replace('&', "&amp;"));
+    }
+    s.push_str("</svg>");
+    s
+}
+
+#[cfg(test)]
+mod lead_test {
+    #[test]
+    fn lead_marks_short_leads_orange() {
+        let svg = super::lead(&[("1990".into(), 8.0, true), ("2000".into(), 30.0, true)], "0 mo", 12.0, "Months", "t");
+        assert_eq!(svg.matches("#ea580c").count(), 1);
+        assert!(svg.contains(">Months<"));
+    }
+}
+
+#[cfg(test)]
+mod board_test {
+    #[test]
+    fn board_marks_over_trigger_orange() {
+        let svg = super::board(&[("A".into(), 0.6, 0.5, 1.0, "over".into()), ("B".into(), 0.1, 0.5, 1.0, "calm".into())], "t");
+        assert!(svg.contains("#ea580c\" stroke=\"#fff") && svg.contains("calm"));
+    }
 }

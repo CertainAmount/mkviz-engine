@@ -1,6 +1,6 @@
 {
   "title": "mkviz-engine: calculations and chart data behind MKViz",
-  "description": "<p>The calculation engine and per-article chart data behind <a href=\"https://mkviz.com\">MKViz (mkviz.com)</a>, a blog that explains US money news with long-run official data from FRED, BLS and EIA. Each folder holds the inputs, settings and output of one chart published on <a href=\"https://mkviz.com\">mkviz.com</a>, with a command that reproduces it.</p><p>New in this version:</p><ul><li><a href=\"https://mkviz.com/yield-curve-inversion/\">When Was the Last Yield Curve Inversion? What History Says</a> (<a href=\"https://github.com/CertainAmount/mkviz-engine/tree/main/data/yield-curve-inversion\">data</a>)</li></ul>",
+  "description": "<p>The calculation engine and per-article chart data behind MKViz (mkviz.com), a blog that explains US money news with long-run official data from FRED, BLS and EIA. Each folder holds the inputs, settings and output of one chart, with a command that reproduces it.</p>",
   "upload_type": "software",
   "creators": [
     {
@@ -17,19 +17,9 @@
   ],
   "related_identifiers": [
     {
-      "identifier": "https://mkviz.com",
-      "relation": "isDocumentedBy",
-      "resource_type": "publication"
-    },
-    {
-      "identifier": "https://mkviz.com/yield-curve-inversion/",
+      "identifier": "https://mkviz.com/recession-watch/",
       "relation": "isSupplementTo",
       "resource_type": "publication"
-    },
-    {
-      "identifier": "https://github.com/CertainAmount/mkviz-engine/tree/main/data/yield-curve-inversion",
-      "relation": "hasPart",
-      "resource_type": "dataset"
     }
   ]
 }

@@ -1,4 +1,4 @@
-# [gold-price](https://mkviz.com/gold-price/)
+# [Gold Price Is Down 18% From Its Peak. How Long Gold Slumps Last](https://mkviz.com/gold-price/)
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
 

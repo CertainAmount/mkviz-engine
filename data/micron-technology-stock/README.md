@@ -1,4 +1,4 @@
-# [micron-technology-stock](https://mkviz.com/micron-technology-stock/)
+# [Micron Stock Is Down 46%. What Past Memory-Chip Busts Show](https://mkviz.com/micron-technology-stock/)
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
 

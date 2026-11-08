@@ -1,4 +1,4 @@
-# [oil-prices-falling](https://mkviz.com/oil-prices-falling/)
+# [Oil Prices Are Falling. When Will Gas Prices Follow?](https://mkviz.com/oil-prices-falling/)
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
 

@@ -67,6 +67,24 @@ pub fn rolling_mean(pts: &[Point], n: usize) -> Vec<Point> {
     pts.windows(n).map(|w| Point { value: w.iter().map(|p| p.value).sum::<f64>() / n as f64, ..w[n - 1].clone() }).collect()
 }
 
+/// 저점 대비 상승: 각 값이 직전 n개(자기 포함) 중 최저보다 몇 % 높은가. 실업수당 청구 4주 평균이 1년 저점에서 20% 오르면 경고처럼
+pub fn from_low(pts: &[Point], n: usize) -> Vec<Point> {
+    if n == 0 { return pts.to_vec(); }
+    pts.windows(n).map(|w| Point { value: w[n - 1].value / w.iter().map(|p| p.value).fold(f64::MAX, f64::min) - 1.0, ..w[n - 1].clone() }).collect()
+}
+
+#[cfg(test)]
+mod from_low_test {
+    use super::*;
+    #[test]
+    fn rise_over_trailing_low() {
+        let pts: Vec<Point> = [100.0, 80.0, 90.0, 96.0].iter().enumerate().map(|(i, v)| Point { date: format!("2000-01-0{}", i + 1), day: i as i64, value: *v }).collect();
+        let r = from_low(&pts, 3);
+        assert_eq!(r.len(), 2);
+        assert!((r[0].value - 0.125).abs() < 1e-9 && (r[1].value - 0.2).abs() < 1e-9);
+    }
+}
+
 /// 물가 조정: 각 값을 그 시점(그 날 이전 가장 가까운 달)의 물가지수로 나누고 마지막 물가지수로 다시 곱해 '오늘 달러'로 맞춘다.
 pub fn deflate(pts: &[Point], cpi: &[Point]) -> Vec<Point> {
     let Some(last) = cpi.last() else { return pts.to_vec() };

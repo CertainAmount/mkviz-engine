@@ -34,6 +34,7 @@
 //!   events … --diff     비율 대신 수준 차이(금리: %p)로.
 //!   payment --loan 300000 --rates 6.66,7.18 [--years 30]
 //!       고정금리 대출의 월 상환액(원리금 균등: P = L·r / (1 - (1+r)^-n), r = 연이율/12).
+//!   recessions <usrec.csv> [--with <unrate.csv> --after 24 --from YYYY-MM-DD]   침체마다 길이(개월), --with 계열의 시작 직전 값 → 최고값(끝 뒤 after개월까지) 상승폭.
 //!   spells <csv> --threshold x [--below]   값이 기준 이상(이하)으로 이어진 구간(시작·끝·길이·극값·진행 중).
 //!   (공통) --per <csv>: 다른 계열로 나눈 비율.
 //!   (공통) --afford <rate.csv>,<income.csv> [--down 0.2 --years 30]: 집값 계열을 월 상환액 / 월 소득으로 바꾼다.
@@ -145,7 +146,9 @@ fn load_with(path: &str, o: &HashMap<String, String>) -> Result<Vec<series::Poin
         }
         None => pts,
     };
-    Ok(match o.get("avg").and_then(|v| v.parse().ok()) { Some(n) => series::rolling_mean(&pts, n), None => pts })
+    let pts = match o.get("avg").and_then(|v| v.parse().ok()) { Some(n) => series::rolling_mean(&pts, n), None => pts };
+    // --from-low n: 직전 n개 중 최저 대비 상승률(평균 뒤에 적용: 청구 4주 평균의 1년 저점 대비)
+    Ok(match o.get("from-low").and_then(|v| v.parse().ok()) { Some(n) => series::from_low(&pts, n), None => pts })
 }
 
 fn position(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
@@ -301,6 +304,36 @@ fn lead_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
         num(Some((r.lead_days - r.days) as f64 / 30.44)))).collect();
     Ok(format!("{{\"n\":{},\"followed\":{},\"median_lead_months\":{},\"min_lead_months\":{},\"max_lead_months\":{},\"episodes\":[{}]}}",
         rows.len(), done.len(), num(stats::median(&done)), num(done.iter().cloned().reduce(f64::min)), num(done.iter().cloned().reduce(f64::max)), items.join(",")))
+}
+
+/// recessions: 사건 계열(USREC 0/1)의 구간마다 시작·끝·개월, --with 계열이 있으면 시작 직전 달 값과
+/// 시작부터 끝 뒤 --after개월(기본 24)까지의 최고값, 그 차이(실업률이면 침체가 몇 %p 올렸나)
+fn recessions_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    let mut ev = series::load(path)?;
+    if let Some(from) = o.get("from").and_then(|d| series::day_number(d)) { ev.retain(|p| p.day >= from); }
+    let with = match o.get("with") { Some(w) => Some(series::load(w)?), None => None };
+    let after = opt_f(o, "after", 24.0) * 30.44;
+    let mut items = Vec::new();
+    let (mut months, mut rises) = (Vec::new(), Vec::new());
+    let mut i = 0;
+    while i < ev.len() {
+        if ev[i].value < 0.5 || (i > 0 && ev[i - 1].value >= 0.5) || i == 0 { i += 1; continue; }
+        let s0 = i;
+        while i < ev.len() && ev[i].value >= 0.5 { i += 1; }
+        let (a, b) = (&ev[s0], &ev[i - 1]);
+        // 최고값 창은 다음 침체 시작 전까지(1980년 침체 뒤 24개월이 1981년 침체를 덮지 않게)
+        let next = ev[i..].iter().find(|p| p.value >= 0.5).map_or(f64::MAX, |p| p.day as f64);
+        let m = (i - s0) as f64; // 월간 계열: 침체 달 수
+        months.push(m);
+        let extra = with.as_ref().and_then(|w| {
+            let before = w.iter().take_while(|p| p.day < a.day).last()?;
+            let peak = w.iter().filter(|p| p.day >= a.day && (p.day as f64) <= (b.day as f64 + after).min(next - 1.0)).max_by(|x, y| x.value.partial_cmp(&y.value).unwrap())?;
+            rises.push(peak.value - before.value);
+            Some(format!(",\"before\":{},\"peak\":{},\"peak_date\":{},\"rise\":{}", num(Some(before.value)), num(Some(peak.value)), s(&peak.date), num(Some(peak.value - before.value))))
+        }).unwrap_or_default();
+        items.push(format!("{{\"start\":{},\"end\":{},\"months\":{m}{extra}}}", s(&a.date), s(&b.date)));
+    }
+    Ok(format!("{{\"n\":{},\"median_months\":{},\"median_rise\":{},\"recessions\":[{}]}}", items.len(), num(stats::median(&months)), num(stats::median(&rises)), items.join(",")))
 }
 
 /// seasonal: 해마다 달별 월평균이 그해 평균보다 몇 % 높았나, 달별 중앙값과 높았던 해의 비율
@@ -474,6 +507,15 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
                           rows.iter().map(|(y, d)| format!("{y},{}\n", d.iter().map(|v| format!("{v:.4}")).collect::<Vec<_>>().join(","))).collect::<String>());
             viz::calendar(&rows, &b.iter().map(|x| x.0).collect::<Vec<_>>(), opt_f(o, "scale", 0.10), &title)
         }
+        "board" => {
+            // 신호판: --rows "이름:지금:경고선:축 끝:지금 글자;…" 줄마다 0~축 끝 트랙, 경고선 눈금, 지금 점(경고선 넘으면 주황). 값은 엔진 결과에서
+            let rows: Vec<(String, f64, f64, f64, String)> = o.get("rows").ok_or("--rows 가 필요")?.split(';').filter_map(|x| {
+                let p: Vec<&str> = x.split(':').collect();
+                Some((p.first()?.to_string(), p.get(1)?.parse().ok()?, p.get(2)?.parse().ok()?, p.get(3)?.parse().ok()?, p.get(4).unwrap_or(&"").to_string()))
+            }).collect();
+            csv = format!("signal,now,trigger,axis_max\n{}", rows.iter().map(|r| format!("{},{},{},{}\n", r.0, r.1, r.2, r.3)).collect::<String>());
+            viz::board(&rows, &title)
+        }
         "lead" => {
             // lead 명령과 같은 구간: 줄마다 신호 시작(0)부터 사건 시작까지 막대, 사건이 아직 없으면 파랑 'so far'
             let rows = lead_rows(path, o)?;
@@ -482,7 +524,8 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             // --from-end: 신호가 끝난 날(곡선이 다시 플러스로)부터 사건까지
             let fe = o.contains_key("from-end");
             viz::lead(&rows.iter().filter(|r| r.days >= min || r.event.is_none())
-                .map(|r| (r.start[..4].to_string(), (r.lead_days - if fe { r.days } else { 0 }) as f64 / 30.44, r.event.is_some())).collect::<Vec<_>>(), &title)
+                .map(|r| (r.start[..4].to_string(), (r.lead_days - if fe { r.days } else { 0 }) as f64 / 30.44, r.event.is_some())).collect::<Vec<_>>(), o.get("zero-label").map(String::as_str).unwrap_or("0 mo"),
+                opt_f(o, "mark", -1.0), o.get("axis").map(String::as_str).unwrap_or(""), &title)
         }
         "timeline" => {
             // --items "해|사건|결과|good·mixed·bad;…" (글의 주장 장부에 출처가 있는 사실만 넣는다)
@@ -493,7 +536,7 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             csv = format!("year,event,outcome,tone\n{}", it.iter().map(|x| format!("{},\"{}\",\"{}\",{}\n", x.0, x.1, x.2, x.3)).collect::<String>());
             viz::timeline(&it, &title)
         }
-        _ => return Err(format!("모르는 프레임: {frame} (underwater|paths|band|dots|response|fan|cases|during|pictogram|timeline|calendar|gauge|multiples|strip|lead)")),
+        _ => return Err(format!("모르는 프레임: {frame} (underwater|paths|band|dots|response|fan|cases|during|pictogram|timeline|calendar|gauge|multiples|strip|lead|board)")),
     };
     let out = o.get("out").ok_or("--out <svg 파일> 이 필요")?;
     std::fs::write(out, &svg).map_err(|e| format!("{out}: {e}"))?;
@@ -707,6 +750,7 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "export" => "Month-end values for the reader tool, carried forward over gaps.",
         "spells" => "Every stretch of consecutive observations at or above the threshold (or at or below it), with its first and last date, length and most extreme value; the last one may still be under way.",
         "lead" => "Signal episodes: consecutive days at or below the threshold (or at or above it), joined when the gap between them is the gap window or less and no event started in between; days inside an event do not count as signal; lead is the time from an episode's first day to the next start of the event series (a 0-to-1 step, e.g. NBER recession months).",
+        "recessions" => "Each run of months flagged 1 in the event series (NBER recession months), with its length; with a second series, its value the month before the start and its highest value from the start to the given months after the end (or to the next recession start, if sooner).",
         "seasonal" => "Each month's average as a percent above or below that calendar year's average, for every complete year; then the median by month and the share of years each month was above its year's average.",
         "during" => "For every fall of the threshold or more in the other series (peak to lowest close), the change in this series over the same dates.",
         "events" => "Change over each window after every event date, compared with the same-length change from all start dates (base rate).",
@@ -732,6 +776,7 @@ fn main() {
         ("turning", Some(p), _) => turning_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("sahm", Some(p), _) => sahm_cmd(p).map(|j| with_meta(j, cmd, p, &opt)),
         ("lead", Some(p), _) => lead_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
+        ("recessions", Some(p), _) => recessions_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("spells", Some(p), _) => spells_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("seasonal", Some(p), _) => seasonal_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("during", Some(p), _) => during_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),

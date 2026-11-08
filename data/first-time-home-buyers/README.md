@@ -1,4 +1,4 @@
-# [first-time-home-buyers](https://mkviz.com/first-time-home-buyers/)
+# [Why First-Time Home Buyers Are Scarce: It's the Monthly Payment](https://mkviz.com/first-time-home-buyers/)
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
 

@@ -1,4 +1,4 @@
-# [spacex-stock](https://mkviz.com/spacex-stock/)
+# [SpaceX Stock After the IPO: How 9 Big Listings Did in Year One](https://mkviz.com/spacex-stock/)
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
 

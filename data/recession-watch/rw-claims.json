@@ -1,0 +1,1 @@
+{"frame":"lead","input":"data/series/fred_ICSA.csv","params":{"avg":"4","axis":"Time from the jump to the next recession start (orange: within a year)","event":"data/series/fred_USREC.csv","from-low":"52","mark":"12","threshold":"0.2","title":"Each jump in jobless claims since 1968: months until the next recession began","zero-label":"same month"}}

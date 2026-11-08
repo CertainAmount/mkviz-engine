@@ -1,4 +1,4 @@
-# [fuel-prices](https://mkviz.com/fuel-prices/)
+# [When Are Gas Prices Cheapest? 35 Years of Monthly Prices](https://mkviz.com/fuel-prices/)
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
 

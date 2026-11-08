@@ -1,4 +1,4 @@
-# [electricity-bills-data-centers](https://mkviz.com/electricity-bills-data-centers/)
+# [Are AI Data Centers Raising Your Electric Bill?](https://mkviz.com/electricity-bills-data-centers/)
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
 

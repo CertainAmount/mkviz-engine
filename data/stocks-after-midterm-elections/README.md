@@ -1,4 +1,4 @@
-# [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/)
+# [Stocks After Midterm Elections: 13 Cases Since 1974](https://mkviz.com/stocks-after-midterm-elections/)
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
 

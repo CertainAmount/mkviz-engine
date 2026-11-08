@@ -1,4 +1,4 @@
-# [binance-hack](https://mkviz.com/binance-hack/)
+# [Binance Hack: Will Customers Get Their Money Back?](https://mkviz.com/binance-hack/)
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
 

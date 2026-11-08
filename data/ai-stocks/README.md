@@ -1,4 +1,4 @@
-# [ai-stocks](https://mkviz.com/ai-stocks/)
+# [Is the AI Stock Boom a Bubble? The Nasdaq-100 Next to 1995-2000](https://mkviz.com/ai-stocks/)
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
 

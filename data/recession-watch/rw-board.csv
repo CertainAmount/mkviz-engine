@@ -1,0 +1,4 @@
+signal,now,trigger,axis_max
+Sahm rule (unemployment),0,0.5,1
+Jobless claims vs. 1-year low,0,0.2,0.4
+Chance of recession within a year,0.09,0.2,0.6
