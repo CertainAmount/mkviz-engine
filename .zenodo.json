@@ -15,11 +15,5 @@
     "FRED",
     "data visualization"
   ],
-  "related_identifiers": [
-    {
-      "identifier": "https://mkviz.com/jobs-report-revisions/",
-      "relation": "isSupplementTo",
-      "resource_type": "publication"
-    }
-  ]
+  "related_identifiers": []
 }
