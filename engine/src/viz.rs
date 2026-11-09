@@ -461,10 +461,12 @@ pub fn strip(rows: &[(String, f64, bool)], names: [&str; 2], title: &str) -> Str
     let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
     let (yo, yh) = (top + 40.0, top + 110.0); // 회색 줄, 파랑 줄
     let step = [0.02, 0.05, 0.1, 0.2].into_iter().find(|st| (hi - lo) / st <= 6.0).unwrap_or(0.2);
+    let signed = lo < 0.0; // 모두 0 이상(오차 크기 등)이면 + 부호를 붙이지 않는다
+    let fmt = |v: f64| if hi - lo <= 0.12 { let r = (v * 1000.0).round() / 10.0; format!("{}%", if r == 0.0 { 0.0 } else { r }) } else { pct(v) }; // 좁은 범위는 소수 한 자리
     let mut v = (lo / step).ceil() * step;
     while v <= hi + 1e-9 {
         let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{top}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"14\">{}</text>",
-                       x(v), x(v), h - 28.0, if v.abs() < 1e-9 { INK } else { "#e5e7eb" }, x(v), h - 10.0, if v > 0.0 { format!("+{}", pct(v)) } else { pct(v) });
+                       x(v), x(v), h - 28.0, if v.abs() < 1e-9 { INK } else { "#e5e7eb" }, x(v), h - 10.0, if v > 0.0 && signed { format!("+{}", pct(v)) } else { pct(v) });
         v += step;
     }
     for (grp, y, c, name) in [(false, yo, GRAY, names[1]), (true, yh, BLUE, names[0])] {
@@ -475,7 +477,7 @@ pub fn strip(rows: &[(String, f64, bool)], names: [&str; 2], title: &str) -> Str
         }
         if let Some(m) = crate::stats::median(&g) {
             let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{c}\" stroke-width=\"2.5\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\" font-weight=\"600\">median {}{}</text>",
-                           x(m), x(m), y - 14.0, y + 14.0, x(m) + 5.0, y + 28.0, if m > 0.0 { "+" } else { "" }, pct(m));
+                           x(m), x(m), y - 14.0, y + 14.0, x(m) + 5.0, y + 28.0, if m > 0.0 && signed { "+" } else { "" }, fmt(m));
         }
     }
     s.push_str("</svg>");
@@ -803,6 +805,62 @@ pub fn fit(rows: &[(String, f64, f64)], train_end: &str, labels: (&str, &str), t
     let _ = write!(s, "<text x=\"{xe:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">{}</text><text x=\"{xe:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"14\" font-weight=\"600\">{:.0}</text>", ye - 2.0, labels.1, ye + 14.0, l.2);
     let _ = write!(s, "<text x=\"{L}\" y=\"{}\" fill=\"{INK}\" font-size=\"13\">{}</text><text x=\"{:.1}\" y=\"{}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{}</text></svg>", H - 6.0, &rows[0].0[..4], W - R - right, H - 6.0, &l.0[..4]);
     s
+}
+
+/// 해마다 막대(0 위·아래): 해마다 평균 수정치처럼 부호가 뜻을 갖는 값. 아래(음수)는 주황, 위는 회색, 경기침체가 있던 해는 음영,
+/// 가장 낮은 해 marks개에 '연도 값' 이름표(Cleveland & McGill: 같은 축 위치, 강조는 몇 개만).
+pub fn years(rows: &[(i32, f64, bool)], suffix: &str, marks: usize, title: &str) -> String {
+    const ORANGE: &str = "#eb6834";
+    let lo = rows.iter().map(|r| r.1).fold(0.0, f64::min);
+    let hi = rows.iter().map(|r| r.1).fold(0.0, f64::max);
+    let step = [10.0, 20.0, 25.0, 50.0, 100.0].into_iter().find(|st| (hi - lo) / st <= 6.0).unwrap_or(200.0);
+    let (lo, hi) = ((lo / step).floor() * step, (hi / step).ceil() * step);
+    let n = rows.len() as f64;
+    let bw = (W - L - R) / n;
+    let x = |i: usize| L + i as f64 * bw;
+    let y = |v: f64| T + 16.0 + (hi - v) / (hi - lo).max(1e-9) * (H - T - B - 16.0);
+    let mut s = head(title);
+    for (i, r) in rows.iter().enumerate().filter(|(_, r)| r.2) {
+        let _ = write!(s, "<rect x=\"{:.1}\" y=\"{}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"{SHADE}\" opacity=\"0.7\"><title>{} recession</title></rect>", x(i), T + 16.0, bw, H - T - B - 16.0, r.0);
+    }
+    let mut v = lo;
+    while v <= hi + 1e-9 {
+        let _ = write!(s, "<line x1=\"{L}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{}{v}{suffix}</text>",
+                       W - R, y(v), y(v), if v == 0.0 { INK } else { "#eef2f7" }, L - 6.0, y(v) + 4.0, if v > 0.0 { "+" } else { "" });
+        v += step;
+    }
+    for (i, r) in rows.iter().enumerate() {
+        let (top, h) = if r.1 >= 0.0 { (y(r.1), y(0.0) - y(r.1)) } else { (y(0.0), y(r.1) - y(0.0)) };
+        let _ = write!(s, "<rect x=\"{:.1}\" y=\"{top:.1}\" width=\"{:.1}\" height=\"{h:.1}\" fill=\"{}\"><title>{}: {:.0}{suffix}</title></rect>", x(i) + 1.0, (bw - 2.0).max(1.0), if r.1 < 0.0 { ORANGE } else { GRAY }, r.0, r.1);
+    }
+    let mut low: Vec<usize> = (0..rows.len()).filter(|&i| rows[i].1 < 0.0).collect();
+    low.sort_by(|&a, &b| rows[a].1.partial_cmp(&rows[b].1).unwrap());
+    let mut picked: Vec<usize> = low.into_iter().take(marks).collect();
+    picked.sort();
+    let mut prev: Option<(f64, f64)> = None; // 앞 이름표 (x, y): 가까우면 한 줄 아래로
+    for &i in &picked {
+        let r = &rows[i];
+        let mut ly = y(r.1) + 15.0;
+        if let Some((px, py)) = prev { if x(i) - px < 80.0 && (ly - py).abs() < 15.0 { ly = py + 16.0; } }
+        prev = Some((x(i), ly));
+        let anchor = if x(i) > W - 70.0 { "end" } else if x(i) < L + 40.0 { "start" } else { "middle" };
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"{anchor}\" fill=\"{INK}\" font-size=\"13\" font-weight=\"600\">{} {:.0}{suffix}</text>", x(i) + bw / 2.0, ly, r.0, r.1);
+    }
+    let (first, last) = (rows[0].0, rows.last().unwrap().0);
+    let _ = write!(s, "<text x=\"{L}\" y=\"{}\" fill=\"{INK}\" font-size=\"13\">{first}</text><text x=\"{:.1}\" y=\"{}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{last}</text></svg>", H - 6.0, W - R, H - 6.0);
+    s
+}
+
+#[cfg(test)]
+mod years_tests {
+    #[test]
+    fn years_colors_negative_and_marks_lowest() {
+        let rows = vec![(2007, 5.0, false), (2008, -73.0, true), (2009, 12.0, true), (2025, -58.0, false)];
+        let s = super::years(&rows, "K", 2, "t");
+        assert_eq!(s.matches("#eb6834").count(), 2);
+        assert!(s.contains("2008 -73K") && s.contains("2025 -58K"));
+        assert_eq!(s.matches("recession</title>").count(), 2);
+    }
 }
 
 #[cfg(test)]

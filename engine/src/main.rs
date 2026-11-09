@@ -9,6 +9,11 @@
 //!       지금 값이 역사 속 어디쯤인지(순위 비율, 최저·최고와 날짜, 중앙값). --change N: N행 전 대비 변화율로 본다(월간 12 = 1년).
 //!   turning <csv> [--window 8 --censor 6 --min-phase 4 --min-cycle 16 --big 0.20]
 //!       강세·약세장 판정(Pagan & Sossounov 2003). 월말 값으로 고점·저점을 찾고 국면별 변화·기간.
+//!   fit <y.csv> --x <a.csv>,<b.csv> [--change 12,12 --ahead 12 --train-from … --train-to …]  (--ahead: n달 뒤 y를 설명)
+//!   closer <target.csv> --a <csv> --b <csv> [--ahead 12 --change 12 --from … --to …]
+//!       두 예측값 중 n달 뒤 목표에 더 가까웠던 쪽: 평균 오차와 a가 더 가까웠던 달의 비율.
+//!   revisions <first.csv> --final <later.csv> [--flag <usrec.csv> --now 165 --from YYYY-MM-DD]
+//!       첫 발표 대비 나중 추정의 수정치 분포, 해마다 평균, 새 첫 발표의 10~90% 범위. figure years는 해마다 막대.
 //!   sahm <unrate.csv>     Sahm 규칙(실업률 3개월 평균 - 직전 12개월 최저, 0.50%p 신호)과 지난 신호 날짜.
 //!   events <csv> --dates d1,d2,... [--forward 91,182,365]
 //!       사건 뒤 N일 변화와 같은 길이 아무 구간(기저율) 비교.
@@ -50,6 +55,7 @@ mod cycles;
 mod episodes;
 mod events;
 mod fit;
+mod revisions;
 mod forward;
 mod indicators;
 mod lead;
@@ -341,7 +347,18 @@ fn recessions_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, Str
 
 /// fit: 월평균으로 맞춘 y와 x들(달이 모두 있는 달만), 학습 기간 계수, 지금 차이와 학습 기간 안 가장 큰 음·양 차이
 fn fit_rows(path: &str, o: &HashMap<String, String>) -> Result<(Vec<(String, f64, Vec<f64>)>, Vec<f64>, f64, usize), String> {
-    let y = monthly_avg(&load_with(path, o)?);
+    let y = load_with(path, o)?;
+    // --y-change n: y도 n달 전 대비 변화율로(예: 물가 지수 → 1년 물가 상승률)
+    let y = monthly_avg(&match o.get("y-change").and_then(|v| v.parse::<usize>().ok()) { Some(n) if n > 0 => series::change_over(&y, n), _ => y });
+    // --ahead n: 달 d의 x로 달력상 n달 뒤 y를 설명한다(예측력 시험). 행 수로 밀면 빠진 달(2025년 10월 CPI)에서 어긋난다
+    let y: Vec<(String, f64)> = match o.get("ahead").and_then(|v| v.parse::<i32>().ok()) {
+        Some(n) if n > 0 => {
+            let by: HashMap<String, f64> = y.iter().cloned().collect();
+            let later = |d: &str| { let k = d[..4].parse::<i32>().unwrap() * 12 + d[5..7].parse::<i32>().unwrap() - 1 + n; format!("{}-{:02}", k / 12, k % 12 + 1) };
+            y.iter().filter_map(|(d, _)| by.get(&later(d)).map(|v| (d.clone(), *v))).collect()
+        }
+        _ => y,
+    };
     let xs = o.get("x").ok_or("--x <a.csv>,<b.csv> 가 필요")?;
     let lags: Vec<usize> = o.get("change").map(|c| c.split(',').map(|v| v.parse().unwrap_or(0)).collect()).unwrap_or_default();
     let mut cols: Vec<HashMap<String, f64>> = Vec::new();
@@ -374,6 +391,64 @@ fn fit_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
         coef.iter().map(|c| num(Some(*c))).collect::<Vec<_>>().join(","), num(Some(r2)), s(&train[0].0), s(&train.last().unwrap().0),
         s(&l.0), num(Some(l.1)), num(Some(fit::predict(&coef, &l.2))), num(Some(gap(l))), l.2.iter().map(|v| num(Some(*v))).collect::<Vec<_>>().join(","),
         s(&lo.0), num(Some(gap(lo))), s(&hi.0), num(Some(gap(hi))), s(&all_lo.0), num(Some(gap(all_lo))), rows.len()))
+}
+
+/// revisions: 첫 발표(path)와 나중 추정(--final)이 둘 다 있는 달. --from으로 시작 달
+fn revision_rows(path: &str, o: &HashMap<String, String>) -> Result<Vec<(String, f64, f64)>, String> {
+    let last: HashMap<String, f64> = series::load(o.get("final").ok_or("--final <csv> 가 필요")?)?.into_iter().map(|p| (p.date, p.value)).collect();
+    let from = o.get("from").cloned().unwrap_or_default();
+    Ok(series::load(path)?.into_iter().filter(|p| p.date >= from).filter_map(|p| last.get(&p.date).map(|l| (p.date.clone(), p.value, *l))).collect())
+}
+
+/// 경기침체 달이 하나라도 있는 해(--flag, 0/1 월간 계열)
+fn flag_years(o: &HashMap<String, String>) -> Result<std::collections::HashSet<i32>, String> {
+    Ok(match o.get("flag") { Some(f) => series::load(f)?.into_iter().filter(|p| p.value > 0.5).filter_map(|p| p.date[..4].parse().ok()).collect(), None => Default::default() })
+}
+
+fn revisions_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    let rows = revision_rows(path, o)?;
+    let sm = revisions::summarize(&rows).ok_or("두 추정이 다 있는 달이 2개 미만")?;
+    let rec = flag_years(o)?;
+    let years = revisions::by_year(&rows, 10);
+    let avg = |f: &dyn Fn(&(i32, f64, usize)) -> bool| { let v: Vec<f64> = years.iter().filter(|y| f(y)).map(|y| y.1).collect(); num((!v.is_empty()).then(|| v.iter().sum::<f64>() / v.len() as f64)) };
+    let mut worst = years.clone();
+    worst.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    // 끝에서부터 이어진 '평균이 음수인 해' 수
+    let streak = years.iter().rev().take_while(|y| y.1 < 0.0).count();
+    let now = o.get("now").and_then(|v| v.parse::<f64>().ok());
+    let yj = |y: &(i32, f64, usize)| format!("{{\"year\":{},\"mean\":{},\"months\":{},\"recession\":{}}}", y.0, num(Some(y.1)), y.2, rec.contains(&y.0));
+    Ok(format!("{{\"months\":{},\"first\":{},\"last\":{},\"mean\":{},\"mean_abs\":{},\"median_abs\":{},\"p10\":{},\"p90\":{},\"share_down\":{},\"sign_flips\":{},\"recession_year_mean\":{},\"other_year_mean\":{},\"negative_year_streak\":{streak},\"now\":{},\"now_range\":[{},{}],\"worst_years\":[{}],\"years\":[{}]}}",
+        sm.n, s(&rows[0].0), s(&rows.last().unwrap().0), num(Some(sm.mean)), num(Some(sm.mean_abs)), num(Some(sm.median_abs)), num(Some(sm.p10)), num(Some(sm.p90)),
+        num(Some(sm.share_down)), sm.sign_flips, avg(&|y| rec.contains(&y.0)), avg(&|y| !rec.contains(&y.0)), num(now), num(now.map(|v| v + sm.p10)), num(now.map(|v| v + sm.p90)),
+        worst.iter().take(5).map(yj).collect::<Vec<_>>().join(","), years.iter().map(yj).collect::<Vec<_>>().join(",")))
+}
+
+/// closer: 두 예측값(--a, --b) 중 어느 쪽이 n달 뒤 목표(path)에 더 가까웠나. 셋 다 --change n이면 n달 변화율(물가 상승률)
+/// closer 명령과 그림이 함께 쓰는 달: (달, a의 오차, b의 오차)
+fn closer_rows(path: &str, o: &HashMap<String, String>) -> Result<Vec<(String, f64, f64)>, String> {
+    let lag: usize = o.get("change").and_then(|v| v.parse().ok()).unwrap_or(0);
+    let prep = |f: &str| -> Result<HashMap<String, f64>, String> { let p = series::load(f)?; Ok(monthly_avg(&if lag > 0 { series::change_over(&p, lag) } else { p }).into_iter().collect()) };
+    let (t, a, b) = (prep(path)?, prep(o.get("a").ok_or("--a <csv>")?)?, prep(o.get("b").ok_or("--b <csv>")?)?);
+    let ahead: i32 = o.get("ahead").and_then(|v| v.parse().ok()).unwrap_or(12);
+    let (from, to) = (o.get("from").map(|d| d[..7].to_string()).unwrap_or_default(), o.get("to").map(|d| d[..7].to_string()).unwrap_or("9999".into()));
+    let later = |d: &str| { let (y, m): (i32, i32) = (d[..4].parse().unwrap(), d[5..7].parse().unwrap()); let k = y * 12 + m - 1 + ahead; format!("{}-{:02}", k / 12, k % 12 + 1) };
+    // --min-gap x: b가 a보다 x 이상 높은 달만(예: 헤드라인 물가가 근원보다 1%p 이상 높을 때)
+    let gap: f64 = o.get("min-gap").and_then(|v| v.parse().ok()).unwrap_or(f64::MIN);
+    let mut keys: Vec<&String> = a.keys().filter(|d| **d >= from && **d <= to && b.contains_key(*d) && t.contains_key(&later(d)) && b[*d] - a[*d] >= gap).collect();
+    keys.sort();
+    if keys.is_empty() { return Err("겹치는 달이 없음".into()); }
+    Ok(keys.into_iter().map(|d| { let y = t[&later(d)]; (d.clone(), (a[d] - y).abs(), (b[d] - y).abs()) }).collect())
+}
+
+fn closer_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    let rows = closer_rows(path, o)?;
+    let ahead: i32 = o.get("ahead").and_then(|v| v.parse().ok()).unwrap_or(12);
+    let n = rows.len() as f64;
+    let (ea, eb) = (rows.iter().map(|r| r.1).sum::<f64>(), rows.iter().map(|r| r.2).sum::<f64>());
+    let wins = rows.iter().filter(|r| r.1 < r.2).count();
+    let keys: Vec<&String> = rows.iter().map(|r| &r.0).collect();
+    Ok(format!("{{\"months\":{},\"first\":{},\"last\":{},\"ahead\":{ahead},\"mae_a\":{},\"mae_b\":{},\"share_a_closer\":{}}}",
+        keys.len(), s(keys[0]), s(keys.last().unwrap()), num(Some(ea / n)), num(Some(eb / n)), num(Some(wins as f64 / n))))
 }
 
 /// seasonal: 해마다 달별 월평균이 그해 평균보다 몇 % 높았나, 달별 중앙값과 높았던 해의 비율
@@ -564,6 +639,22 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             let lab = o.get("labels").cloned().unwrap_or("Actual,Expected".into());
             let (a, e) = lab.split_once(',').unwrap_or(("Actual", "Expected"));
             viz::fit(&r, o.get("train-to").map(String::as_str).unwrap_or("9999"), (a, e), &title)
+        }
+        "closer" => {
+            // closer 명령과 같은 달: 줄마다 한 예측의 n달 뒤 오차(절댓값) 점, 위 줄 a(파랑), 아래 줄 b(회색), 중앙값 선. --names "a 이름,b 이름"
+            let rows = closer_rows(path, o)?;
+            csv = format!("month,miss_a,miss_b\n{}", rows.iter().map(|r| format!("{},{:.4},{:.4}\n", r.0, r.1, r.2)).collect::<String>());
+            let names: Vec<&str> = o.get("names").map(|v| v.split(',').collect()).unwrap_or(vec!["Forecast A", "Forecast B"]);
+            let pts: Vec<(String, f64, bool)> = rows.iter().flat_map(|r| [(r.0.clone(), r.1, true), (r.0.clone(), r.2, false)]).collect();
+            viz::strip(&pts, [names[0], names.get(1).copied().unwrap_or("Forecast B")], &title)
+        }
+        "years" => {
+            // revisions 명령과 같은 해마다 평균 수정치, 경기침체 해 음영(--flag), 가장 낮은 해 --marks개 이름표
+            let rows = revision_rows(path, o)?;
+            let rec = flag_years(o)?;
+            let ys: Vec<(i32, f64, bool)> = revisions::by_year(&rows, 10).into_iter().map(|(y, m, _)| (y, m, rec.contains(&y))).collect();
+            csv = format!("year,mean_revision,recession\n{}", ys.iter().map(|(y, m, r)| format!("{y},{m:.1},{}\n", *r as u8)).collect::<String>());
+            viz::years(&ys, o.get("suffix").map(String::as_str).unwrap_or(""), o.get("marks").and_then(|v| v.parse().ok()).unwrap_or(3), &title)
         }
         "lead" => {
             // lead 명령과 같은 구간: 줄마다 신호 시작(0)부터 사건 시작까지 막대, 사건이 아직 없으면 파랑 'so far'
@@ -797,7 +888,9 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "passthrough" => "For every rise or fall of the threshold or more in the leading series within the window, the later change in the following series from the day the threshold was crossed, divided by the size of the leading move (pass-through).",
         "cycles" => "Policy-rate cycles: consecutive target-rate changes in the same direction grouped together; a new cycle starts when the direction reverses.",
         "export" => "Month-end values for the reader tool, carried forward over gaps.",
-        "fit" => "Ordinary least squares on monthly averages: the coefficients come from the training months only; every month then gets the value those conditions usually went with (expected) and the actual minus expected (gap). With --change, an input is its percent change from n months earlier.",
+        "closer" => "For every month with both forecasts, the absolute gap between each forecast (--a, --b) and the target n months later (--ahead); reported as the mean gap of each and the share of months forecast a was closer. With --change n, all three are n-month percent changes; --min-gap keeps only months where forecast b exceeded forecast a by at least that much.",
+        "revisions" => "For every month with both estimates, revision = later estimate minus first print. Reported: mean, mean and median absolute revision, 10th-90th percentile, share revised down, months whose sign flipped, the mean of each calendar year with at least ten months, and that range added to a new first print (--now).",
+        "fit" => "Ordinary least squares on monthly averages: the coefficients come from the training months only; every month then gets the value those conditions usually went with (expected) and the actual minus expected (gap). With --change, an input is its percent change from n months earlier; with --ahead n, each month's inputs explain the value n months later; --y-change n turns the explained series into its n-month percent change too.",
         "spells" => "Every stretch of consecutive observations at or above the threshold (or at or below it), with its first and last date, length and most extreme value; the last one may still be under way.",
         "lead" => "Signal episodes: consecutive days at or below the threshold (or at or above it), joined when the gap between them is the gap window or less and no event started in between; days inside an event do not count as signal; lead is the time from an episode's first day to the next start of the event series (a 0-to-1 step, e.g. NBER recession months).",
         "recessions" => "Each run of months flagged 1 in the event series (NBER recession months), with its length; with a second series, its value the month before the start and its highest value from the start to the given months after the end (or to the next recession start, if sooner).",
@@ -827,6 +920,8 @@ fn main() {
         ("sahm", Some(p), _) => sahm_cmd(p).map(|j| with_meta(j, cmd, p, &opt)),
         ("lead", Some(p), _) => lead_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("recessions", Some(p), _) => recessions_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
+        ("closer", Some(p), _) => closer_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
+        ("revisions", Some(p), _) => revisions_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("fit", Some(p), _) => fit_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("spells", Some(p), _) => spells_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("seasonal", Some(p), _) => seasonal_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),

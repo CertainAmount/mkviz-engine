@@ -1,0 +1,1 @@
+{"frame":"years","input":"data/series/bls_ces_first.csv","params":{"final":"data/series/bls_ces_third.csv","flag":"data/series/fred_USREC.csv","marks":"3","suffix":"K","title":"First jobs numbers have been revised down four years in a row"}}
