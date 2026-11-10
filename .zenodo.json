@@ -15,11 +15,5 @@
     "FRED",
     "data visualization"
   ],
-  "related_identifiers": [
-    {
-      "identifier": "https://mkviz.com/mortgage-rates-treasury-gap/",
-      "relation": "isSupplementTo",
-      "resource_type": "publication"
-    }
-  ]
+  "related_identifiers": []
 }

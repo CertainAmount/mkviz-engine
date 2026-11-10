@@ -690,7 +690,7 @@ pub fn spells(pts: &[Point], th: f64, min_days: i64, now: Option<(f64, &str)>, t
         Some((v, lab)) => {
             let xn = x(l.day as f64) + 10.0;
             let _ = write!(s, "<circle cx=\"{xn:.1}\" cy=\"{:.1}\" r=\"5\" fill=\"#fff\" stroke=\"{BLUE}\" stroke-width=\"2.5\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{BLUE}\" font-weight=\"600\" font-size=\"14\">{}</text><title>{lab}</title>", y(v), xn + 7.0, y(v) + 5.0, pct(v));
-            let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"12\">{}</text>", xn + 7.0, y(l.value) + 16.0, pct(l.value));
+            // 마지막 자료 값 글자는 쓰지 않는다: 두 값이 나란히 있으면 독자가 어느 것이 지금인지 묻는다(2026-11-10 콜드 리드 3명)
         }
         None => { let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"{BLUE}\" font-weight=\"600\" font-size=\"14\">{}</text>", x(l.day as f64) + 7.0, y(l.value) + 5.0, pct(l.value)); }
     }
