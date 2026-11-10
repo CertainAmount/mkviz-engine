@@ -1,0 +1,1 @@
+{"frame":"grid","input":"data/series/fred_MSPUS.csv","params":{"changes":"-0.15,-0.1,-0.05,0,0.05","down":"0.09","line":"0.30","now-rate":"7.18","rate-income":"data/series/fred_MEHOINUSA646N.csv","rates":"5.5,6,6.5,7.18","title":"Share of median household income for the monthly payment on a median-priced home with 9% down, by mortgage rate and price"}}

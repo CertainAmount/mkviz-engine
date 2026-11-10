@@ -106,6 +106,14 @@ pub fn afford(price: &[Point], rate: &[Point], income: &[Point], down: f64, year
     }).collect()
 }
 
+/// 다른 계열을 뺀 차이(그날 이전 가장 가까운 값). 예: 30년 모기지 금리 - 10년 국채 금리 = 대출자가 국채 위에 더 내는 몫(%p).
+pub fn minus(pts: &[Point], by: &[Point]) -> Vec<Point> {
+    pts.iter().filter_map(|p| {
+        let b = by.iter().filter(|b| b.day <= p.day).last()?.value;
+        Some(Point { value: p.value - b, ..p.clone() })
+    }).collect()
+}
+
 /// 다른 계열로 나눈 비율(그날 이전 가장 가까운 값). 예: 집값 / 연 소득 = 소득 몇 년 치.
 pub fn per(pts: &[Point], by: &[Point]) -> Vec<Point> {
     pts.iter().filter_map(|p| {
@@ -142,6 +150,15 @@ mod tests {
         let p = parse("date,close\n2020-01-02,10\n2020-01-01,.\n2019-12-31,9,x\n");
         assert_eq!(p.len(), 2);
         assert_eq!(p[0].date, "2019-12-31");
+    }
+
+    #[test]
+    fn minus_uses_latest_prior_value() {
+        // 주별 모기지 금리 - 그날 이전 가장 가까운 국채 금리
+        let m = parse("d,v\n2026-11-05,7.18\n");
+        let t = parse("d,v\n2026-11-04,4.84\n2026-11-06,4.86\n");
+        let d = minus(&m, &t);
+        assert!((d[0].value - 2.34).abs() < 1e-9);
     }
 
     #[test]

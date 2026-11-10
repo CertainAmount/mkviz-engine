@@ -180,6 +180,10 @@ mod tests {
         assert!(u.starts_with("<svg") && u.ends_with("</svg>") && u.contains("-20%") && u.contains("<rect"));
         let q = paths_with(&p, &["2000-01-01".into()], 400, "t", false, &[]);
         assert!(q.contains("polyline") && q.len() < 20_000);
+        let st = stack(&[("Now".into(), 4.84, 2.34)], Some(1.67), ["Treasury", "Gap"], "t");
+        assert!(st.contains("7.18%") && st.contains("6.51% with the usual gap") && st.contains("+2.34"));
+        let g = grid(&[6.0, 7.0], &[-0.1, 0.0], &[vec![0.25, 0.28], vec![0.29, 0.33]], 0.30, Some((1, 1)), "t");
+        assert!(g.contains("Today") && g.contains("-10%") && g.contains("33%") && g.contains("stroke-width=\"2.5\""));
     }
 }
 
@@ -872,4 +876,70 @@ mod fit_tests {
         assert_eq!(s.matches("<polyline").count(), 2);
         assert!(s.contains(">67<") && s.contains(">92<") && s.contains("Expected"));
     }
+}
+
+/// 쌓은 막대: 시점마다 한 줄, 바탕(파랑) + 나머지(주황) = 전체. 예: 모기지 금리 = 10년 국채 금리 + 금리 차.
+/// 두 몫이 같은 0에서 이어져 길이로 비교된다(Cleveland & McGill 1984). typical: 바탕 + 보통 차이 자리에 점선 눈금(그 차이였다면 전체가 어디였나).
+/// rows: (이름, 바탕, 나머지). 값은 %p 단위 그대로 글자로(소수 둘째 자리).
+pub fn stack(rows: &[(String, f64, f64)], typical: Option<f64>, names: [&str; 2], title: &str) -> String {
+    let (rh, top) = (46.0, 40.0);
+    let h = top + rh * rows.len() as f64 + 40.0;
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    let lw = 92.0; // 줄 이름 칸
+    let max = rows.iter().map(|r| r.1 + r.2).fold(0.0, f64::max).max(rows.iter().map(|r| r.1 + typical.unwrap_or(0.0)).fold(0.0, f64::max));
+    let x = |v: f64| lw + v / max * (W - lw - 64.0);
+    let orange = "#eb6834";
+    // 범례(색만으로 뜻을 말하지 않게 글자로)
+    let _ = write!(s, "<rect x=\"{lw}\" y=\"8\" width=\"12\" height=\"12\" rx=\"2\" fill=\"{BLUE}\"/><text x=\"{:.1}\" y=\"19\" fill=\"{INK}\" font-size=\"14\">{}</text>", lw + 17.0, names[0].replace('&', "&amp;"));
+    let lx = lw + 30.0 + names[0].len() as f64 * 7.6;
+    let _ = write!(s, "<rect x=\"{lx:.1}\" y=\"8\" width=\"12\" height=\"12\" rx=\"2\" fill=\"{orange}\"/><text x=\"{:.1}\" y=\"19\" fill=\"{INK}\" font-size=\"14\">{}</text>", lx + 17.0, names[1].replace('&', "&amp;"));
+    for (k, (name, base, gap)) in rows.iter().enumerate() {
+        let y0 = top + k as f64 * rh;
+        let last = k + 1 == rows.len();
+        let _ = write!(s, "<text x=\"0\" y=\"{:.1}\" fill=\"{}\" font-size=\"14\"{}>{}</text>", y0 + 21.0, if last { "#0f172a" } else { INK }, if last { " font-weight=\"700\"" } else { "" }, name.replace('&', "&amp;"));
+        let (xa, xb, xc) = (x(0.0), x(*base), x(base + gap));
+        let _ = write!(s, "<rect x=\"{xa:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"24\" fill=\"{BLUE}\"/>", y0 + 4.0, (xb - xa - 1.0).max(0.0));
+        let _ = write!(s, "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"24\" rx=\"3\" fill=\"{orange}\"/>", xb + 1.0, y0 + 4.0, (xc - xb - 1.0).max(0.0));
+        // 몫 글자: 칸이 넓으면 안에 흰 글자, 좁으면 생략(전체 글자가 남는다)
+        if xb - xa > 44.0 { let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"#fff\" font-size=\"13\">{base:.2}</text>", xa + 6.0, y0 + 21.0); }
+        if xc - xb > 40.0 { let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"#fff\" font-size=\"13\">+{gap:.2}</text>", xb + 6.0, y0 + 21.0); }
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"#0f172a\" font-size=\"15\" font-weight=\"700\">{:.2}%</text>", xc + 6.0, y0 + 21.0, base + gap);
+        if let Some(t) = typical.filter(|_| last) {
+            let xt = x(base + t);
+            let _ = write!(s, "<line x1=\"{xt:.1}\" x2=\"{xt:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#0f172a\" stroke-width=\"2\" stroke-dasharray=\"3 3\"/>", y0 + 1.0, y0 + 33.0);
+            let _ = write!(s, "<text x=\"{xt:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"#0f172a\" font-size=\"13\">{:.2}% with the usual gap</text>", y0 + 50.0, base + t);
+        }
+    }
+    s.push_str("</svg>");
+    s
+}
+
+/// 격자: 줄 = 금리, 칸 = 집값 변화. 칸마다 월 상환액이 월 소득에서 차지하는 몫(%), line을 넘으면 주황, 아래면 파랑(진하기는 line에서 먼 정도).
+/// 지금 칸(now_row, 0% 변화)은 굵은 테두리. 독자가 "무엇이 얼마나 움직여야 하나"를 한 장에서 찾게(세 길: 금리·집값·소득).
+pub fn grid(rates: &[f64], changes: &[f64], cells: &[Vec<f64>], line: f64, now: Option<(usize, usize)>, title: &str) -> String {
+    let (lw, top, cw, ch) = (64.0, 46.0, ((W - 64.0 - 8.0) / changes.len() as f64).min(84.0), 34.0);
+    let h = top + ch * rates.len() as f64 + 34.0;
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    let _ = write!(s, "<text x=\"{lw}\" y=\"16\" fill=\"{INK}\" font-size=\"13\">Home price vs. today →</text><text x=\"0\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Rate</text>", top - 8.0);
+    for (j, c) in changes.iter().enumerate() {
+        let lab = if c.abs() < 1e-9 { "Today".to_string() } else { format!("{}{}", if *c > 0.0 { "+" } else { "" }, pct(*c)) };
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{lab}</text>", lw + cw * (j as f64 + 0.5), top - 8.0);
+    }
+    for (i, r) in rates.iter().enumerate() {
+        let y0 = top + i as f64 * ch;
+        let _ = write!(s, "<text x=\"0\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"14\">{r:.2}%</text>", y0 + 22.0);
+        for (j, v) in cells[i].iter().enumerate() {
+            let x0 = lw + j as f64 * cw;
+            let d = ((v - line).abs() / 0.12).min(1.0);
+            let fill = if *v > line { format!("rgba(235,104,52,{:.2})", 0.15 + 0.6 * d) } else { format!("rgba(37,99,235,{:.2})", 0.12 + 0.55 * d) };
+            let ink = if d > 0.6 { "#fff" } else { "#0f172a" };
+            let _ = write!(s, "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"{fill}\"/>", x0 + 1.0, y0 + 1.0, cw - 2.0, ch - 2.0);
+            let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{ink}\" font-size=\"14\">{}</text>", x0 + cw / 2.0, y0 + 22.0, pct(*v));
+            if now == Some((i, j)) {
+                let _ = write!(s, "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"none\" stroke=\"#0f172a\" stroke-width=\"2.5\"/>", x0 + 1.5, y0 + 1.5, cw - 3.0, ch - 3.0);
+            }
+        }
+    }
+    let _ = write!(s, "<text x=\"{lw}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Orange: payment above {} of income. Blue: below.</text></svg>", h - 10.0, pct(line));
+    s
 }

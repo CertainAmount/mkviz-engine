@@ -1,6 +1,16 @@
-# [Why First-Time Home Buyers Are Scarce: It's the Monthly Payment](https://mkviz.com/first-time-home-buyers/)
+# [First-Time Home Buyers: What Would Make a Home Affordable Again?](https://mkviz.com/first-time-home-buyers/)
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
+
+## home-payment-grid
+
+Data: [home-payment-grid.csv](home-payment-grid.csv) · settings: [home-payment-grid.json](home-payment-grid.json)
+
+![home-payment-grid](home-payment-grid.svg)
+
+```
+./engine/target/release/mkviz-engine figure grid data/series/fred_MSPUS.csv --changes -0.15,-0.1,-0.05,0,0.05 --down 0.09 --line 0.30 --now-rate 7.18 --rate-income data/series/fred_MEHOINUSA646N.csv --rates 5.5,6,6.5,7.18 --title 'Share of median household income for the monthly payment on a median-priced home with 9% down, by mortgage rate and price' --out home-payment-grid.svg
+```
 
 ## home-payment-spells
 

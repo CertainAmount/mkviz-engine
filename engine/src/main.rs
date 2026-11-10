@@ -43,7 +43,11 @@
 //!   fit <y.csv> --x <a.csv>,<b.csv> [--change ,12 --train-from YYYY-MM --train-to YYYY-MM --from YYYY-MM]
 //!       최소제곱 회귀: 학습 기간 달들로 계수를 정하고, 달마다 예상값과 실제와의 차이(잔차). --change: x마다 n달 전 대비 변화율(빈칸은 수준).
 //!   spells <csv> --threshold x [--below]   값이 기준 이상(이하)으로 이어진 구간(시작·끝·길이·극값·진행 중).
-//!   (공통) --per <csv>: 다른 계열로 나눈 비율.
+//!   (공통) --per <csv>: 다른 계열로 나눈 비율. --minus <csv>: 다른 계열을 뺀 차이(모기지 금리 - 10년 국채).
+//!   figure stack <total.csv> --base <csv> --dates d1,d2,… --out <svg> [--labels … --typical 1.7 --names "10-year Treasury,Gap"]
+//!       쌓은 막대: 시점마다 전체(모기지 금리) = 바탕(국채 금리, 파랑) + 나머지(금리 차, 주황). --typical: 바탕 + 보통 차이 자리에 점선 눈금.
+//!   figure grid <price.csv> --rate-income <income.csv> --rates 5,6,7 --changes -0.2,0,0.1 --out <svg> [--line 0.3 --now-rate 7.18 --down 0.2]
+//!       격자: 금리(줄) × 집값 변화(칸)마다 마지막 집값의 월 상환액이 월 소득에서 차지하는 몫. line 넘으면 주황, 아래면 파랑, 지금 칸 테두리.
 //!   (공통) --afford <rate.csv>,<income.csv> [--down 0.2 --years 30]: 집값 계열을 월 상환액 / 월 소득으로 바꾼다.
 //!   export <csv> --out <json> [--from YYYY]
 //!       독자 도구(계산기)용 월간 데이터: {"start":"YYYY-MM","v":[달마다 마지막 값...]}. 빈 달은 직전 값.
@@ -146,6 +150,8 @@ fn load_with(path: &str, o: &HashMap<String, String>) -> Result<Vec<series::Poin
     // --avg n: n개 이동 평균(계절이 큰 월별 계열을 해 단위로 견줄 때)
     // --per <csv>: 다른 계열로 나눈 비율(집값 / 연 소득 = 소득 몇 년 치)
     let pts = match o.get("per") { Some(c) => series::per(&pts, &series::load(c)?), None => pts };
+    // --minus <csv>: 다른 계열을 뺀 차이(모기지 금리 - 10년 국채 = 금리 차, %p)
+    let pts = match o.get("minus") { Some(c) => series::minus(&pts, &series::load(c)?), None => pts };
     // --afford <금리 csv>,<연 소득 csv> [--down 0.2 --years 30]: 집값 -> 월 상환액이 월 소득에서 차지하는 몫(series::afford)
     let pts = match o.get("afford") {
         Some(v) => {
@@ -576,6 +582,38 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             let now = o.get("now").and_then(|v| v.parse().ok()).map(|v: f64| (v, o.get("now-label").map(String::as_str).unwrap_or("Now")));
             if let Some((v, _)) = now { csv.push_str(&format!("now,{v}\n")); }
             viz::spells(&pts, th, md, now, &title)
+        }
+        "stack" => {
+            // 시점마다 전체(이 계열) = 바탕(--base 계열, 그날 이전 가장 가까운 값) + 나머지. --dates 시점들, --labels 줄 이름
+            let base = series::load(o.get("base").ok_or("--base <csv> 가 필요")?)?;
+            let at = |s: &[series::Point], d: i64| s.iter().filter(|p| p.day <= d).last().map(|p| p.value);
+            let dates: Vec<&str> = o.get("dates").ok_or("--dates 가 필요")?.split(',').collect();
+            let labels: Vec<String> = o.get("labels").map(|v| v.split(',').map(String::from).collect()).unwrap_or_default();
+            let rows: Vec<(String, f64, f64)> = dates.iter().enumerate().filter_map(|(k, d)| {
+                let day = series::day_number(d)?;
+                let (t, b) = (at(&pts, day)?, at(&base, day)?);
+                Some((labels.get(k).cloned().unwrap_or(d[..7].to_string()), b, t - b))
+            }).collect();
+            let names: Vec<&str> = o.get("names").map(|v| v.split(',').collect()).unwrap_or(vec!["Base", "Gap"]);
+            csv = format!("row,base,gap,total\n{}", rows.iter().map(|r| format!("{},{:.3},{:.3},{:.3}\n", r.0, r.1, r.2, r.1 + r.2)).collect::<String>());
+            viz::stack(&rows, o.get("typical").and_then(|v| v.parse().ok()), [names[0], names.get(1).copied().unwrap_or("Gap")], &title)
+        }
+        "grid" => {
+            // 마지막 집값(이 계열)에 집값 변화를 곱하고 금리마다 월 상환액 / 마지막 연 소득의 1/12. --now-rate: 지금 금리 줄의 0% 칸에 테두리
+            let inc = series::load(o.get("rate-income").ok_or("--rate-income <소득 csv> 가 필요")?)?.last().ok_or("소득 자료 없음")?.value;
+            let price = pts.last().ok_or("자료 없음")?.value;
+            let fl = |k: &str| -> Result<Vec<f64>, String> { o.get(k).ok_or(format!("--{k} 가 필요"))?.split(',').map(|v| v.parse::<f64>().map_err(|e| e.to_string())).collect() };
+            let (rates, changes) = (fl("rates")?, fl("changes")?);
+            let down = opt_f(o, "down", 0.2);
+            let cells: Vec<Vec<f64>> = rates.iter().map(|r| changes.iter().map(|c| {
+                let loan = price * (1.0 + c) * (1.0 - down);
+                let m = r / 1200.0;
+                loan * m / (1.0 - (1.0 + m).powf(-360.0)) / (inc / 12.0)
+            }).collect()).collect();
+            let now = o.get("now-rate").and_then(|v| v.parse::<f64>().ok()).and_then(|nr| Some((rates.iter().position(|r| (r - nr).abs() < 1e-9)?, changes.iter().position(|c| c.abs() < 1e-9)?)));
+            csv = format!("rate,{}\n{}", changes.iter().map(|c| format!("{c}")).collect::<Vec<_>>().join(","),
+                          rates.iter().zip(&cells).map(|(r, row)| format!("{r},{}\n", row.iter().map(|v| format!("{v:.4}")).collect::<Vec<_>>().join(","))).collect::<String>());
+            viz::grid(&rates, &changes, &cells, opt_f(o, "line", 0.30), now, &title)
         }
         "strip" => {
             // --rows "이름:값:1(강조)|0;…" --names "강조 묶음,나머지" (값은 엔진 position 결과)

@@ -16,6 +16,7 @@
 | [dollar-weaker-2026](https://mkviz.com/dollar-weaker-2026/) | [dollar-underwater](dollar-weaker-2026/dollar-underwater.csv) | underwater | fred_DTWEXBGS.csv, fred_TWEXBMTH.csv |
 | [fed-interest-rates](https://mkviz.com/fed-interest-rates/) | [mortgage-after-first-hike](fed-interest-rates/mortgage-after-first-hike.csv) |  |  |
 | [fed-interest-rates](https://mkviz.com/fed-interest-rates/) | [mortgage-rate-band](fed-interest-rates/mortgage-rate-band.csv) |  |  |
+| [first-time-home-buyers](https://mkviz.com/first-time-home-buyers/) | [home-payment-grid](first-time-home-buyers/home-payment-grid.csv) | grid | fred_MEHOINUSA646N.csv, fred_MSPUS.csv |
 | [first-time-home-buyers](https://mkviz.com/first-time-home-buyers/) | [home-payment-spells](first-time-home-buyers/home-payment-spells.csv) | spells | fred_MEHOINUSA646N.csv, fred_MORTGAGE30US.csv, fred_MSPUS.csv |
 | [first-time-home-buyers](https://mkviz.com/first-time-home-buyers/) | [home-first-time-pictogram](first-time-home-buyers/home-first-time-pictogram.csv) | pictogram |  |
 | [fuel-prices](https://mkviz.com/fuel-prices/) | [gas-calendar](fuel-prices/gas-calendar.csv) | calendar | fred_GASREGW.csv |
@@ -26,6 +27,7 @@
 | [jobs-report-revisions](https://mkviz.com/jobs-report-revisions/) | [jobs-revisions-years](jobs-report-revisions/jobs-revisions-years.csv) | years | bls_ces_first.csv, bls_ces_third.csv, fred_USREC.csv |
 | [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [nasdaq-after-midterms](stocks-after-midterm-elections/nasdaq-after-midterms.csv) | fan | fred_NASDAQCOM.csv |
 | [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [midterm-cases](stocks-after-midterm-elections/midterm-cases.csv) | cases |  |
+| [mortgage-rates-treasury-gap](https://mkviz.com/mortgage-rates-treasury-gap/) | [mortgage-rate-stack](mortgage-rates-treasury-gap/mortgage-rate-stack.csv) | stack | fred_DGS10.csv, fred_MORTGAGE30US.csv |
 | [nasdaq-correction-history](https://mkviz.com/nasdaq-correction-history/) | [nasdaq-drops-dots](nasdaq-correction-history/nasdaq-drops-dots.csv) |  |  |
 | [recession-watch](https://mkviz.com/recession-watch/) | [rw-board](recession-watch/rw-board.csv) | board | fred_UNRATE.csv |
 | [recession-watch](https://mkviz.com/recession-watch/) | [rw-claims](recession-watch/rw-claims.csv) | lead | fred_ICSA.csv, fred_USREC.csv |
