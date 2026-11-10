@@ -46,6 +46,8 @@
 //!   (공통) --per <csv>: 다른 계열로 나눈 비율. --minus <csv>: 다른 계열을 뺀 차이(모기지 금리 - 10년 국채).
 //!   figure stack <total.csv> --base <csv> --dates d1,d2,… --out <svg> [--labels … --typical 1.7 --names "10-year Treasury,Gap"]
 //!       쌓은 막대: 시점마다 전체(모기지 금리) = 바탕(국채 금리, 파랑) + 나머지(금리 차, 주황). --typical: 바탕 + 보통 차이 자리에 점선 눈금.
+//!   figure savings <rate.csv> --loan L --marks "이름:하락폭,..." --out <svg> [--drop 1.5 --years 30]
+//!       절약 곡선: 금리가 내릴수록 같은 대출의 월 상환액이 얼마나 주나, 이름 붙은 하락폭에 점.
 //!   figure grid <price.csv> --rate-income <income.csv> --rates 5,6,7 --changes -0.2,0,0.1 --out <svg> [--line 0.3 --now-rate 7.18 --down 0.2]
 //!       격자: 금리(줄) × 집값 변화(칸)마다 마지막 집값의 월 상환액이 월 소득에서 차지하는 몫. line 넘으면 주황, 아래면 파랑, 지금 칸 테두리.
 //!   (공통) --afford <rate.csv>,<income.csv> [--down 0.2 --years 30]: 집값 계열을 월 상환액 / 월 소득으로 바꾼다.
@@ -614,6 +616,21 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             csv = format!("rate,{}\n{}", changes.iter().map(|c| format!("{c}")).collect::<Vec<_>>().join(","),
                           rates.iter().zip(&cells).map(|(r, row)| format!("{r},{}\n", row.iter().map(|v| format!("{v:.4}")).collect::<Vec<_>>().join(","))).collect::<String>());
             viz::grid(&rates, &changes, &cells, opt_f(o, "line", 0.30), now, &title)
+        }
+        "savings" => {
+            // 같은 대출에서 금리가 내릴 때 월 절약액: --loan 314640 [--years 30 --drop 1.5] --marks "이름:하락폭,..." 지금 금리는 이 계열의 마지막 값
+            let now = pts.last().ok_or("자료 없음")?.value;
+            let loan = opt_f(o, "loan", 0.0);
+            if loan <= 0.0 { return Err("--loan 이 필요".into()); }
+            let years = opt_f(o, "years", 30.0);
+            let base = monthly_payment(loan, now, years);
+            let drop = opt_f(o, "drop", 1.5);
+            let curve: Vec<(f64, f64)> = (0..=60).map(|k| { let d = drop * k as f64 / 60.0; (d, base - monthly_payment(loan, now - d, years)) }).collect();
+            let marks: Vec<(String, f64, f64)> = o.get("marks").map(|m| m.split(',').filter_map(|x| {
+                let (n, d) = x.rsplit_once(':')?; let d: f64 = d.parse().ok()?; Some((n.to_string(), d, base - monthly_payment(loan, now - d, years)))
+            }).collect()).unwrap_or_default();
+            csv = format!("label,drop_points,new_rate,monthly_saving\n{}", marks.iter().map(|(n, d, sv)| format!("{n},{d},{:.2},{sv:.2}\n", now - d)).collect::<String>());
+            viz::savings(&curve, &marks, now, &title)
         }
         "strip" => {
             // --rows "이름:값:1(강조)|0;…" --names "강조 묶음,나머지" (값은 엔진 position 결과)

@@ -183,6 +183,8 @@ mod tests {
         let st = stack(&[("Now".into(), 4.84, 2.34)], Some(1.67), ["Treasury", "Gap"], "t");
         assert!(st.contains("7.18%") && st.contains("6.51% with the usual gap") && st.contains("+2.34"));
         let g = grid(&[6.0, 7.0], &[-0.1, 0.0], &[vec![0.25, 0.28], vec![0.29, 0.33]], 0.30, Some((1, 1)), "t");
+        let sv = savings(&[(0.0, 0.0), (1.0, 208.0)], &[("Usual gap".into(), 0.67, 140.0)], 7.18, "t");
+        assert!(sv.contains("$140 a month") && sv.contains("Usual gap") && sv.contains("7.18%"));
         assert!(g.contains("Today") && g.contains("-10%") && g.contains("33%") && g.contains("stroke-width=\"2.5\""));
     }
 }
@@ -941,5 +943,44 @@ pub fn grid(rates: &[f64], changes: &[f64], cells: &[Vec<f64>], line: f64, now: 
         }
     }
     let _ = write!(s, "<text x=\"{lw}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Orange: payment above {} of income. Blue: below.</text></svg>", h - 10.0, pct(line));
+    s
+}
+
+/// 절약 곡선: 가로 = 금리가 얼마나 내리나(%p), 세로 = 같은 대출의 월 상환액이 얼마나 줄어드나($).
+/// 선 위에 이름 붙은 점(예: 차이가 보통으로, 0.5%p, 1%p)을 찍어 "어느 쪽이 더 크나"를 위치로 견준다(Cleveland & McGill 1984).
+/// 첫 점(마크의 첫 번째)은 파랑으로 강조. pts: (하락 %p, 월 절약 $), marks: (이름, 하락 %p, 월 절약 $)
+pub fn savings(pts: &[(f64, f64)], marks: &[(String, f64, f64)], now_rate: f64, title: &str) -> String {
+    let (x0, x1) = (0.0, pts.last().map_or(1.0, |p| p.0));
+    let ymax = pts.iter().map(|p| p.1).fold(0.0, f64::max);
+    let step = if ymax > 300.0 { 100.0 } else { 50.0 };
+    let ytop = (ymax / step).ceil() * step;
+    let (l, r, t, b) = (54.0, 20.0, 18.0, 46.0);
+    let x = |v: f64| l + (v - x0) / (x1 - x0) * (W - l - r);
+    let y = |v: f64| t + (ytop - v) / ytop * (H - t - b);
+    let mut s = head(title);
+    let mut v = 0.0;
+    while v <= ytop + 1e-9 {
+        let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#eef2f7\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">${}</text>", W - r, y(v), y(v), l - 6.0, y(v) + 4.0, v);
+        v += step;
+    }
+    // 가로 눈금: 하락폭과 그때의 금리
+    let mut d = 0.0;
+    while d <= x1 + 1e-9 {
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{:.2}%</text>", x(d), H - b + 18.0, now_rate - d);
+        d += 0.5;
+    }
+    let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">Mortgage rate (now {now_rate:.2}%) →</text>", (l + W - r) / 2.0, H - 6.0);
+    let line: Vec<String> = pts.iter().map(|p| format!("{:.1},{:.1}", x(p.0), y(p.1))).collect();
+    let _ = write!(s, "<polyline points=\"{}\" fill=\"none\" stroke=\"{GRAY}\" stroke-width=\"2\"/>", line.join(" "));
+    for (k, (name, dx, sv)) in marks.iter().enumerate() {
+        let (cx, cy) = (x(*dx), y(*sv));
+        let c = if k == 0 { BLUE } else { INK };
+        let _ = write!(s, "<circle cx=\"{cx:.1}\" cy=\"{cy:.1}\" r=\"6\" fill=\"{c}\"/>");
+        // 강조 점은 선 위 왼쪽, 나머지는 선 아래 오른쪽: 점들이 가까워도 글자가 겹치지 않게(2026-11-10 휴대폰 확인)
+        let (anchor, tx, ty) = if k == 0 { ("end", cx - 12.0, cy - 30.0) } else { ("start", cx + 12.0, cy + 22.0) };
+        let _ = write!(s, "<text x=\"{tx:.1}\" y=\"{ty:.1}\" text-anchor=\"{anchor}\" fill=\"{c}\" font-size=\"15\" font-weight=\"700\">${:.0} a month</text><text x=\"{tx:.1}\" y=\"{:.1}\" text-anchor=\"{anchor}\" fill=\"{c}\" font-size=\"13\">{}</text>",
+                       sv, ty + 16.0, name.replace('&', "&amp;"));
+    }
+    s.push_str("</svg>");
     s
 }
