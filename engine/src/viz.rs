@@ -457,9 +457,11 @@ pub fn multiples(cases: &[(String, Vec<(f64, f64)>)], days: f64, title: &str) ->
 
 /// 띠 점 그림(strip plot): 모든 사례를 한 축 위의 점으로, 강조 묶음은 파랑(이름표), 나머지는 회색. 묶음마다 중앙값 세로선.
 /// "이 묶음이 나머지보다 높은가"를 개별 점과 함께 보여 준다(평균 막대 두 개보다 분포가 보인다, Weissgerber 외 2015).
-pub fn strip(rows: &[(String, f64, bool)], names: [&str; 2], title: &str) -> String {
+pub fn strip(rows: &[(String, f64, bool)], names: [&str; 2], axis: Option<&str>, title: &str) -> String {
     let (top, left, rr) = (26.0, 16.0, R + 8.0);
-    let h = 200.0;
+    // 가로축 이름(선택): 점이 무엇을 재는지 그림만 보고 알게(2026-11-11 콜드 리드 두 독자: '0%~10%가 무엇인지 모르겠다')
+    let h = if axis.is_some() { 222.0 } else { 200.0 };
+    let tick_y = 190.0;
     let vals: Vec<f64> = rows.iter().map(|r| r.1).collect();
     let lo = (vals.iter().cloned().fold(0.0, f64::min) * 20.0).floor() / 20.0;
     let hi = (vals.iter().cloned().fold(0.0, f64::max) * 20.0).ceil() / 20.0;
@@ -472,7 +474,7 @@ pub fn strip(rows: &[(String, f64, bool)], names: [&str; 2], title: &str) -> Str
     let mut v = (lo / step).ceil() * step;
     while v <= hi + 1e-9 {
         let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{top}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"14\">{}</text>",
-                       x(v), x(v), h - 28.0, if v.abs() < 1e-9 { INK } else { "#e5e7eb" }, x(v), h - 10.0, if v > 0.0 && signed { format!("+{}", pct(v)) } else { pct(v) });
+                       x(v), x(v), tick_y - 18.0, if v.abs() < 1e-9 { INK } else { "#e5e7eb" }, x(v), tick_y, if v > 0.0 && signed { format!("+{}", pct(v)) } else { pct(v) });
         v += step;
     }
     for (grp, y, c, name) in [(false, yo, GRAY, names[1]), (true, yh, BLUE, names[0])] {
@@ -486,6 +488,9 @@ pub fn strip(rows: &[(String, f64, bool)], names: [&str; 2], title: &str) -> Str
                            x(m), x(m), y - 14.0, y + 14.0, x(m) + 5.0, y + 28.0, if m > 0.0 && signed { "+" } else { "" }, fmt(m));
         }
     }
+    if let Some(a) = axis {
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"14\">{}</text>", (left + W - rr) / 2.0, h - 6.0, a.replace('&', "&amp;"));
+    }
     s.push_str("</svg>");
     s
 }
@@ -497,7 +502,7 @@ mod strip_test {
     #[test]
     fn groups_and_medians() {
         let r = vec![("VA".into(), 0.12, true), ("PA".into(), 0.12, true), ("TX".into(), 0.03, false), ("CA".into(), -0.04, false)];
-        let svg = strip(&r, ["PJM", "Other"], "t");
+        let svg = strip(&r, ["PJM", "Other"], None, "t");
         assert_eq!(svg.matches("<circle").count(), 4);
         assert!(svg.contains("median +12%") && svg.contains("PJM"));
     }
@@ -980,6 +985,53 @@ pub fn savings(pts: &[(f64, f64)], marks: &[(String, f64, f64)], now_rate: f64, 
         let (anchor, tx, ty) = if k == 0 { ("end", cx - 12.0, cy - 30.0) } else { ("start", cx + 12.0, cy + 22.0) };
         let _ = write!(s, "<text x=\"{tx:.1}\" y=\"{ty:.1}\" text-anchor=\"{anchor}\" fill=\"{c}\" font-size=\"15\" font-weight=\"700\">${:.0} a month</text><text x=\"{tx:.1}\" y=\"{:.1}\" text-anchor=\"{anchor}\" fill=\"{c}\" font-size=\"13\">{}</text>",
                        sv, ty + 16.0, name.replace('&', "&amp;"));
+    }
+    s.push_str("</svg>");
+    s
+}
+
+/// 옮겨 가는 점(shift): 줄마다 처음 값(빈 점) → 고친 값(채운 점), 뒤에 과거 오차로 본 범위(옅은 띠), 기준선 하나(점선).
+/// 두 추정이 고치면 한곳으로 모이는지(또는 갈라지는지)를 한 축 위에서 본다. rows: (이름, 처음, 고친 값, 범위 아래, 위), 단위 %
+pub fn shift(rows: &[(String, f64, f64, f64, f64)], refv: f64, ref_label: &str, show_range: bool, title: &str) -> String {
+    // 범위 띠는 선택(--range): 두 회차 독자 넷이 띠를 '못 믿을 값'으로 읽었다(2026-11-11)
+    let lo = rows.iter().map(|r| if show_range { r.3.min(r.1) } else { r.1.min(r.2) }).fold(refv, f64::min);
+    let hi = rows.iter().map(|r| if show_range { r.4.max(r.1) } else { r.1.max(r.2) }).fold(refv, f64::max);
+    let (x0, x1) = ((lo * 2.0).floor() / 2.0, (hi * 2.0).ceil() / 2.0);
+    let (l, r) = (20.0, 20.0);
+    let x = |v: f64| l + (v - x0) / (x1 - x0).max(1e-9) * (W - l - r);
+    let top = 62.0;
+    let gap = (H - top - 40.0) / rows.len().max(1) as f64;
+    // 기준 점선이 글자를 가로지르지 않게 글자 뒤에 흰 테두리(2026-11-11 휴대폰 확인)
+    const HALO: &str = "stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\"";
+    let mut s = head(title);
+    let _ = write!(s, "<defs><marker id=\"shift-arrow\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" markerWidth=\"6\" markerHeight=\"6\" orient=\"auto\"><path d=\"M0,0L10,5L0,10z\" fill=\"{BLUE}\"/></marker></defs>");
+    // 범례: 빈 점·화살표·채운 점·띠가 무엇인지 그림 안에서(2026-11-11 콜드 리드 두 독자: 범례가 없어 기호를 추측했다)
+    let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"14\" r=\"5\" fill=\"#fff\" stroke=\"{GRAY}\" stroke-width=\"2\"/><text x=\"{:.1}\" y=\"19\" fill=\"{INK}\" font-size=\"14\">first fill</text><circle cx=\"{:.1}\" cy=\"14\" r=\"6\" fill=\"{BLUE}\"/><text x=\"{:.1}\" y=\"19\" fill=\"{INK}\" font-size=\"14\">after its usual miss</text>",
+                   l + 6.0, l + 16.0, l + 98.0, l + 109.0);
+    if show_range {
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"14\" y2=\"14\" stroke=\"{SHADE}\" stroke-width=\"10\" stroke-linecap=\"round\"/><text x=\"{:.1}\" y=\"19\" fill=\"{INK}\" font-size=\"14\">past misses</text>", l + 280.0, l + 300.0, l + 310.0);
+    }
+    let mut v = x0;
+    while v <= x1 + 1e-9 {
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{top}\" y2=\"{:.1}\" stroke=\"#eef2f7\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{v:.1}%</text>", x(v), x(v), H - 34.0, x(v), H - 16.0);
+        v += 0.5;
+    }
+    let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{INK}\" stroke-dasharray=\"4 4\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{} {refv:.2}%</text>",
+                   x(refv), x(refv), top - 8.0, H - 34.0, x(refv), top - 12.0, ref_label.replace('&', "&amp;"));
+    // 값 글자는 기준선 한쪽에만: 기준선보다 크면 오른쪽으로, 작으면 왼쪽으로 펼친다(가운데 정렬은 선을 가로질렀다, 2026-11-11 휴대폰 확인)
+    let side = |v: f64, at: f64| if v >= refv { ("start", (at - 6.0).max(x(refv) + 5.0)) } else { ("end", (at + 6.0).min(x(refv) - 5.0)) };
+    for (i, (name, raw, fixed, rlo, rhi)) in rows.iter().enumerate() {
+        let y = top + gap * (i as f64 + 0.62);
+        let _ = write!(s, "<text x=\"{l}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"14\" font-weight=\"600\" {HALO}>{}</text>", y - 30.0, name.replace('&', "&amp;"));
+        if show_range { let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{y:.1}\" y2=\"{y:.1}\" stroke=\"{SHADE}\" stroke-width=\"10\" stroke-linecap=\"round\"><title>past range {rlo:.2}% to {rhi:.2}%</title></line>", x(*rlo), x(*rhi)); }
+        let dir = if fixed >= raw { 1.0 } else { -1.0 };
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{y:.1}\" y2=\"{y:.1}\" stroke=\"{BLUE}\" stroke-width=\"2\" marker-end=\"url(#shift-arrow)\"/>", x(*raw) + dir * 7.0, x(*fixed) - dir * 8.0);
+        let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{y:.1}\" r=\"6\" fill=\"#fff\" stroke=\"{GRAY}\" stroke-width=\"2\"><title>as filled {raw:.2}%</title></circle>", x(*raw));
+        let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{y:.1}\" r=\"7\" fill=\"{BLUE}\"><title>corrected {fixed:.2}%</title></circle>", x(*fixed));
+        // 고친 값은 점 위, 처음 값은 점 아래: 0.1%p(약 20px) 떨어져도 글자가 겹치지 않게
+        let ((fa, fx), (ra, rx)) = (side(*fixed, x(*fixed)), side(*raw, x(*raw)));
+        let _ = write!(s, "<text x=\"{fx:.1}\" y=\"{:.1}\" text-anchor=\"{fa}\" fill=\"{BLUE}\" font-size=\"15\" font-weight=\"700\" {HALO}>{fixed:.1}%</text><text x=\"{rx:.1}\" y=\"{:.1}\" text-anchor=\"{ra}\" fill=\"{INK}\" font-size=\"14\" {HALO}>{raw:.2}% first fill</text>",
+                       y - 13.0, y + 24.0);
     }
     s.push_str("</svg>");
     s

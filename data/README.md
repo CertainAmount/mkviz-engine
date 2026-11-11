@@ -30,6 +30,7 @@
 | [mortgage-rates-treasury-gap](https://mkviz.com/mortgage-rates-treasury-gap/) | [mortgage-rate-stack](mortgage-rates-treasury-gap/mortgage-rate-stack.csv) | stack | fred_DGS10.csv, fred_MORTGAGE30US.csv |
 | [mortgage-rates-treasury-gap](https://mkviz.com/mortgage-rates-treasury-gap/) | [mortgage-gap-savings](mortgage-rates-treasury-gap/mortgage-gap-savings.csv) | savings | fred_MORTGAGE30US.csv |
 | [nasdaq-correction-history](https://mkviz.com/nasdaq-correction-history/) | [nasdaq-drops-dots](nasdaq-correction-history/nasdaq-drops-dots.csv) |  |  |
+| [october-inflation-rate](https://mkviz.com/october-inflation-rate/) | [october-inflation-shift](october-inflation-rate/october-inflation-shift.csv) | shift | bls_CUUR0000SA0.csv |
 | [recession-watch](https://mkviz.com/recession-watch/) | [rw-board](recession-watch/rw-board.csv) | board | fred_UNRATE.csv |
 | [recession-watch](https://mkviz.com/recession-watch/) | [rw-claims](recession-watch/rw-claims.csv) | lead | fred_ICSA.csv, fred_USREC.csv |
 | [yield-curve-inversion](https://mkviz.com/yield-curve-inversion/) | [yc-lead](yield-curve-inversion/yc-lead.csv) | lead | fred_T10Y2Y.csv, fred_USREC.csv |

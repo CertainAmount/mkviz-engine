@@ -61,6 +61,8 @@ mod cycles;
 mod episodes;
 mod events;
 mod fit;
+mod gapfill;
+mod pace;
 mod revisions;
 mod forward;
 mod indicators;
@@ -431,6 +433,56 @@ fn revisions_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, Stri
         worst.iter().take(5).map(yj).collect::<Vec<_>>().join(","), years.iter().map(yj).collect::<Vec<_>>().join(",")))
 }
 
+/// gapfill: 빠진 달(--missing YYYY-MM)을 앞뒤 달 기하평균으로 메운 n달 변화율(그 달에서 --change달 뒤까지)과,
+/// 같은 방법을 과거 모든 달에 해 본 오차(전체·같은 달만). 같은 달 오차의 평균을 빼면 치우침을 걷은 값, 최소·최대로 범위
+fn gapfill_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    let m: gapfill::Months = series::load(path)?.iter().filter_map(|p| Some((gapfill::key(&p.date)?, p.value))).collect();
+    let miss = gapfill::key(o.get("missing").ok_or("--missing YYYY-MM")?).ok_or("--missing YYYY-MM")?;
+    let lag: i64 = o.get("change").and_then(|v| v.parse().ok()).unwrap_or(12);
+    let from = o.get("from").and_then(|d| gapfill::key(d)).unwrap_or(0);
+    let later = *m.get(&(miss + lag)).ok_or("변화율 끝 달 값이 없음")?;
+    let prev = m.get(&(miss - 1 + lag)).and_then(|v| Some(v / m.get(&(miss - 1))? - 1.0));
+    let q = |v: &[f64], p: f64| v[((v.len() - 1) as f64 * p).round() as usize];
+    let mut parts = vec![];
+    // geomean: 앞뒤 달 기하평균(BLS), trend: 직전 12달 상승률의 한 달 몫(재무부 TIPS 규칙)
+    for (name, f) in [("geomean", gapfill::fill as fn(&gapfill::Months, i64) -> Option<f64>), ("trend", gapfill::trend)] {
+        let Some(filled) = f(&m, miss) else { continue };
+        let est = later / filled - 1.0;
+        let all = gapfill::backtest(&m, lag, from, miss - 1, f);
+        let same: Vec<(i64, f64)> = all.iter().copied().filter(|(k, _)| k.rem_euclid(12) == miss.rem_euclid(12)).collect();
+        if same.is_empty() { continue; }
+        let mut abs: Vec<f64> = same.iter().map(|r| r.1.abs()).collect();
+        abs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let mean = same.iter().map(|r| r.1).sum::<f64>() / same.len() as f64;
+        let lo = same.iter().map(|r| r.1).fold(f64::MAX, f64::min);
+        let hi = same.iter().map(|r| r.1).fold(f64::MIN, f64::max);
+        let above = same.iter().filter(|r| r.1 > 0.0).count() as f64 / same.len() as f64;
+        let rows = same.iter().map(|(k, e)| format!("{{\"month\":{},\"error\":{}}}", s(&gapfill::label(*k)), num(Some(*e)))).collect::<Vec<_>>().join(",");
+        parts.push(format!("{}:{{\"filled\":{},\"estimate\":{},\"n\":{},\"mean_error\":{},\"median_abs_error\":{},\"min_error\":{},\"max_error\":{},\"share_above\":{},\"adjusted\":{},\"range\":[{},{}],\"rows\":[{rows}]}}",
+            s(name), num(Some(filled)), num(Some(est)), same.len(), num(Some(mean)), num(Some(q(&abs, 0.5))), num(Some(lo)), num(Some(hi)), num(Some(above)),
+            num(Some(est - mean)), num(Some(est - hi)), num(Some(est - lo))));
+    }
+    if parts.is_empty() { return Err("메울 값이나 시험할 달이 없음".into()); }
+    Ok(format!("{{\"missing\":{},\"end\":{},\"prev_change\":{},{}}}", s(&gapfill::label(miss)), s(&gapfill::label(miss + lag)), num(prev), parts.join(",")))
+}
+
+/// accel: 최근 --short달 속도(연율)가 1년 변화율보다 --gap 이상 빠른 달마다 --ahead달 뒤 1년 변화율이 더 높았나. 마지막 달의 두 값도
+fn accel_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    let m: gapfill::Months = series::load(path)?.iter().filter_map(|p| Some((gapfill::key(&p.date)?, p.value))).collect();
+    let short: i64 = o.get("short").and_then(|v| v.parse().ok()).unwrap_or(3);
+    let ahead: i64 = o.get("ahead").and_then(|v| v.parse().ok()).unwrap_or(12);
+    let gap = opt_f(o, "gap", 0.01);
+    let rows = pace::after_accel(&m, short, gap, ahead, o.get("from").map(String::as_str).unwrap_or("0000-01"));
+    if rows.is_empty() { return Err("가속한 달이 없음".into()); }
+    let mut ch: Vec<f64> = rows.iter().map(|r| r.2 - r.1).collect();
+    ch.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let higher = rows.iter().filter(|r| r.2 > r.1).count();
+    let now = pace::rates(&m, short).into_iter().last().ok_or("자료 없음")?;
+    let list = rows.iter().map(|r| format!("{{\"month\":{},\"yoy\":{},\"yoy_later\":{}}}", s(&gapfill::label(r.0)), num(Some(r.1)), num(Some(r.2)))).collect::<Vec<_>>().join(",");
+    Ok(format!("{{\"months\":{},\"higher_later\":{higher},\"share_higher\":{},\"median_change\":{},\"now\":{{\"month\":{},\"pace\":{},\"yoy\":{}}},\"rows\":[{list}]}}",
+        rows.len(), num(Some(higher as f64 / rows.len() as f64)), num(Some(ch[ch.len() / 2])), s(&gapfill::label(now.0)), num(Some(now.1)), num(Some(now.2))))
+}
+
 /// closer: 두 예측값(--a, --b) 중 어느 쪽이 n달 뒤 목표(path)에 더 가까웠나. 셋 다 --change n이면 n달 변화율(물가 상승률)
 /// closer 명령과 그림이 함께 쓰는 달: (달, a의 오차, b의 오차)
 fn closer_rows(path: &str, o: &HashMap<String, String>) -> Result<Vec<(String, f64, f64)>, String> {
@@ -617,6 +669,28 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
                           rates.iter().zip(&cells).map(|(r, row)| format!("{r},{}\n", row.iter().map(|v| format!("{v:.4}")).collect::<Vec<_>>().join(","))).collect::<String>());
             viz::grid(&rates, &changes, &cells, opt_f(o, "line", 0.30), now, &title)
         }
+        "shift" => {
+            // 빠진 달 메우기 두 방법(gapfill)의 처음 값 → 같은 달 과거 오차의 평균을 걷은 값, 범위, 기준선은 직전 달 변화율: --missing YYYY-MM [--change 12 --from ... --names "이름,이름" --ref-label "Sept."]
+            let m: gapfill::Months = pts.iter().filter_map(|p| Some((gapfill::key(&p.date)?, p.value))).collect();
+            let miss = gapfill::key(o.get("missing").ok_or("--missing YYYY-MM")?).ok_or("--missing YYYY-MM")?;
+            let lag: i64 = o.get("change").and_then(|v| v.parse().ok()).unwrap_or(12);
+            let from = o.get("from").and_then(|d| gapfill::key(d)).unwrap_or(0);
+            let later = *m.get(&(miss + lag)).ok_or("변화율 끝 달 값이 없음")?;
+            let refv = 100.0 * (m.get(&(miss - 1 + lag)).ok_or("직전 달 값이 없음")? / m.get(&(miss - 1)).ok_or("직전 달 값이 없음")? - 1.0);
+            let names: Vec<String> = o.get("names").map(|n| n.split(',').map(str::to_string).collect()).unwrap_or_else(|| vec!["Average of the months around it".into(), "Prior 12-month trend".into()]);
+            let mut rows = vec![];
+            for (i, f) in [gapfill::fill as fn(&gapfill::Months, i64) -> Option<f64>, gapfill::trend].into_iter().enumerate() {
+                let filled = f(&m, miss).ok_or("메울 값이 없음")?;
+                let est = 100.0 * (later / filled - 1.0);
+                let errs: Vec<f64> = gapfill::backtest(&m, lag, from, miss - 1, f).into_iter().filter(|(k, _)| k.rem_euclid(12) == miss.rem_euclid(12)).map(|r| 100.0 * r.1).collect();
+                if errs.is_empty() { return Err("시험할 달이 없음".into()); }
+                let mean = errs.iter().sum::<f64>() / errs.len() as f64;
+                let (elo, ehi) = (errs.iter().copied().fold(f64::MAX, f64::min), errs.iter().copied().fold(f64::MIN, f64::max));
+                rows.push((names.get(i).cloned().unwrap_or_default(), est, est - mean, est - ehi, est - elo));
+            }
+            csv = format!("method,as_filled,corrected,range_low,range_high\n{}", rows.iter().map(|r| format!("{},{:.4},{:.4},{:.4},{:.4}\n", r.0, r.1, r.2, r.3, r.4)).collect::<String>());
+            viz::shift(&rows, refv, o.get("ref-label").map(String::as_str).unwrap_or("Month before"), o.contains_key("range"), &title)
+        }
         "savings" => {
             // 같은 대출에서 금리가 내릴 때 월 절약액: --loan 314640 [--years 30 --drop 1.5] --marks "이름:하락폭,..." 지금 금리는 이 계열의 마지막 값
             let now = pts.last().ok_or("자료 없음")?.value;
@@ -640,7 +714,7 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             }).collect();
             let names: Vec<&str> = o.get("names").map(|v| v.split(',').collect()).unwrap_or(vec!["Group", "Others"]);
             csv = format!("name,value,highlight\n{}", rows.iter().map(|r| format!("{},{},{}\n", r.0, r.1, r.2 as u8)).collect::<String>());
-            viz::strip(&rows, [names[0], names.get(1).copied().unwrap_or("Others")], &title)
+            viz::strip(&rows, [names[0], names.get(1).copied().unwrap_or("Others")], o.get("axis").map(String::as_str), &title)
         }
         "multiples" => {
             // --dates 고점 날짜들(또는 --threshold로 하락 사례 자동), --days 고점 뒤 기간. 마지막(진행 중) 사례가 '지금'
@@ -701,7 +775,7 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             csv = format!("month,miss_a,miss_b\n{}", rows.iter().map(|r| format!("{},{:.4},{:.4}\n", r.0, r.1, r.2)).collect::<String>());
             let names: Vec<&str> = o.get("names").map(|v| v.split(',').collect()).unwrap_or(vec!["Forecast A", "Forecast B"]);
             let pts: Vec<(String, f64, bool)> = rows.iter().flat_map(|r| [(r.0.clone(), r.1, true), (r.0.clone(), r.2, false)]).collect();
-            viz::strip(&pts, [names[0], names.get(1).copied().unwrap_or("Forecast B")], &title)
+            viz::strip(&pts, [names[0], names.get(1).copied().unwrap_or("Forecast B")], o.get("axis").map(String::as_str), &title)
         }
         "years" => {
             // revisions 명령과 같은 해마다 평균 수정치, 경기침체 해 음영(--flag), 가장 낮은 해 --marks개 이름표
@@ -949,6 +1023,8 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "spells" => "Every stretch of consecutive observations at or above the threshold (or at or below it), with its first and last date, length and most extreme value; the last one may still be under way.",
         "lead" => "Signal episodes: consecutive days at or below the threshold (or at or above it), joined when the gap between them is the gap window or less and no event started in between; days inside an event do not count as signal; lead is the time from an episode's first day to the next start of the event series (a 0-to-1 step, e.g. NBER recession months).",
         "recessions" => "Each run of months flagged 1 in the event series (NBER recession months), with its length; with a second series, its value the month before the start and its highest value from the start to the given months after the end (or to the next recession start, if sooner).",
+        "accel" => "Pace: the change over the last n months, annualized, compared with the 12-month change. For every month the pace ran at least the gap above the 12-month change, we looked up the 12-month change the given months later and counted how often it was higher.",
+        "gapfill" => "A missing month is filled with the geometric mean of the months before and after it (the approximation BLS describes for missing CPI data), and, separately, with the month before it raised by one-twelfth of the prior 12-month change (Treasury's fallback rule for inflation-protected bonds); the n-month change is measured from each filled value. To test each method, every earlier same calendar month with data was treated as missing in the same way and its filled change compared with the actual one; the mean error is the method's usual bias, and its smallest and largest errors give the range.",
         "seasonal" => "Each month's average as a percent above or below that calendar year's average, for every complete year; then the median by month and the share of years each month was above its year's average.",
         "during" => "For every fall of the threshold or more in the other series (peak to lowest close), the change in this series over the same dates.",
         "events" => "Change over each window after every event date, compared with the same-length change from all start dates (base rate).",
@@ -979,6 +1055,8 @@ fn main() {
         ("revisions", Some(p), _) => revisions_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("fit", Some(p), _) => fit_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("spells", Some(p), _) => spells_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
+        ("accel", Some(p), _) => accel_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
+        ("gapfill", Some(p), _) => gapfill_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("seasonal", Some(p), _) => seasonal_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("during", Some(p), _) => during_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("events", Some(p), _) => events_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),

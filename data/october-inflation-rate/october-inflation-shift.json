@@ -1,0 +1,1 @@
+{"frame":"shift","input":"data/series/bls_CUUR0000SA0.csv","params":{"from":"1985-01-01","missing":"2025-10","names":"Midpoint of Sept. and Nov. 2025 (BLS),Treasury's stand-in for TIPS","ref-label":"September rate","title":"October's annual inflation rate, two ways"}}
