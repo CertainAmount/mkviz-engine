@@ -12,7 +12,7 @@
 
 ### Methods
 1. **Midpoint (geometric mean).** October 2025 = √(September 2025 × November 2025), the approximation BLS describes for a missing month "if all parties agree."
-2. **Prior 12-month trend.** October 2025 = September 2025 × (September 2025 ÷ September 2024)^(1/12), Treasury's fallback rule for inflation-protected securities (31 CFR 356, Appendix B). This reproduces Treasury's published TIPS index for October 2025, 325.60, to three decimals.
+2. **Prior 12-month trend.** October 2025 = September 2025 × (September 2025 ÷ September 2024)^(1/12), Treasury's fallback rule for inflation-protected securities (31 CFR 356, Appendix B). This reproduces Treasury's published TIPS index for October 2025, 325.604, to three decimals.
 3. **Test.** For every October from 1985 to 2023 (39 years; October 2024 cannot be tested because its 12-month comparison would need October 2025), we treated the month as missing, filled it each way, and compared the resulting 12-month change ending the next October with the actual one. Error = filled-based change minus actual change, in percentage points.
 4. **Correction.** Corrected estimate = this year's filled-based change minus the method's mean October error; range = minus the largest and smallest errors.
 
