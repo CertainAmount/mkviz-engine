@@ -11,6 +11,7 @@
 | [ai-stocks](https://mkviz.com/ai-stocks/) | [ai-dotcom-aftermath](ai-stocks/ai-dotcom-aftermath.csv) | paths | fred_NASDAQ100.csv |
 | [ai-stocks](https://mkviz.com/ai-stocks/) | [ai-crash-pictogram](ai-stocks/ai-crash-pictogram.csv) | pictogram |  |
 | [binance-hack](https://mkviz.com/binance-hack/) | [exchange-hacks-timeline](binance-hack/exchange-hacks-timeline.csv) | timeline |  |
+| [black-friday-deals](https://mkviz.com/black-friday-deals/) | [holiday-price-season](black-friday-deals/holiday-price-season.csv) | season | bls_CUUR0000SA0.csv, bls_CUUR0000SAA.csv, bls_CUUR0000SEEE01.csv, bls_CUUR0000SEEE04.csv, bls_CUUR0000SEHK.csv, bls_CUUR0000SERA01.csv, bls_CUUR0000SERE01.csv |
 | [consumer-sentiment](https://mkviz.com/consumer-sentiment/) | [sentiment-gap](consumer-sentiment/sentiment-gap.csv) | fit | fred_CPIAUCSL.csv, fred_UMCSENT.csv, fred_UNRATE.csv |
 | [core-inflation](https://mkviz.com/core-inflation/) | [core-vs-headline-miss](core-inflation/core-vs-headline-miss.csv) | closer | fred_CPIAUCSL.csv, fred_CPILFESL.csv |
 | [dollar-weaker-2026](https://mkviz.com/dollar-weaker-2026/) | [dollar-underwater](dollar-weaker-2026/dollar-underwater.csv) | underwater | fred_DTWEXBGS.csv, fred_TWEXBMTH.csv |

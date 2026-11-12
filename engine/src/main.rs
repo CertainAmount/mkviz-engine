@@ -513,6 +513,16 @@ fn closer_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String>
 
 /// seasonal: 해마다 달별 월평균이 그해 평균보다 몇 % 높았나, 달별 중앙값과 높았던 해의 비율
 fn seasonal_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    // --detrend --base 10 --ahead 3: 추세(2×12 이동평균)를 걷고 기준 달에서 뒤 달들로 가는 계절 변화(해마다 중앙값·내려간 비율)
+    if o.contains_key("detrend") {
+        let d = seasonal::detrended(&monthly_avg(&load_with(path, o)?));
+        let base: i64 = o.get("base").and_then(|v| v.parse().ok()).unwrap_or(10);
+        let ahead: i64 = o.get("ahead").and_then(|v| v.parse().ok()).unwrap_or(3);
+        let rows: Vec<String> = seasonal::from_base(&d, base, ahead).iter().map(|(h, med, down, n)| format!("{{\"months_after\":{h},\"median_change\":{},\"share_down\":{},\"years\":{n}}}", num(Some(*med)), num(Some(*down)))).collect();
+        let raw: Vec<f64> = { let p = monthly_avg(&load_with(path, o)?); p.windows(2).map(|w| w[1].1 / w[0].1 - 1.0).collect() };
+        let trend = raw.iter().sum::<f64>() / raw.len().max(1) as f64;
+        return Ok(format!("{{\"base_month\":{base},\"avg_monthly_change\":{},\"from_base\":[{}]}}", num(Some(trend)), rows.join(",")));
+    }
     let t = seasonal::table(&monthly_avg(&load_with(path, o)?));
     let b = seasonal::by_month(&t);
     let months: Vec<String> = b.iter().enumerate().map(|(k, (m, up))| format!("{{\"month\":{},\"median_dev\":{},\"share_above\":{}}}", k + 1, num(Some(*m)), num(Some(*up)))).collect();
@@ -668,6 +678,20 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             csv = format!("rate,{}\n{}", changes.iter().map(|c| format!("{c}")).collect::<Vec<_>>().join(","),
                           rates.iter().zip(&cells).map(|(r, row)| format!("{r},{}\n", row.iter().map(|v| format!("{v:.4}")).collect::<Vec<_>>().join(","))).collect::<String>());
             viz::grid(&rates, &changes, &cells, opt_f(o, "line", 0.30), now, &title)
+        }
+        "season" => {
+            // 품목별 기준 달 대비 계절 변화(추세 제거, seasonal --detrend와 같은 계산): --rows "이름:csv,이름:csv" --base 10 --ahead 4 --cols "Nov.,Dec.,Jan.,Feb."
+            let base: i64 = o.get("base").and_then(|v| v.parse().ok()).unwrap_or(10);
+            let ahead: i64 = o.get("ahead").and_then(|v| v.parse().ok()).unwrap_or(4);
+            let cols: Vec<&str> = o.get("cols").map(|v| v.split(',').collect()).unwrap_or_default();
+            let mut rows = vec![];
+            for spec in o.get("rows").ok_or("--rows \"이름:csv,…\"")?.split(',') {
+                let (name, file) = spec.rsplit_once(':').ok_or("--rows 항목은 이름:csv")?;
+                let d = seasonal::detrended(&monthly_avg(&series::load(file)?));
+                rows.push((name.to_string(), seasonal::from_base(&d, base, ahead).iter().map(|r| 100.0 * r.1).collect::<Vec<f64>>()));
+            }
+            csv = format!("item,{}\n{}", cols.join(","), rows.iter().map(|(n, v)| format!("{n},{}\n", v.iter().map(|x| format!("{x:.2}")).collect::<Vec<_>>().join(","))).collect::<String>());
+            viz::season(&rows, &cols, o.get("note").map(String::as_str).unwrap_or(""), &title)
         }
         "shift" => {
             // 빠진 달 메우기 두 방법(gapfill)의 처음 값 → 같은 달 과거 오차의 평균을 걷은 값, 범위, 기준선은 직전 달 변화율: --missing YYYY-MM [--change 12 --from ... --names "이름,이름" --ref-label "Sept."]
@@ -1025,7 +1049,7 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "recessions" => "Each run of months flagged 1 in the event series (NBER recession months), with its length; with a second series, its value the month before the start and its highest value from the start to the given months after the end (or to the next recession start, if sooner).",
         "accel" => "Pace: the change over the last n months, annualized, compared with the 12-month change. For every month the pace ran at least the gap above the 12-month change, we looked up the 12-month change the given months later and counted how often it was higher.",
         "gapfill" => "A missing month is filled with the geometric mean of the months before and after it (the approximation BLS describes for missing CPI data), and, separately, with the month before it raised by one-twelfth of the prior 12-month change (Treasury's fallback rule for inflation-protected bonds); the n-month change is measured from each filled value. To test each method, every earlier same calendar month with data was treated as missing in the same way and its filled change compared with the actual one; the mean error is the method's usual bias, and its smallest and largest errors give the range.",
-        "seasonal" => "Each month's average as a percent above or below that calendar year's average, for every complete year; then the median by month and the share of years each month was above its year's average.",
+        "seasonal" => "Each month's average as a percent above or below that calendar year's average, for every complete year; then the median by month and the share of years each month was above its year's average. With --detrend, each month is instead divided by a centered 2x12 moving average (classical ratio-to-moving-average decomposition), which removes steady trends; --base and --ahead then give, year by year, the change from the base month to each later month net of trend, reported as the median and the share of years it fell.",
         "during" => "For every fall of the threshold or more in the other series (peak to lowest close), the change in this series over the same dates.",
         "events" => "Change over each window after every event date, compared with the same-length change from all start dates (base rate).",
         _ => "Chart frame drawn from the same data.",

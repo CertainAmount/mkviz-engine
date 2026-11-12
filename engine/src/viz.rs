@@ -1036,3 +1036,42 @@ pub fn shift(rows: &[(String, f64, f64, f64, f64)], refv: f64, ref_label: &str, 
     s.push_str("</svg>");
     s
 }
+
+/// 계절 칸(season): 품목마다 한 줄, 기준 달 뒤 몇 달을 칸으로. 칸 값은 기준 달 대비 변화(추세를 걷은 중앙값, %).
+/// 내린 칸은 파랑이 진할수록 많이 내린 것, 오른 칸은 옅은 회색. 줄마다 가장 싼 달에 테두리. rows: (이름, [값…]), cols: 칸 이름
+pub fn season(rows: &[(String, Vec<f64>)], cols: &[&str], note: &str, title: &str) -> String {
+    // note: 칸 값이 무엇인지 그림 위 한 줄(2026-11-11 콜드 리드 두 독자: '10월 대비'인 줄 그림만 봐서는 몰랐다)
+    let (left, top, rr) = (118.0, if note.is_empty() { 40.0 } else { 66.0 }, 12.0);
+    let cw = (W - left - rr) / cols.len().max(1) as f64;
+    let ch = 34.0;
+    let h = top + ch * rows.len() as f64 + 28.0;
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    let lo = rows.iter().flat_map(|r| r.1.iter().copied()).fold(0.0, f64::min);
+    if !note.is_empty() {
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"20\" fill=\"{INK}\" font-size=\"14\">{}</text>", 8.0, note.replace('&', "&amp;"));
+    }
+    for (j, c) in cols.iter().enumerate() {
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"14\" font-weight=\"600\">{}</text>", left + cw * (j as f64 + 0.5), top - 12.0, c);
+    }
+    for (i, (name, vals)) in rows.iter().enumerate() {
+        let y = top + ch * i as f64;
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"14\">{}</text>", left - 8.0, y + ch / 2.0 + 5.0, name.replace('&', "&amp;"));
+        // 가장 싼 달: 최솟값과 0.05%p 안쪽이면 같이 표시(반올림하면 같은 두 칸 중 하나만 테두리면 헷갈린다, 2026-11-12 콜드 리드)
+        let min = vals.iter().copied().fold(f64::MAX, f64::min);
+        let is_best = |v: f64| v < 0.0 && v - min < 0.05;
+        for (j, v) in vals.iter().enumerate() {
+            let x = left + cw * j as f64;
+            // 내린 정도를 같은 파랑의 진하기로(한 색상 단계, 0이 흰색에 가깝게)
+            let a = if *v < 0.0 { 0.12 + 0.78 * (v / lo.min(-1e-9)).min(1.0) } else { 0.0 };
+            let fill = if *v < 0.0 { format!("fill=\"{BLUE}\" fill-opacity=\"{a:.2}\"") } else { "fill=\"#f1f5f9\"".to_string() };
+            let ink = if a > 0.5 { "#fff" } else { INK };
+            let _ = write!(s, "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" rx=\"4\" {fill} stroke=\"#fff\" stroke-width=\"2\"><title>{} {}: {:+.1}%</title></rect>", x, y, cw, ch, name, cols[j], v);
+            if is_best(*v) {
+                let _ = write!(s, "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" rx=\"4\" fill=\"none\" stroke=\"#0f172a\" stroke-width=\"2\"/>", x + 2.0, y + 2.0, cw - 4.0, ch - 4.0);
+            }
+            let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{ink}\" font-size=\"14\" font-weight=\"{}\">{}{:.1}%</text>", x + cw / 2.0, y + ch / 2.0 + 5.0, if is_best(*v) { 700 } else { 400 }, if *v > 0.0 { "+" } else { "" }, v);
+        }
+    }
+    s.push_str("</svg>");
+    s
+}

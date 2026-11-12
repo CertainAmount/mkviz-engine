@@ -15,5 +15,11 @@
     "FRED",
     "data visualization"
   ],
-  "related_identifiers": []
+  "related_identifiers": [
+    {
+      "identifier": "https://mkviz.com/black-friday-deals/",
+      "relation": "isSupplementTo",
+      "resource_type": "publication"
+    }
+  ]
 }
