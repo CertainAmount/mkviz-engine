@@ -7,6 +7,9 @@
 | [electricity-bills-data-centers](https://mkviz.com/electricity-bills-data-centers/) | [power-underwater](electricity-bills-data-centers/power-underwater.csv) | underwater | bls_CUUR0000SEHF01.csv, fred_CPIAUCSL.csv |
 | [electricity-bills-data-centers](https://mkviz.com/electricity-bills-data-centers/) | [dc-share-pictogram](electricity-bills-data-centers/dc-share-pictogram.csv) | pictogram |  |
 | [electricity-bills-data-centers](https://mkviz.com/electricity-bills-data-centers/) | [power-states-strip](electricity-bills-data-centers/power-states-strip.csv) | strip |  |
+| [mortgage-rates-history](https://mkviz.com/mortgage-rates-history/) | [mortgage-rate-recent](mortgage-rates-history/mortgage-rate-recent.csv) | recent | fred_MORTGAGE30US.csv |
+| [mortgage-rates-history](https://mkviz.com/mortgage-rates-history/) | [mortgage-rate-history](mortgage-rates-history/mortgage-rate-history.csv) | tracker | fred_MORTGAGE30US.csv |
+| [mortgage-rates-history](https://mkviz.com/mortgage-rates-history/) | [mortgage-gap-history](mortgage-rates-history/mortgage-gap-history.csv) | tracker | fred_DGS10.csv, fred_MORTGAGE30US.csv |
 | [ai-stocks](https://mkviz.com/ai-stocks/) | [ai-vs-dotcom](ai-stocks/ai-vs-dotcom.csv) | paths | fred_NASDAQ100.csv |
 | [ai-stocks](https://mkviz.com/ai-stocks/) | [ai-dotcom-aftermath](ai-stocks/ai-dotcom-aftermath.csv) | paths | fred_NASDAQ100.csv |
 | [ai-stocks](https://mkviz.com/ai-stocks/) | [ai-crash-pictogram](ai-stocks/ai-crash-pictogram.csv) | pictogram |  |

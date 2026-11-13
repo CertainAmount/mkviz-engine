@@ -222,6 +222,126 @@ pub fn band(pts: &[Point], title: &str, as_pct: bool, suffix: &str) -> String {
     s
 }
 
+/// 추적기 그림(데이터 페이지, 2026-11-13): 긴 역사 위의 지금. 선(월말 값), 모든 관측의 가운데 80% 띠와 중앙값 점선, 이름 붙은 고점 몇 개,
+/// 지금 점과 값. 띠(--mid, 기본 가운데 80%)·중앙값은 그리는 월말 값이 아니라 모든 관측(rank와 같은 기준)으로 잰다. 범례는 그림 안 한 줄(note).
+pub fn tracker(all: &[Point], drawn: &[Point], title: &str, suffix: &str, peaks: usize, years: &[String], note: &str, mid: f64) -> String {
+    let (qa, qb) = ((1.0 - mid) / 2.0, 1.0 - (1.0 - mid) / 2.0); // 음영: 가운데 mid 몫(0.5면 사분위 범위)
+    const HALO: &str = "stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\"";
+    let mut vals: Vec<f64> = all.iter().map(|p| p.value).collect();
+    vals.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let q = |f: f64| vals[((vals.len() - 1) as f64 * f) as usize];
+    let now = all.last().unwrap();
+    let lab = |v: f64| format!("{:.1}{suffix}", v);
+    let left = ([q(qb), q(0.5), q(qa)].iter().map(|v| lab(*v).chars().count()).max().unwrap_or(4) as f64 * 8.4 + 12.0).max(L);
+    let top = if note.is_empty() { T } else { T + 22.0 };
+    let (lo, hi) = (vals[0].min(now.value), vals[vals.len() - 1].max(now.value));
+    let pad = (hi - lo) * 0.06;
+    let (lo, hi) = (lo - pad, hi + pad * 3.0); // 위 여백: 고점 이름표 자리
+    let (x0, x1) = (drawn[0].day as f64, now.day as f64);
+    let x = |d: f64| left + (d - x0) / (x1 - x0).max(1.0) * (W - left - R);
+    let y = |v: f64| top + (hi - v) / (hi - lo).max(1e-9) * (H - top - B);
+    let mut s = head(title);
+    if !note.is_empty() {
+        let _ = write!(s, "<text x=\"{left}\" y=\"{:.1}\" font-size=\"13\" fill=\"{INK}\">{}</text>", T + 6.0, note.replace('&', "&amp;"));
+    }
+    let _ = write!(s, "<rect x=\"{left}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"{SHADE}\"/>", y(q(qb)), W - left - R, y(q(qa)) - y(q(qb)));
+    let _ = write!(s, "<line x1=\"{left}\" x2=\"{}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{INK}\" stroke-dasharray=\"4 3\"/>", W - R, y(q(0.5)), y(q(0.5)));
+    let mut last_y = f64::MIN;
+    for v in [q(qb), q(0.5), q(qa)] {
+        if y(v) - last_y < 14.0 { continue; }
+        last_y = y(v);
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" font-size=\"14\" fill=\"{INK}\">{}</text>", left - 6.0, y(v) + 4.0, lab(v));
+    }
+    let step = (drawn.len() / 500).max(1);
+    let d: Vec<String> = drawn.iter().step_by(step).chain(std::iter::once(now)).map(|p| format!("{:.1},{:.1}", x(p.day as f64), y(p.value))).collect();
+    let _ = write!(s, "<polyline points=\"{}\" fill=\"none\" stroke=\"{GRAY}\" stroke-width=\"1.3\"/>", d.join(" "));
+    // 고점: 큰 값부터, 서로 6년 넘게 떨어진 것만(같은 사건의 이웃 달을 겹쳐 세지 않게), 지금과 2년 안은 뺀다(지금 점이 말한다)
+    let mut order: Vec<&Point> = drawn.iter().collect();
+    order.sort_by(|a, b| b.value.partial_cmp(&a.value).unwrap());
+    let mut picked: Vec<&Point> = Vec::new();
+    for p in order {
+        if picked.len() >= peaks { break; }
+        if (now.day - p.day) < 730 || picked.iter().any(|k| (k.day - p.day).abs() < 6 * 365) { continue; }
+        picked.push(p);
+    }
+    if !years.is_empty() {  // 이름 붙일 해를 고르면(글이 말하는 사건) 그해 최고값에 단다: 자동 고점이 이웃 해를 고르는 일을 막는다
+        // "low:2021"은 그해 최저값에, 이름표는 점 아래에
+        picked = years.iter().filter_map(|yr| {
+            let (low, yr) = match yr.strip_prefix("low:") { Some(y) => (true, y), None => (false, yr.as_str()) };
+            let it = drawn.iter().filter(|p| p.date.starts_with(yr));
+            if low { it.min_by(|a, b| a.value.partial_cmp(&b.value).unwrap()) } else { it.max_by(|a, b| a.value.partial_cmp(&b.value).unwrap()) }
+        }).collect();
+    }
+    let lows: Vec<bool> = years.iter().map(|y| y.starts_with("low:")).collect();
+    let mut boxes: Vec<(f64, f64, f64, f64)> = Vec::new(); // 이름표 자리: '지금' 이름표가 겹치면 점 아래로 내린다
+    for (i, p) in picked.iter().enumerate() {
+        let px = x(p.day as f64).clamp(left + 18.0, W - R - 18.0);
+        let py = if lows.get(i).copied().unwrap_or(false) { y(p.value) + 18.0 } else { y(p.value) - 7.0 };
+        let half = (5 + lab(p.value).chars().count()) as f64 * 3.6;
+        boxes.push((px - half, px + half, py - 13.0, py + 2.0));
+        let _ = write!(s, "<text x=\"{px:.1}\" y=\"{py:.1}\" text-anchor=\"middle\" font-size=\"13\" fill=\"{INK}\" {HALO}>{} {}</text>", &p.date[..4], lab(p.value));
+    }
+    let (nx, ny) = (x(now.day as f64), y(now.value));
+    let nw = (4 + lab(now.value).chars().count()) as f64 * 8.0;
+    let hit = |ty: f64| boxes.iter().any(|&(a, b, c, d)| a < nx - 9.0 && b > nx - 9.0 - nw && c < ty + 2.0 && d > ty - 14.0);
+    // 위·아래 중 이름표와 겹치지 않고 선을 덜 가리는 쪽(이름표 칸 안에 들어오는 선의 점 수)
+    let cover = |ty: f64| drawn.iter().filter(|p| { let (px, py) = (x(p.day as f64), y(p.value)); px > nx - 9.0 - nw && px < nx - 9.0 && py > ty - 14.0 && py < ty + 2.0 }).count() + if hit(ty) { 1000 } else { 0 };
+    let span: Vec<f64> = drawn.iter().filter(|p| x(p.day as f64) > nx - 9.0 - nw).map(|p| y(p.value)).collect();
+    let (top_y, bot_y) = (span.iter().cloned().fold(ny, f64::min), span.iter().cloned().fold(ny, f64::max));
+    let ty = [ny - 9.0, ny + 22.0, bot_y + 18.0, top_y - 6.0].into_iter().filter(|t| *t > T + 14.0 && *t < H - B - 2.0)
+        .min_by_key(|t| cover(*t)).unwrap_or(ny - 9.0);
+    let _ = write!(s, "<circle cx=\"{nx:.1}\" cy=\"{ny:.1}\" r=\"5\" fill=\"{BLUE}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" font-size=\"14\" font-weight=\"600\" fill=\"#0f172a\" {HALO}>Now {}</text>", nx - 9.0, ty, lab(now.value));
+    // 가로축: 10년마다 눈금 글자, 양 끝 연도와 겹치면 뺀다
+    let (y0, y1): (i32, i32) = (drawn[0].date[..4].parse().unwrap_or(0), now.date[..4].parse().unwrap_or(0));
+    let _ = write!(s, "<text x=\"{left}\" y=\"{}\" font-size=\"14\" fill=\"{INK}\">{y0}</text><text x=\"{}\" y=\"{}\" text-anchor=\"end\" font-size=\"14\" fill=\"{INK}\">{y1}</text>", H - 6.0, W - R, H - 6.0);
+    let mut yr = (y0 / 10 + 1) * 10;
+    while yr < y1 {
+        let dx = x(crate::series::day_number(&format!("{yr}-01-01")).unwrap_or(0) as f64);
+        if dx - left > 44.0 && W - R - dx > 64.0 {
+            let _ = write!(s, "<text x=\"{dx:.1}\" y=\"{}\" text-anchor=\"middle\" font-size=\"14\" fill=\"{INK}\">{yr}</text>", H - 6.0);
+        }
+        yr += 10;
+    }
+    s.push_str("</svg>");
+    s
+}
+
+/// 최근 그림(데이터 페이지 맨 위, 2026-11-13): 최근 N개 관측의 선, 그 기간의 최저·최고와 지금에 점과 값, 첫·가운데·끝 달 눈금.
+/// '좋아지나 나빠지나'를 매주 보는 독자용(콜드 리드: 추적기라면 최근 흐름이 먼저 보여야 한다).
+pub fn recent(pts: &[Point], title: &str, suffix: &str) -> String {
+    const HALO: &str = "stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\"";
+    const MON: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let lab = |v: f64| format!("{:.2}{suffix}", v);
+    let mo = |d: &str| format!("{} {}", MON[d[5..7].parse::<usize>().unwrap_or(1) - 1], &d[..4]);
+    let lo = pts.iter().min_by(|a, b| a.value.partial_cmp(&b.value).unwrap()).unwrap();
+    let hi = pts.iter().max_by(|a, b| a.value.partial_cmp(&b.value).unwrap()).unwrap();
+    let now = pts.last().unwrap();
+    let (vmin, vmax) = (lo.value, hi.value);
+    let pad = (vmax - vmin).max(0.1) * 0.25;
+    let (top, left, right) = (T + 18.0, 16.0, 16.0);
+    let (x0, x1) = (pts[0].day as f64, now.day as f64);
+    let x = |d: f64| left + (d - x0) / (x1 - x0).max(1.0) * (W - left - right - 70.0);
+    let y = |v: f64| top + (vmax + pad - v) / (vmax - vmin + 2.0 * pad) * (H - top - B - 10.0);
+    let mut s = head(title);
+    let d: Vec<String> = pts.iter().map(|p| format!("{:.1},{:.1}", x(p.day as f64), y(p.value))).collect();
+    let _ = write!(s, "<polyline points=\"{}\" fill=\"none\" stroke=\"{GRAY}\" stroke-width=\"2\"/>", d.join(" "));
+    for (p, name, below) in [(lo, "Low", true), (hi, "High", false)] {
+        if std::ptr::eq(p, now) { continue; }
+        let (px, py) = (x(p.day as f64), y(p.value));
+        let ty = if below { py + 22.0 } else { py - 10.0 };
+        let _ = write!(s, "<circle cx=\"{px:.1}\" cy=\"{py:.1}\" r=\"4\" fill=\"{INK}\"/><text x=\"{px:.1}\" y=\"{ty:.1}\" text-anchor=\"middle\" font-size=\"14\" fill=\"{INK}\" {HALO}>{name} {} ({})</text>", lab(p.value), &mo(&p.date)[..3]);
+    }
+    let (nx, ny) = (x(now.day as f64), y(now.value));
+    let _ = write!(s, "<circle cx=\"{nx:.1}\" cy=\"{ny:.1}\" r=\"6\" fill=\"{BLUE}\"/><text x=\"{:.1}\" y=\"{:.1}\" font-size=\"15\" font-weight=\"600\" fill=\"#0f172a\">Now</text><text x=\"{:.1}\" y=\"{:.1}\" font-size=\"15\" font-weight=\"600\" fill=\"#0f172a\">{}</text>", nx + 10.0, ny - 2.0, nx + 10.0, ny + 16.0, lab(now.value));
+    let mid = &pts[pts.len() / 2];
+    for (p, anchor) in [(&pts[0], "start"), (mid, "middle"), (now, "end")] {
+        let px = if anchor == "end" { W - right } else { x(p.day as f64) };
+        let _ = write!(s, "<text x=\"{px:.1}\" y=\"{}\" text-anchor=\"{anchor}\" font-size=\"14\" fill=\"{INK}\">{}</text>", H - 6.0, mo(&p.date));
+    }
+    s.push_str("</svg>");
+    s
+}
+
 /// 사례 점 그림: 사례마다 점 하나(가로 = 시작 연도, 세로 = 깊이). 기준선 하나, 지금 사례만 파랑(Cleveland & McGill: 같은 축 위 위치).
 pub fn dots(items: &[(i64, f64, bool)], line: f64, first_year: &str, last_year: &str, title: &str) -> String {
     let lo = items.iter().map(|i| i.1).fold(0.0, f64::min);

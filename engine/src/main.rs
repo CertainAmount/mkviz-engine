@@ -26,6 +26,10 @@
 //!   analogs <a.csv,b.csv,...> [--mode yoy|level --k 5 --exclude 24 --target <csv> --ahead 12]
 //!       과거 비슷한 달 k개(여러 지표의 표준화 값)와 target의 ahead개월 뒤 변화.
 //!   figure band|dots <csv> --out <svg> [--pct --suffix % --from YYYY-MM-DD] | [--threshold 0.10 --deep 0.20]
+//!   figure recent <csv> --out <svg> [--weeks 53 --suffix %]
+//!       최근 그림(데이터 페이지 맨 위): 최근 N개 관측의 선, 그 기간 최저·최고·지금에 점과 값.
+//!   figure tracker <csv> --out <svg> [--suffix " pt" --peaks 3 | --years 1980,2008 --note "…" --mid 0.5 --from YYYY-MM-DD]
+//!       추적기(데이터 페이지): 긴 역사 선, 모든 관측의 가운데 80% 띠·중앙값, 이름 붙은 고점, 지금 점과 값, 10년 눈금.
 //!   figure fan <csv> --dates d1,d2,… --out <svg> [--weeks 26 --label … --base --base-label …]
 //!       사건 날짜들 뒤 경로의 중앙값 선 + 사분위 띠(강조할 지금 사례가 없을 때).
 //!   figure response <leader.csv> --follower <csv> --out <svg> [--threshold 0.20 --window 63 --weeks 20]
@@ -565,6 +569,8 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             let labels: Vec<String> = o.get("labels").map(|v| v.split(',').map(String::from).collect()).unwrap_or_default();
             viz::paths_with(&pts, &d, o.get("days").and_then(|v| v.parse().ok()).unwrap_or(365), &title, o.contains_key("diff"), &labels)
         }
+        "recent" => { let n = o.get("weeks").and_then(|v| v.parse().ok()).unwrap_or(53usize); viz::recent(&pts[pts.len().saturating_sub(n)..], &title, o.get("suffix").map(String::as_str).unwrap_or("")) }
+        "tracker" => viz::tracker(&pts, &turning::monthly(&pts), &title, o.get("suffix").map(String::as_str).unwrap_or(""), o.get("peaks").and_then(|v| v.parse().ok()).unwrap_or(3), &o.get("years").map(|v| v.split(',').map(String::from).collect::<Vec<_>>()).unwrap_or_default(), o.get("note").map(String::as_str).unwrap_or(""), opt_f(o, "mid", 0.8)),
         "band" => viz::band(&turning::monthly(&pts), &title, o.contains_key("pct"), o.get("suffix").map(String::as_str).unwrap_or("")),
         "dots" => {
             let eps = episodes::drawdowns(&pts, opt_f(o, "threshold", 0.10));

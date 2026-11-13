@@ -1,0 +1,1 @@
+{"frame":"tracker","input":"data/series/fred_MORTGAGE30US.csv","params":{"mid":"0.5","minus":"data/series/fred_DGS10.csv","note":"Shaded: the middle half of all weeks since 1971. Dashed: median.","suffix":" pt","years":"1980,2008,2022"}}
