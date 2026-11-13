@@ -61,6 +61,7 @@ mod cycles;
 mod episodes;
 mod events;
 mod fit;
+mod bond;
 mod gapfill;
 mod pace;
 mod revisions;
@@ -483,6 +484,16 @@ fn accel_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> 
         rows.len(), num(Some(higher as f64 / rows.len() as f64)), num(Some(ch[ch.len() / 2])), s(&gapfill::label(now.0)), num(Some(now.1)), num(Some(now.2))))
 }
 
+/// bond: 채권 펀드 손익분기. --duration 6 --yield 4.86 --jump 0.24 [--convexity 0 --years 10] (금리 단위 %)
+fn bond_cmd(o: &HashMap<String, String>) -> Result<String, String> {
+    let d = opt_f(o, "duration", 0.0);
+    if d <= 0.0 { return Err("--duration 이 필요".into()); }
+    let (c, y0, dy, years) = (opt_f(o, "convexity", 0.0), opt_f(o, "yield", 0.0) / 100.0, opt_f(o, "jump", 0.0) / 100.0, opt_f(o, "years", 10.0));
+    let be = bond::breakeven(d, c, y0, dy);
+    let at: Vec<String> = [1.0, 2.0, 3.0, 5.0, years].iter().map(|t| { let (a, j) = bond::values(d, c, y0, dy, *t); format!("{{\"years\":{t},\"unchanged\":{},\"jumped\":{}}}", num(Some(a)), num(Some(j))) }).collect();
+    Ok(format!("{{\"duration\":{d},\"yield\":{},\"jump\":{},\"loss\":{},\"breakeven_years\":{},\"at\":[{}]}}", num(Some(y0)), num(Some(dy)), num(Some(bond::jump_loss(d, c, dy))), num(be), at.join(",")))
+}
+
 /// closer: 두 예측값(--a, --b) 중 어느 쪽이 n달 뒤 목표(path)에 더 가까웠나. 셋 다 --change n이면 n달 변화율(물가 상승률)
 /// closer 명령과 그림이 함께 쓰는 달: (달, a의 오차, b의 오차)
 fn closer_rows(path: &str, o: &HashMap<String, String>) -> Result<Vec<(String, f64, f64)>, String> {
@@ -678,6 +689,19 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             csv = format!("rate,{}\n{}", changes.iter().map(|c| format!("{c}")).collect::<Vec<_>>().join(","),
                           rates.iter().zip(&cells).map(|(r, row)| format!("{r},{}\n", row.iter().map(|v| format!("{v:.4}")).collect::<Vec<_>>().join(","))).collect::<String>());
             viz::grid(&rates, &changes, &cells, opt_f(o, "line", 0.30), now, &title)
+        }
+        "breakeven" => {
+            // 채권 펀드 손익분기(bond 명령과 같은 계산): --funds "이름:듀레이션,…" --yield 4.86 --jump 0.24 [--start 10000 --years 20]
+            let (y0, dy, years, start) = (opt_f(o, "yield", 0.0) / 100.0, opt_f(o, "jump", 0.0) / 100.0, opt_f(o, "years", 10.0), opt_f(o, "start", 10000.0));
+            let mut rows = vec![];
+            for spec in o.get("funds").ok_or("--funds \"이름:듀레이션,…\"")?.split(',') {
+                let (name, d) = spec.rsplit_once(':').ok_or("--funds 항목은 이름:듀레이션")?;
+                let d: f64 = d.parse().map_err(|_| "듀레이션은 숫자")?;
+                let pts: Vec<(f64, f64)> = (0..=(years * 12.0) as usize).map(|k| { let t = k as f64 / 12.0; let (a, j) = bond::values(d, 0.0, y0, dy, t); (t, (j - a) * start) }).collect();
+                rows.push((name.to_string(), bond::breakeven(d, 0.0, y0, dy), pts));
+            }
+            csv = format!("fund,years,ahead_of_unchanged\n{}", rows.iter().flat_map(|(n, _, p)| p.iter().filter(|q| (q.0 * 12.0).round() as usize % 12 == 0).map(move |q| format!("{n},{:.0},{:.2}\n", q.0, q.1))).collect::<String>());
+            viz::breakeven(&rows, o.get("note").map(String::as_str).unwrap_or(""), &title)
         }
         "season" => {
             // 품목별 기준 달 대비 계절 변화(추세 제거, seasonal --detrend와 같은 계산): --rows "이름:csv,이름:csv" --base 10 --ahead 4 --cols "Nov.,Dec.,Jan.,Feb."
@@ -1090,6 +1114,7 @@ fn main() {
         ("passthrough", Some(p), _) => passthrough_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("cycles", Some(p), _) => cycles_cmd(p, &opt).map(|j| with_meta(j, cmd, p.split(',').next().unwrap(), &opt)),
         ("payment", _, _) => payment_cmd(&opt),
+        ("bond", _, _) => bond_cmd(&opt).map(|j| { let mut j = j; j.pop(); format!("{j},\"method\":{}}}", s("A bond fund's value drops at once by about its duration times the rise in yields (duration times the rise; no convexity), then compounds at the higher yield; the no-change path compounds at the old yield. Simplified: the fund's yield moves with the market at once and yields then stay put. Break-even is when the two paths meet.")) }),
         ("export", Some(p), _) => export_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("figure", Some(f), Some(p)) => figure_cmd(f, p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         _ => Err("사용: mkviz-engine drawdowns|position|turning|sahm|events <csv> [옵션] | figure <frame> <csv> --out <svg> (main.rs 머리 주석)".into()),

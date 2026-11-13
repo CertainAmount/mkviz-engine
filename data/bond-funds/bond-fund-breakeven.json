@@ -1,0 +1,1 @@
+{"frame":"breakeven","input":"data/series/fred_DGS10.csv","params":{"funds":"Short-term fund:2.5,Core bond fund:5.72,Long Treasury fund:16","jump":"0.25","note":"$10,000 in each fund, compared with yields unchanged","title":"Bond funds after this week's jump in yields","years":"20","yield":"5.08"}}

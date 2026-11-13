@@ -1075,3 +1075,54 @@ pub fn season(rows: &[(String, Vec<f64>)], cols: &[&str], note: &str, title: &st
     s.push_str("</svg>");
     s
 }
+
+/// 손익분기(breakeven): 펀드마다 '금리가 그대로였을 때보다 몇 달러 앞서거나 뒤처지나'(가로 년). 0선을 지나는 해에 점과 이름표.
+/// rows: (이름, 손익분기 년, [(년, 차이 달러)])
+pub fn breakeven(rows: &[(String, Option<f64>, Vec<(f64, f64)>)], note: &str, title: &str) -> String {
+    // note: 시작 금액·무엇과 견주는지 그림 위 한 줄(2026-11-13 콜드 리드: 세로축 달러의 기준이 안 보였다)
+    // 범례: 펀드마다 한 줄(색 점 + 이름 + 손익분기 해). 점 옆 긴 이름표는 서로 겹쳤다(2026-11-13)
+    let legend = rows.len() as f64 * 20.0;
+    let (l, r, t, b) = (58.0, 20.0, if note.is_empty() { 24.0 } else { 44.0 } + legend, 40.0);
+    let x1 = rows.iter().flat_map(|r| r.2.last().map(|p| p.0)).fold(1.0, f64::max);
+    let lo = rows.iter().flat_map(|r| r.2.iter().map(|p| p.1)).fold(0.0, f64::min);
+    let hi = rows.iter().flat_map(|r| r.2.iter().map(|p| p.1)).fold(0.0, f64::max);
+    let step = [100.0, 200.0, 250.0, 500.0, 1000.0].into_iter().find(|s| (hi - lo) / s <= 6.0).unwrap_or(2000.0);
+    let (y0, y1) = ((lo / step).floor() * step, (hi / step).ceil() * step);
+    let x = |v: f64| l + v / x1 * (W - l - r);
+    let y = |v: f64| t + (y1 - v) / (y1 - y0).max(1e-9) * (H - t - b);
+    let mut s = head(title);
+    if !note.is_empty() {
+        let _ = write!(s, "<text x=\"8\" y=\"20\" fill=\"{INK}\" font-size=\"14\">{}</text>", note.replace('&', "&amp;"));
+    }
+    let shades_l = ["#93c5fd", BLUE, "#1e3a8a"];
+    for (i, (name, be, _)) in rows.iter().enumerate() {
+        let yy = if note.is_empty() { 18.0 } else { 40.0 } + 20.0 * i as f64;
+        let c = shades_l[i.min(2)];
+        let tail = be.map(|v| format!(": even in {v:.1} years")).unwrap_or_default();
+        let _ = write!(s, "<circle cx=\"14\" cy=\"{:.1}\" r=\"5\" fill=\"{c}\"/><text x=\"24\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"14\"><tspan fill=\"{c}\" font-weight=\"700\">{}</tspan>{tail}</text>", yy - 4.0, yy + 1.0, name.replace('&', "&amp;"));
+    }
+    let mut v = y0;
+    while v <= y1 + 1e-9 {
+        let lab = if v > 0.0 { format!("+${v:.0}") } else if v < 0.0 { format!("-${:.0}", -v) } else { "$0".into() };
+        let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{lab}</text>", W - r, y(v), y(v), if v.abs() < 1e-9 { INK } else { "#eef2f7" }, l - 6.0, y(v) + 4.0);
+        v += step;
+    }
+    let tick = if x1 > 12.0 { 5.0 } else { 2.0 };
+    let mut yr = 0.0;
+    while yr <= x1 + 1e-9 {
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{}</text>", x(yr), H - b + 18.0, if yr == 0.0 { "now".to_string() } else { format!("{yr:.0}") });
+        yr += tick;
+    }
+    let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">years from now</text>", (l + W - r) / 2.0, H - 6.0);
+    let shades = ["#93c5fd", BLUE, "#1e3a8a"];
+    for (i, (name, be, pts)) in rows.iter().enumerate() {
+        let c = shades[i.min(2)];
+        let line: Vec<String> = pts.iter().map(|p| format!("{:.1},{:.1}", x(p.0), y(p.1))).collect();
+        let _ = write!(s, "<polyline points=\"{}\" fill=\"none\" stroke=\"{c}\" stroke-width=\"2.5\"><title>{}</title></polyline>", line.join(" "), name.replace('&', "&amp;"));
+        if let Some(bx) = be.filter(|v| *v <= x1) {
+            let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"5\" fill=\"{c}\"/>", x(bx), y(0.0));
+        }
+    }
+    s.push_str("</svg>");
+    s
+}
