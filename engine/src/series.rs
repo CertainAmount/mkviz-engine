@@ -114,6 +114,15 @@ pub fn minus(pts: &[Point], by: &[Point]) -> Vec<Point> {
     }).collect()
 }
 
+/// 앞 n일 평균을 뺀 차이: 그날 전 n일(그날 제외)의 다른 계열 평균. 주간 조사값(목요일 발표 모기지 금리는 지난 목~수 신청 평균)에서
+/// 같은 기간 국채 금리를 빼려고(그날 하나만 빼면 조사가 끝난 뒤 하루의 움직임이 차이로 보인다, 2026-11-14 주장 검증).
+pub fn minus_window(pts: &[Point], by: &[Point], n: i64) -> Vec<Point> {
+    pts.iter().filter_map(|p| {
+        let w: Vec<f64> = by.iter().filter(|b| b.day < p.day && b.day >= p.day - n).map(|b| b.value).collect();
+        (!w.is_empty()).then(|| Point { value: p.value - w.iter().sum::<f64>() / w.len() as f64, ..p.clone() })
+    }).collect()
+}
+
 /// 다른 계열로 나눈 비율(그날 이전 가장 가까운 값). 예: 집값 / 연 소득 = 소득 몇 년 치.
 pub fn per(pts: &[Point], by: &[Point]) -> Vec<Point> {
     pts.iter().filter_map(|p| {
@@ -203,5 +212,14 @@ mod tests {
         let c = parse("d,v\n2000-01-01,50\n2001-01-01,100\n");
         let d = deflate(&p, &c);
         assert!((d[0].value - 200.0).abs() < 1e-9 && (d[1].value - 100.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn minus_window_averages_days_before() {
+        let p = |d: &str, v: f64| Point { date: d.into(), day: day_number(d).unwrap(), value: v };
+        let rate = vec![p("2026-11-12", 7.11)];
+        let y = vec![p("2026-11-05", 9.0), p("2026-11-06", 4.0), p("2026-11-10", 5.0), p("2026-11-12", 6.0)];
+        let g = minus_window(&rate, &y, 7);
+        assert!((g[0].value - (7.11 - 6.0)).abs() < 1e-9, "{}", g[0].value); // 11-05~11-11의 9, 4, 5 평균 6. 그날(11-12) 값은 빼지 않는다
     }
 }

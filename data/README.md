@@ -7,6 +7,9 @@
 | [electricity-bills-data-centers](https://mkviz.com/electricity-bills-data-centers/) | [power-underwater](electricity-bills-data-centers/power-underwater.csv) | underwater | bls_CUUR0000SEHF01.csv, fred_CPIAUCSL.csv |
 | [electricity-bills-data-centers](https://mkviz.com/electricity-bills-data-centers/) | [dc-share-pictogram](electricity-bills-data-centers/dc-share-pictogram.csv) | pictogram |  |
 | [electricity-bills-data-centers](https://mkviz.com/electricity-bills-data-centers/) | [power-states-strip](electricity-bills-data-centers/power-states-strip.csv) | strip |  |
+| [bond-fund-calculator](https://mkviz.com/bond-fund-calculator/) | [bond-yield-recent](bond-fund-calculator/bond-yield-recent.csv) | recent | fred_DGS7.csv |
+| [bond-fund-calculator](https://mkviz.com/bond-fund-calculator/) | [bond-fund-underwater](bond-fund-calculator/bond-fund-underwater.csv) | underwater | fred_DGS7.csv |
+| [bond-fund-calculator](https://mkviz.com/bond-fund-calculator/) | [bond-fund-recovery](bond-fund-calculator/bond-fund-recovery.csv) | recover | fred_DGS7.csv |
 | [mortgage-rates-history](https://mkviz.com/mortgage-rates-history/) | [mortgage-rate-recent](mortgage-rates-history/mortgage-rate-recent.csv) | recent | fred_MORTGAGE30US.csv |
 | [mortgage-rates-history](https://mkviz.com/mortgage-rates-history/) | [mortgage-rate-history](mortgage-rates-history/mortgage-rate-history.csv) | tracker | fred_MORTGAGE30US.csv |
 | [mortgage-rates-history](https://mkviz.com/mortgage-rates-history/) | [mortgage-gap-history](mortgage-rates-history/mortgage-gap-history.csv) | tracker | fred_DGS10.csv, fred_MORTGAGE30US.csv |

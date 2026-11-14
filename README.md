@@ -6,15 +6,15 @@ The calculation engine and chart data behind [MKViz](https://mkviz.com), a blog 
 
 Every number in an MKViz article that comes from our own calculation is produced by this engine, and every chart's data is published here so anyone can check it.
 
-![Mortgage Rates History Since 1971: Is a 7% Rate High?](data/mortgage-rates-history/mortgage-rate-recent.svg)
+![Bond Fund Calculator: Every Loss Since 1969 and Its Recovery](data/bond-fund-calculator/bond-yield-recent.svg)
 
 **Latest articles**
 
+- [Bond Fund Calculator: Every Loss Since 1969 and Its Recovery](https://mkviz.com/bond-fund-calculator/) · [data](data/bond-fund-calculator/)
 - [Mortgage Rates History Since 1971: Is a 7% Rate High?](https://mkviz.com/mortgage-rates-history/) · [data](data/mortgage-rates-history/)
 - [Bond Funds and Rising Yields: How Long Until You Break Even?](https://mkviz.com/bond-funds/) · [data](data/bond-funds/)
 - [Black Friday Deals: Is November Really the Cheapest Month?](https://mkviz.com/black-friday-deals/) · [data](data/black-friday-deals/)
 - [October Inflation Rate: The Number BLS Couldn't Publish](https://mkviz.com/october-inflation-rate/) · [data](data/october-inflation-rate/)
-- [Why Are Mortgage Rates So High? The Gap Over Treasuries Is Back](https://mkviz.com/mortgage-rates-treasury-gap/) · [data](data/mortgage-rates-treasury-gap/)
 
 ## What's here
 

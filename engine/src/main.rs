@@ -160,7 +160,12 @@ fn load_with(path: &str, o: &HashMap<String, String>) -> Result<Vec<series::Poin
     // --per <csv>: 다른 계열로 나눈 비율(집값 / 연 소득 = 소득 몇 년 치)
     let pts = match o.get("per") { Some(c) => series::per(&pts, &series::load(c)?), None => pts };
     // --minus <csv>: 다른 계열을 뺀 차이(모기지 금리 - 10년 국채 = 금리 차, %p)
-    let pts = match o.get("minus") { Some(c) => series::minus(&pts, &series::load(c)?), None => pts };
+    // --minus-window n: 그날 하나 대신 그날 전 n일 평균을 뺀다(주간 조사값용)
+    let pts = match (o.get("minus"), o.get("minus-window").and_then(|v| v.parse().ok())) {
+        (Some(c), Some(n)) => series::minus_window(&pts, &series::load(c)?, n),
+        (Some(c), None) => series::minus(&pts, &series::load(c)?),
+        _ => pts,
+    };
     // --afford <금리 csv>,<연 소득 csv> [--down 0.2 --years 30]: 집값 -> 월 상환액이 월 소득에서 차지하는 몫(series::afford)
     let pts = match o.get("afford") {
         Some(v) => {
@@ -170,6 +175,8 @@ fn load_with(path: &str, o: &HashMap<String, String>) -> Result<Vec<series::Poin
         }
         None => pts,
     };
+    // --bond-return m: 금리 계열(%)을 만기 m년 채권 펀드의 총수익 지수로(bond::total_return, 달마다)
+    let pts = match o.get("bond-return").and_then(|v| v.parse().ok()) { Some(m) => bond::total_return(&pts, m), None => pts };
     let pts = match o.get("avg").and_then(|v| v.parse().ok()) { Some(n) => series::rolling_mean(&pts, n), None => pts };
     // --from-low n: 직전 n개 중 최저 대비 상승률(평균 뒤에 적용: 청구 4주 평균의 1년 저점 대비)
     Ok(match o.get("from-low").and_then(|v| v.parse().ok()) { Some(n) => series::from_low(&pts, n), None => pts })
@@ -560,7 +567,7 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             let flag = match o.get("flag") { Some(f) => series::load(f)?, None => vec![] };
             let cut = lines.iter().cloned().fold(f64::MAX, f64::min);
             let marks: Vec<(i64, f64)> = if cut < f64::MAX {
-                episodes::drawdowns(&pts, cut).iter().filter(|e| e.recovered.is_some()).map(|e| (series::day_number(&e.low_date).unwrap_or(0), e.low)).collect()
+                episodes::drawdowns(&pts, cut).iter().filter(|e| e.recovered.is_some() || e.low_date != pts.last().map(|p| p.date.clone()).unwrap_or_default()).map(|e| (series::day_number(&e.low_date).unwrap_or(0), e.low)).collect()
             } else { vec![] };
             viz::underwater(&turning::monthly(&pts), &lines, &flag, &marks, &title)
         }
@@ -572,6 +579,22 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
         "recent" => { let n = o.get("weeks").and_then(|v| v.parse().ok()).unwrap_or(53usize); viz::recent(&pts[pts.len().saturating_sub(n)..], &title, o.get("suffix").map(String::as_str).unwrap_or("")) }
         "tracker" => viz::tracker(&pts, &turning::monthly(&pts), &title, o.get("suffix").map(String::as_str).unwrap_or(""), o.get("peaks").and_then(|v| v.parse().ok()).unwrap_or(3), &o.get("years").map(|v| v.split(',').map(String::from).collect::<Vec<_>>()).unwrap_or_default(), o.get("note").map(String::as_str).unwrap_or(""), opt_f(o, "mid", 0.8)),
         "band" => viz::band(&turning::monthly(&pts), &title, o.contains_key("pct"), o.get("suffix").map(String::as_str).unwrap_or("")),
+        "recover" => {
+            // 하락마다 한 줄: 고점 해와 그때 금리(--rates 금리 csv), 고점에서 새 고점까지 개월(진행 중이면 지금까지, 파랑). 시작 금리 높은 순.
+            // "시작 금리가 낮을수록 회복이 길었나"를 한 그림으로(채권 펀드: 이자가 낙폭을 메우는 속도)
+            let rates = series::load(o.get("rates").ok_or("--rates <금리 csv> 가 필요")?)?;
+            let at = |d: i64| rates.iter().filter(|p| p.day <= d).last().map(|p| p.value);
+            let last = pts.last().ok_or("자료 없음")?.day;
+            let mut rows: Vec<(f64, String, f64, bool)> = episodes::drawdowns(&pts, opt_f(o, "threshold", 0.05)).iter().filter_map(|e| {
+                let pk = series::day_number(&e.peak)?;
+                let r = at(pk)?;
+                let days = e.days_to_recover.map(|d| d as f64).unwrap_or((last - pk) as f64);
+                Some((r, format!("{} · {:.1}%", &e.peak[..4], r), days / 30.44, e.recovered.is_some()))
+            }).collect();
+            rows.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+            let rows: Vec<(String, f64, bool)> = rows.into_iter().map(|r| (r.1, r.2, r.3)).collect();
+            viz::lead(&rows, "", -1.0, o.get("axis").map(String::as_str).unwrap_or("Months from high to new high"), &title)
+        }
         "dots" => {
             let eps = episodes::drawdowns(&pts, opt_f(o, "threshold", 0.10));
             let items: Vec<(i64, f64, bool)> = eps.iter().map(|e| (series::day_number(&e.peak).unwrap(), e.low, e.recovered.is_none())).collect();
@@ -672,7 +695,12 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             let labels: Vec<String> = o.get("labels").map(|v| v.split(',').map(String::from).collect()).unwrap_or_default();
             let rows: Vec<(String, f64, f64)> = dates.iter().enumerate().filter_map(|(k, d)| {
                 let day = series::day_number(d)?;
-                let (t, b) = (at(&pts, day)?, at(&base, day)?);
+                // --window n: 바탕을 그날 전 n일 평균으로(--minus-window와 같은 뜻, 주간 조사값)
+                let b = match o.get("window").and_then(|v| v.parse::<i64>().ok()) {
+                    Some(n) => series::minus_window(&[series::Point { date: d.to_string(), day, value: 0.0 }], &base, n).first().map(|p| -p.value)?,
+                    None => at(&base, day)?,
+                };
+                let t = at(&pts, day)?;
                 Some((labels.get(k).cloned().unwrap_or(d[..7].to_string()), b, t - b))
             }).collect();
             let names: Vec<&str> = o.get("names").map(|v| v.split(',').collect()).unwrap_or(vec!["Base", "Gap"]);

@@ -236,13 +236,13 @@ pub fn tracker(all: &[Point], drawn: &[Point], title: &str, suffix: &str, peaks:
     let top = if note.is_empty() { T } else { T + 22.0 };
     let (lo, hi) = (vals[0].min(now.value), vals[vals.len() - 1].max(now.value));
     let pad = (hi - lo) * 0.06;
-    let (lo, hi) = (lo - pad, hi + pad * 3.0); // 위 여백: 고점 이름표 자리
+    let (lo, hi) = (lo - pad, hi + pad * 2.0); // 위 여백: 고점 이름표 자리
     let (x0, x1) = (drawn[0].day as f64, now.day as f64);
     let x = |d: f64| left + (d - x0) / (x1 - x0).max(1.0) * (W - left - R);
     let y = |v: f64| top + (hi - v) / (hi - lo).max(1e-9) * (H - top - B);
     let mut s = head(title);
     if !note.is_empty() {
-        let _ = write!(s, "<text x=\"{left}\" y=\"{:.1}\" font-size=\"13\" fill=\"{INK}\">{}</text>", T + 6.0, note.replace('&', "&amp;"));
+        let _ = write!(s, "<text x=\"2\" y=\"{:.1}\" font-size=\"13\" fill=\"{INK}\">{}</text>", T + 2.0, note.replace('&', "&amp;")); // 그림 위 제목과 같은 왼쪽 선
     }
     let _ = write!(s, "<rect x=\"{left}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"{SHADE}\"/>", y(q(qb)), W - left - R, y(q(qa)) - y(q(qb)));
     let _ = write!(s, "<line x1=\"{left}\" x2=\"{}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{INK}\" stroke-dasharray=\"4 3\"/>", W - R, y(q(0.5)), y(q(0.5)));
@@ -318,7 +318,7 @@ pub fn recent(pts: &[Point], title: &str, suffix: &str) -> String {
     let now = pts.last().unwrap();
     let (vmin, vmax) = (lo.value, hi.value);
     let pad = (vmax - vmin).max(0.1) * 0.25;
-    let (top, left, right) = (T + 18.0, 16.0, 16.0);
+    let (top, left, right) = (T + 4.0, 16.0, 16.0);
     let (x0, x1) = (pts[0].day as f64, now.day as f64);
     let x = |d: f64| left + (d - x0) / (x1 - x0).max(1.0) * (W - left - right - 70.0);
     let y = |v: f64| top + (vmax + pad - v) / (vmax - vmin + 2.0 * pad) * (H - top - B - 10.0);
@@ -834,7 +834,9 @@ pub fn lead(rows: &[(String, f64, bool)], zero: &str, mark: f64, axis: &str, tit
     let max = rows.iter().map(|r| r.1).fold(12.0, f64::max);
     let step = if max > 72.0 { 24.0 } else if max > 36.0 { 12.0 } else { 6.0 };
     let xmax = (max / step).ceil() * step;
-    let (l, r) = (52.0, 96.0);
+    // 줄 이름이 해(4자)보다 길면(예: '1984 · 11.6%') 왼쪽 여백을 늘린다
+    let l = rows.iter().map(|r| r.0.chars().count()).max().map(|n| n as f64 * 7.6 + 14.0).unwrap_or(52.0).max(52.0);
+    let r = 96.0;
     let x = |m: f64| l + m / xmax * (W - l - r);
     let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
     let ax = if axis.is_empty() { 0.0 } else { 20.0 };

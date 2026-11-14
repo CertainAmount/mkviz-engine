@@ -1,0 +1,1 @@
+{"frame":"recover","input":"data/series/fred_DGS7.csv","params":{"bond-return":"7","rates":"data/series/fred_DGS7.csv","threshold":"0.05","title":"Every 5%-plus loss in a 7-year Treasury bond fund since 1969: the yield when it started and months to a new high"}}
