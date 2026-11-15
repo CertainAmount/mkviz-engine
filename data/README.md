@@ -10,6 +10,8 @@
 | [bond-fund-calculator](https://mkviz.com/bond-fund-calculator/) | [bond-yield-recent](bond-fund-calculator/bond-yield-recent.csv) | recent | fred_DGS7.csv |
 | [bond-fund-calculator](https://mkviz.com/bond-fund-calculator/) | [bond-fund-underwater](bond-fund-calculator/bond-fund-underwater.csv) | underwater | fred_DGS7.csv |
 | [bond-fund-calculator](https://mkviz.com/bond-fund-calculator/) | [bond-fund-recovery](bond-fund-calculator/bond-fund-recovery.csv) | recover | fred_DGS7.csv |
+| [inflation-rate-tracker](https://mkviz.com/inflation-rate-tracker/) | [inflation-recent](inflation-rate-tracker/inflation-recent.csv) | recent | fred_CPIAUCSL.csv |
+| [inflation-rate-tracker](https://mkviz.com/inflation-rate-tracker/) | [inflation-tracker](inflation-rate-tracker/inflation-tracker.csv) | tracker | fred_CPIAUCSL.csv |
 | [mortgage-rates-history](https://mkviz.com/mortgage-rates-history/) | [mortgage-rate-recent](mortgage-rates-history/mortgage-rate-recent.csv) | recent | fred_MORTGAGE30US.csv |
 | [mortgage-rates-history](https://mkviz.com/mortgage-rates-history/) | [mortgage-rate-history](mortgage-rates-history/mortgage-rate-history.csv) | tracker | fred_MORTGAGE30US.csv |
 | [mortgage-rates-history](https://mkviz.com/mortgage-rates-history/) | [mortgage-gap-history](mortgage-rates-history/mortgage-gap-history.csv) | tracker | fred_DGS10.csv, fred_MORTGAGE30US.csv |
@@ -19,6 +21,7 @@
 | [binance-hack](https://mkviz.com/binance-hack/) | [exchange-hacks-timeline](binance-hack/exchange-hacks-timeline.csv) | timeline |  |
 | [black-friday-deals](https://mkviz.com/black-friday-deals/) | [holiday-price-season](black-friday-deals/holiday-price-season.csv) | season | bls_CUUR0000SA0.csv, bls_CUUR0000SAA.csv, bls_CUUR0000SEEE01.csv, bls_CUUR0000SEEE04.csv, bls_CUUR0000SEHK.csv, bls_CUUR0000SERA01.csv, bls_CUUR0000SERE01.csv |
 | [bond-funds](https://mkviz.com/bond-funds/) | [bond-fund-breakeven](bond-funds/bond-fund-breakeven.csv) | breakeven | fred_DGS10.csv |
+| [bond-funds](https://mkviz.com/bond-funds/) | [bond-fund-catchup](bond-funds/bond-fund-catchup.csv) | catchup | fred_DGS7.csv |
 | [consumer-sentiment](https://mkviz.com/consumer-sentiment/) | [sentiment-gap](consumer-sentiment/sentiment-gap.csv) | fit | fred_CPIAUCSL.csv, fred_UMCSENT.csv, fred_UNRATE.csv |
 | [core-inflation](https://mkviz.com/core-inflation/) | [core-vs-headline-miss](core-inflation/core-vs-headline-miss.csv) | closer | fred_CPIAUCSL.csv, fred_CPILFESL.csv |
 | [dollar-weaker-2026](https://mkviz.com/dollar-weaker-2026/) | [dollar-underwater](dollar-weaker-2026/dollar-underwater.csv) | underwater | fred_DTWEXBGS.csv, fred_TWEXBMTH.csv |

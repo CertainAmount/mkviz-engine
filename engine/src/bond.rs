@@ -19,6 +19,17 @@ pub fn breakeven(d: f64, c: f64, y0: f64, dy: f64) -> Option<f64> {
     Some(-(k.ln()) / ((1.0 + y0 + dy).ln() - (1.0 + y0).ln()))
 }
 
+/// 액면 채권(반년 복리)의 수정 듀레이션: (1 - (1+y/2)^(-2m)) / y. y는 연 수익률(0.05), m은 만기(년)
+pub fn par_duration(y: f64, m: f64) -> f64 {
+    if y.abs() < 1e-9 { m } else { (1.0 - (1.0 + y / 2.0).powf(-2.0 * m)) / y }
+}
+
+/// 따라잡기: 고점(peak 번째 달)의 수익률 y(연, 반년 복리)로 그대로 불어났을 경로를 실제 지수가 다시 넘는 데 걸린 달 수.
+/// 손익분기 규칙(≈ 듀레이션 년)을 실제 금리 경로로 시험한다. 끝까지 못 넘으면 None
+pub fn catchup(idx: &[f64], peak: usize, y: f64) -> Option<usize> {
+    (peak + 1..idx.len()).find(|&k| idx[k] >= idx[peak] * (1.0 + y / 2.0).powf((k - peak) as f64 / 6.0)).map(|k| k - peak)
+}
+
 /// 만기 고정 채권 펀드의 총수익 지수(시작 100): 금리 계열(%)의 달마다 마지막 값으로, 매달 그 금리를 쿠폰으로 하는
 /// m년 만기 액면 채권을 사서 한 달 뒤 금리로 다시 값을 매기고(반년 복리) 한 달 이자를 더한다(Swinkels 2019의 방식).
 /// 수수료·세금은 없다. 1962년부터 있는 국채 금리로 '채권 펀드가 크게 빠진 때와 회복에 걸린 시간'을 잴 수 있다.
@@ -48,6 +59,17 @@ pub fn total_return(pts: &[crate::series::Point], m: f64) -> Vec<crate::series::
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn catchup_and_par_duration() {
+        // 5% 액면 7년물 듀레이션 약 5.8년, 0%면 만기와 같다
+        assert!((par_duration(0.05, 7.0) - 5.85).abs() < 0.02, "{}", par_duration(0.05, 7.0));
+        assert_eq!(par_duration(0.0, 7.0), 7.0);
+        // 고점 100에서 떨어졌다가 연 12%(반년 6%)로 그대로였을 경로를 6달째에 넘는다
+        let idx = [100.0, 95.0, 97.0, 100.0, 103.0, 104.5, 106.5, 107.0];
+        assert_eq!(catchup(&idx, 0, 0.12), Some(6));
+        assert_eq!(catchup(&idx[..6], 0, 0.12), None);
+    }
 
     #[test]
     fn breakeven_near_duration() {

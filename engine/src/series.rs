@@ -148,9 +148,36 @@ pub fn change_over(pts: &[Point], lag: usize) -> Vec<Point> {
         .collect()
 }
 
+/// 월별 계열에서 한 달만 빈 곳을 앞뒤 달의 기하평균으로 메운다(BLS가 빠진 CPI 달에 설명하는 근사, gapfill::fill과 같다).
+/// 두 달 이상 이어 빈 곳은 메우지 않는다. 메운 점의 날짜는 그 달 1일
+pub fn fill_months(pts: &[Point]) -> Vec<Point> {
+    let ym = |d: &str| -> Option<i64> { Some(d.get(..4)?.parse::<i64>().ok()? * 12 + d.get(5..7)?.parse::<i64>().ok()? - 1) };
+    let mut out: Vec<Point> = Vec::with_capacity(pts.len());
+    for p in pts {
+        if let (Some(prev), Some(k)) = (out.last().cloned(), ym(&p.date)) {
+            if ym(&prev.date) == Some(k - 2) {
+                let d = format!("{}-{:02}-01", (k - 1).div_euclid(12), (k - 1).rem_euclid(12) + 1);
+                out.push(Point { day: day_number(&d).unwrap_or(prev.day), date: d, value: (prev.value * p.value).sqrt() });
+            }
+        }
+        out.push(p.clone());
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fill_months_one_gap_only() {
+        let p = parse("date,close\n2025-09-01,100\n2025-11-01,121\n2026-02-01,130\n");
+        let f = fill_months(&p);
+        assert_eq!(f.len(), 4); // 10월만 메우고, 12~1월(두 달 빈 곳)은 두지 않는다
+        assert_eq!(f[1].date, "2025-10-01");
+        assert!((f[1].value - 110.0).abs() < 1e-9);
+        assert!(f[1].day > f[0].day && f[1].day < f[2].day);
+    }
 
     #[test]
     fn days_and_parse() {

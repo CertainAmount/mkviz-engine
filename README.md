@@ -6,15 +6,15 @@ The calculation engine and chart data behind [MKViz](https://mkviz.com), a blog 
 
 Every number in an MKViz article that comes from our own calculation is produced by this engine, and every chart's data is published here so anyone can check it.
 
-![Bond Fund Calculator: Every Loss Since 1969 and Its Recovery](data/bond-fund-calculator/bond-yield-recent.svg)
+![Current Inflation Rate: Tracker, Calculator, History Since 1948](data/inflation-rate-tracker/inflation-recent.svg)
 
 **Latest articles**
 
+- [Current Inflation Rate: Tracker, Calculator, History Since 1948](https://mkviz.com/inflation-rate-tracker/) · [data](data/inflation-rate-tracker/)
 - [Bond Fund Calculator: Every Loss Since 1969 and Its Recovery](https://mkviz.com/bond-fund-calculator/) · [data](data/bond-fund-calculator/)
 - [Mortgage Rates History Since 1971: Is a 7% Rate High?](https://mkviz.com/mortgage-rates-history/) · [data](data/mortgage-rates-history/)
 - [Bond Funds and Rising Yields: How Long Until You Break Even?](https://mkviz.com/bond-funds/) · [data](data/bond-funds/)
 - [Black Friday Deals: Is November Really the Cheapest Month?](https://mkviz.com/black-friday-deals/) · [data](data/black-friday-deals/)
-- [October Inflation Rate: The Number BLS Couldn't Publish](https://mkviz.com/october-inflation-rate/) · [data](data/october-inflation-rate/)
 
 ## What's here
 

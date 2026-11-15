@@ -1,0 +1,1 @@
+{"frame":"tracker","input":"data/series/fred_CPIAUCSL.csv","params":{"fill-gaps":"","note":"Shaded: where the middle 80% of months fell. Dashed: the median.","pct-change":"12","suffix":"%","years":"1980,2022"}}

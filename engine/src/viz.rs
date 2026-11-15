@@ -308,10 +308,10 @@ pub fn tracker(all: &[Point], drawn: &[Point], title: &str, suffix: &str, peaks:
 
 /// 최근 그림(데이터 페이지 맨 위, 2026-11-13): 최근 N개 관측의 선, 그 기간의 최저·최고와 지금에 점과 값, 첫·가운데·끝 달 눈금.
 /// '좋아지나 나빠지나'를 매주 보는 독자용(콜드 리드: 추적기라면 최근 흐름이 먼저 보여야 한다).
-pub fn recent(pts: &[Point], title: &str, suffix: &str) -> String {
+pub fn recent(pts: &[Point], title: &str, suffix: &str, decimals: usize, now_label: &str) -> String {
     const HALO: &str = "stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\"";
     const MON: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    let lab = |v: f64| format!("{:.2}{suffix}", v);
+    let lab = |v: f64| format!("{:.*}{suffix}", decimals, v);
     let mo = |d: &str| format!("{} {}", MON[d[5..7].parse::<usize>().unwrap_or(1) - 1], &d[..4]);
     let lo = pts.iter().min_by(|a, b| a.value.partial_cmp(&b.value).unwrap()).unwrap();
     let hi = pts.iter().max_by(|a, b| a.value.partial_cmp(&b.value).unwrap()).unwrap();
@@ -332,7 +332,7 @@ pub fn recent(pts: &[Point], title: &str, suffix: &str) -> String {
         let _ = write!(s, "<circle cx=\"{px:.1}\" cy=\"{py:.1}\" r=\"4\" fill=\"{INK}\"/><text x=\"{px:.1}\" y=\"{ty:.1}\" text-anchor=\"middle\" font-size=\"14\" fill=\"{INK}\" {HALO}>{name} {} ({})</text>", lab(p.value), &mo(&p.date)[..3]);
     }
     let (nx, ny) = (x(now.day as f64), y(now.value));
-    let _ = write!(s, "<circle cx=\"{nx:.1}\" cy=\"{ny:.1}\" r=\"6\" fill=\"{BLUE}\"/><text x=\"{:.1}\" y=\"{:.1}\" font-size=\"15\" font-weight=\"600\" fill=\"#0f172a\">Now</text><text x=\"{:.1}\" y=\"{:.1}\" font-size=\"15\" font-weight=\"600\" fill=\"#0f172a\">{}</text>", nx + 10.0, ny - 2.0, nx + 10.0, ny + 16.0, lab(now.value));
+    let _ = write!(s, "<circle cx=\"{nx:.1}\" cy=\"{ny:.1}\" r=\"6\" fill=\"{BLUE}\"/><text x=\"{:.1}\" y=\"{:.1}\" font-size=\"15\" font-weight=\"600\" fill=\"#0f172a\">{}</text><text x=\"{:.1}\" y=\"{:.1}\" font-size=\"15\" font-weight=\"600\" fill=\"#0f172a\">{}</text>", nx + 10.0, ny - 2.0, now_label.replace('&', "&amp;"), nx + 10.0, ny + 16.0, lab(now.value));
     let mid = &pts[pts.len() / 2];
     for (p, anchor) in [(&pts[0], "start"), (mid, "middle"), (now, "end")] {
         let px = if anchor == "end" { W - right } else { x(p.day as f64) };
@@ -1244,6 +1244,39 @@ pub fn breakeven(rows: &[(String, Option<f64>, Vec<(f64, f64)>)], note: &str, ti
         if let Some(bx) = be.filter(|v| *v <= x1) {
             let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"5\" fill=\"{c}\"/>", x(bx), y(0.0));
         }
+    }
+    s.push_str("</svg>");
+    s
+}
+
+/// 따라잡기 그림(2026-11-15, 채권 펀드 재작성): 하락마다 한 줄, 같은 가로축(년)에 '금리 그대로였을 경로'를 다시 넘기까지 걸린 해(막대)와
+/// 그 시작 금리의 듀레이션(손익분기 규칙이 말하는 해, 주황 눈금). 아직 못 넘은 하락은 파랑 막대 '지금까지'. 규칙이 실제보다 느렸나를 위치로(B5)
+pub fn catchup(rows: &[(String, f64, f64, bool)], title: &str) -> String {
+    let row = 26.0;
+    let leg = 42.0;
+    let h = T + leg + rows.len() as f64 * row + B + 8.0;
+    let max = rows.iter().map(|r| r.1.max(r.2)).fold(1.0, f64::max);
+    let xmax = (max / 2.0).ceil() * 2.0;
+    let l = rows.iter().map(|r| r.0.chars().count()).max().map(|n| n as f64 * 7.6 + 14.0).unwrap_or(52.0).max(52.0);
+    let r = 70.0;
+    let x = |v: f64| l + v / xmax * (W - l - r);
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    let _ = write!(s, "<rect x=\"{l}\" y=\"{:.1}\" width=\"18\" height=\"10\" rx=\"2\" fill=\"{GRAY}\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Years to catch up</text><line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#ea580c\" stroke-width=\"3\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Duration rule</text>",
+                   T + 2.0, l + 24.0, T + 11.0, l + 160.0, l + 160.0, T, T + 13.0, l + 168.0, T + 11.0);
+    let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Year of the high · 7-year yield then</text>", 2.0, T + 31.0);
+    let top = T + leg;
+    let mut v = 0.0;
+    while v <= xmax + 1e-9 {
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{top}\" y2=\"{:.1}\" stroke=\"#eef2f7\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{}</text>",
+                       x(v), x(v), h - B, x(v), h - B + 16.0, if v == 0.0 { "0".to_string() } else { format!("{v} yrs") });
+        v += 2.0;
+    }
+    for (k, (name, yrs, dur, done)) in rows.iter().enumerate() {
+        let y = top + k as f64 * row + 6.0;
+        let (c, lab) = if *done { (GRAY, format!("{yrs:.1} yrs")) } else { (BLUE, format!("{yrs:.1} so far")) };
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"14\">{}</text><rect x=\"{l}\" y=\"{y:.1}\" width=\"{:.1}\" height=\"12\" rx=\"2\" fill=\"{c}\"/><line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#ea580c\" stroke-width=\"3\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{}\" font-size=\"13\"{}>{lab}</text>",
+                       l - 8.0, y + 11.0, name.replace('&', "&amp;"), (x(*yrs) - l).max(2.0), x(*dur), x(*dur), y - 3.0, y + 15.0,
+                       if (dur - yrs).abs() < 0.9 || yrs > dur { x(yrs.max(*dur)) + 6.0 } else { x(*yrs) + 6.0 }, y + 11.0, if *done { INK } else { BLUE }, if *done { "" } else { " font-weight=\"600\"" });
     }
     s.push_str("</svg>");
     s

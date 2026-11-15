@@ -153,6 +153,8 @@ fn drawdowns(path: &str, o: &HashMap<String, String>) -> Result<String, String> 
 /// --splice <옛 계열 csv>가 있으면 옛 계열을 앞에 이어 붙인다(series::splice).
 fn load_with(path: &str, o: &HashMap<String, String>) -> Result<Vec<series::Point>, String> {
     let pts = series::load(path)?;
+    // --fill-gaps: 한 달 빈 곳을 앞뒤 달 기하평균으로(2025년 10월 CPI: 셧다운으로 조사 없음)
+    let pts = if o.contains_key("fill-gaps") { series::fill_months(&pts) } else { pts };
     let pts = match o.get("splice") { Some(old) => series::splice(&pts, &series::load(old)?), None => pts };
     // --deflate <물가지수 csv>: 오늘 달러로 바꾼 실질 값(예: 금의 1980년 고점은 물가를 빼면 언제 넘었나)
     let pts = match o.get("deflate") { Some(c) => series::deflate(&pts, &series::load(c)?), None => pts };
@@ -179,7 +181,12 @@ fn load_with(path: &str, o: &HashMap<String, String>) -> Result<Vec<series::Poin
     let pts = match o.get("bond-return").and_then(|v| v.parse().ok()) { Some(m) => bond::total_return(&pts, m), None => pts };
     let pts = match o.get("avg").and_then(|v| v.parse().ok()) { Some(n) => series::rolling_mean(&pts, n), None => pts };
     // --from-low n: 직전 n개 중 최저 대비 상승률(평균 뒤에 적용: 청구 4주 평균의 1년 저점 대비)
-    Ok(match o.get("from-low").and_then(|v| v.parse().ok()) { Some(n) => series::from_low(&pts, n), None => pts })
+    let pts = match o.get("from-low").and_then(|v| v.parse().ok()) { Some(n) => series::from_low(&pts, n), None => pts };
+    // --pct-change n: 달력상 n달 전 대비 변화율을 % 단위로(물가지수 -> 연간 물가 상승률 3.9, 그림·spells에서. position --change는 비율 그대로)
+    Ok(match o.get("pct-change").and_then(|v| v.parse().ok()) {
+        Some(n) => series::change_over(&pts, n).into_iter().map(|p| series::Point { value: p.value * 100.0, ..p }).collect(),
+        None => pts,
+    })
 }
 
 fn position(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
@@ -480,7 +487,7 @@ fn gapfill_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String
 
 /// accel: 최근 --short달 속도(연율)가 1년 변화율보다 --gap 이상 빠른 달마다 --ahead달 뒤 1년 변화율이 더 높았나. 마지막 달의 두 값도
 fn accel_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
-    let m: gapfill::Months = series::load(path)?.iter().filter_map(|p| Some((gapfill::key(&p.date)?, p.value))).collect();
+    let m: gapfill::Months = load_with(path, o)?.iter().filter_map(|p| Some((gapfill::key(&p.date)?, p.value))).collect();
     let short: i64 = o.get("short").and_then(|v| v.parse().ok()).unwrap_or(3);
     let ahead: i64 = o.get("ahead").and_then(|v| v.parse().ok()).unwrap_or(12);
     let gap = opt_f(o, "gap", 0.01);
@@ -493,6 +500,32 @@ fn accel_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> 
     let list = rows.iter().map(|r| format!("{{\"month\":{},\"yoy\":{},\"yoy_later\":{}}}", s(&gapfill::label(r.0)), num(Some(r.1)), num(Some(r.2)))).collect::<Vec<_>>().join(",");
     Ok(format!("{{\"months\":{},\"higher_later\":{higher},\"share_higher\":{},\"median_change\":{},\"now\":{{\"month\":{},\"pace\":{},\"yoy\":{}}},\"rows\":[{list}]}}",
         rows.len(), num(Some(higher as f64 / rows.len() as f64)), num(Some(ch[ch.len() / 2])), s(&gapfill::label(now.0)), num(Some(now.1)), num(Some(now.2))))
+}
+
+/// catchup: --bond-return 지수의 하락마다(--threshold) 고점 달 금리(--rates)로 그대로 불어났을 경로를 실제 지수가 다시 넘는 데
+/// 걸린 달 수와 그 금리의 액면 채권 듀레이션(년). 손익분기 ≈ 듀레이션 규칙의 실제 시험. 진행 중이면 지금 경로와의 차이
+fn catchup_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    let m: f64 = o.get("bond-return").and_then(|v| v.parse().ok()).ok_or("--bond-return <만기 년> 이 필요")?;
+    let pts = load_with(path, o)?;
+    let rates = series::load(o.get("rates").ok_or("--rates <금리 csv> 가 필요")?)?;
+    let idx: Vec<f64> = pts.iter().map(|p| p.value).collect();
+    let mut rows = Vec::new();
+    let (mut done, mut faster) = (Vec::new(), 0);
+    for e in episodes::drawdowns(&pts, opt_f(o, "threshold", 0.05)) {
+        let Some(i) = pts.iter().position(|p| p.date == e.peak) else { continue };
+        let Some(r) = rates.iter().filter(|p| p.day <= pts[i].day).last().map(|p| p.value / 100.0) else { continue };
+        let dur = bond::par_duration(r, m);
+        let new_high = e.days_to_recover.map(|d| (d as f64 / 30.44).round());
+        let (cu, gap) = match bond::catchup(&idx, i, r) {
+            Some(k) => (Some(k as f64), None),
+            None => (None, Some(idx[idx.len() - 1] / (idx[i] * (1.0 + r / 2.0).powf((idx.len() - 1 - i) as f64 / 6.0)) - 1.0)),
+        };
+        if let Some(k) = cu { done.push(k / 12.0); if k / 12.0 < dur { faster += 1; } }
+        rows.push(format!("{{\"peak\":{},\"rate\":{},\"duration_years\":{},\"months_to_new_high\":{},\"months_to_catch_up\":{},\"years_to_catch_up\":{},\"gap_now\":{}}}",
+            s(&e.peak[..7]), num(Some(r)), num(Some(dur)), num(new_high), num(cu), num(cu.map(|k| k / 12.0)), num(gap)));
+    }
+    if rows.is_empty() { return Err("하락 없음".into()); }
+    Ok(format!("{{\"caught_up\":{},\"faster_than_duration\":{faster},\"median_years_to_catch_up\":{},\"rows\":[{}]}}", done.len(), num(stats::median(&done)), rows.join(",")))
 }
 
 /// bond: 채권 펀드 손익분기. --duration 6 --yield 4.86 --jump 0.24 [--convexity 0 --years 10] (금리 단위 %)
@@ -576,7 +609,7 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             let labels: Vec<String> = o.get("labels").map(|v| v.split(',').map(String::from).collect()).unwrap_or_default();
             viz::paths_with(&pts, &d, o.get("days").and_then(|v| v.parse().ok()).unwrap_or(365), &title, o.contains_key("diff"), &labels)
         }
-        "recent" => { let n = o.get("weeks").and_then(|v| v.parse().ok()).unwrap_or(53usize); viz::recent(&pts[pts.len().saturating_sub(n)..], &title, o.get("suffix").map(String::as_str).unwrap_or("")) }
+        "recent" => { let n = o.get("weeks").and_then(|v| v.parse().ok()).unwrap_or(53usize); viz::recent(&pts[pts.len().saturating_sub(n)..], &title, o.get("suffix").map(String::as_str).unwrap_or(""), o.get("decimals").and_then(|v| v.parse().ok()).unwrap_or(2), o.get("now").map(String::as_str).unwrap_or("Now")) }
         "tracker" => viz::tracker(&pts, &turning::monthly(&pts), &title, o.get("suffix").map(String::as_str).unwrap_or(""), o.get("peaks").and_then(|v| v.parse().ok()).unwrap_or(3), &o.get("years").map(|v| v.split(',').map(String::from).collect::<Vec<_>>()).unwrap_or_default(), o.get("note").map(String::as_str).unwrap_or(""), opt_f(o, "mid", 0.8)),
         "band" => viz::band(&turning::monthly(&pts), &title, o.contains_key("pct"), o.get("suffix").map(String::as_str).unwrap_or("")),
         "recover" => {
@@ -594,6 +627,19 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             rows.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
             let rows: Vec<(String, f64, bool)> = rows.into_iter().map(|r| (r.1, r.2, r.3)).collect();
             viz::lead(&rows, "", -1.0, o.get("axis").map(String::as_str).unwrap_or("Months from high to new high"), &title)
+        }
+        "catchup" => {
+            // 하락마다: 시작 해·금리, '금리 그대로' 경로를 다시 넘기까지 해(진행 중이면 지금까지), 그 금리 액면 채권 듀레이션
+            let m: f64 = o.get("bond-return").and_then(|v| v.parse().ok()).ok_or("--bond-return <만기 년> 이 필요")?;
+            let rates = series::load(o.get("rates").ok_or("--rates <금리 csv> 가 필요")?)?;
+            let idx: Vec<f64> = pts.iter().map(|p| p.value).collect();
+            let rows: Vec<(String, f64, f64, bool)> = episodes::drawdowns(&pts, opt_f(o, "threshold", 0.05)).iter().filter_map(|e| {
+                let i = pts.iter().position(|p| p.date == e.peak)?;
+                let r = rates.iter().filter(|p| p.day <= pts[i].day).last()?.value / 100.0;
+                let (yrs, done) = match bond::catchup(&idx, i, r) { Some(k) => (k as f64 / 12.0, true), None => ((idx.len() - 1 - i) as f64 / 12.0, false) };
+                Some((format!("{} · {:.1}%", &e.peak[..4], r * 100.0), yrs, bond::par_duration(r, m), done))
+            }).collect();
+            viz::catchup(&rows, &title)
         }
         "dots" => {
             let eps = episodes::drawdowns(&pts, opt_f(o, "threshold", 0.10));
@@ -1105,6 +1151,7 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "spells" => "Every stretch of consecutive observations at or above the threshold (or at or below it), with its first and last date, length and most extreme value; the last one may still be under way.",
         "lead" => "Signal episodes: consecutive days at or below the threshold (or at or above it), joined when the gap between them is the gap window or less and no event started in between; days inside an event do not count as signal; lead is the time from an episode's first day to the next start of the event series (a 0-to-1 step, e.g. NBER recession months).",
         "recessions" => "Each run of months flagged 1 in the event series (NBER recession months), with its length; with a second series, its value the month before the start and its highest value from the start to the given months after the end (or to the next recession start, if sooner).",
+        "catchup" => "For every drawdown of the bond fund index (threshold below the prior high), the no-change path grows from the high at the yield of that month (semiannual compounding); catch-up is the first later month the actual index is back at or above that path, compared with the modified duration of a par bond at that yield. Months to a new high are counted from the same high.",
         "accel" => "Pace: the change over the last n months, annualized, compared with the 12-month change. For every month the pace ran at least the gap above the 12-month change, we looked up the 12-month change the given months later and counted how often it was higher.",
         "gapfill" => "A missing month is filled with the geometric mean of the months before and after it (the approximation BLS describes for missing CPI data), and, separately, with the month before it raised by one-twelfth of the prior 12-month change (Treasury's fallback rule for inflation-protected bonds); the n-month change is measured from each filled value. To test each method, every earlier same calendar month with data was treated as missing in the same way and its filled change compared with the actual one; the mean error is the method's usual bias, and its smallest and largest errors give the range.",
         "seasonal" => "Each month's average as a percent above or below that calendar year's average, for every complete year; then the median by month and the share of years each month was above its year's average. With --detrend, each month is instead divided by a centered 2x12 moving average (classical ratio-to-moving-average decomposition), which removes steady trends; --base and --ahead then give, year by year, the change from the base month to each later month net of trend, reported as the median and the share of years it fell.",
@@ -1148,6 +1195,7 @@ fn main() {
         ("passthrough", Some(p), _) => passthrough_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("cycles", Some(p), _) => cycles_cmd(p, &opt).map(|j| with_meta(j, cmd, p.split(',').next().unwrap(), &opt)),
         ("payment", _, _) => payment_cmd(&opt),
+        ("catchup", Some(p), _) => catchup_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("bond", _, _) => bond_cmd(&opt).map(|j| { let mut j = j; j.pop(); format!("{j},\"method\":{}}}", s("A bond fund's value drops at once by about its duration times the rise in yields (duration times the rise; no convexity), then compounds at the higher yield; the no-change path compounds at the old yield. Simplified: the fund's yield moves with the market at once and yields then stay put. Break-even is when the two paths meet.")) }),
         ("export", Some(p), _) => export_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("figure", Some(f), Some(p)) => figure_cmd(f, p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
