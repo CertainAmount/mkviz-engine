@@ -66,6 +66,7 @@ mod episodes;
 mod events;
 mod fit;
 mod bond;
+mod breadth;
 mod gapfill;
 mod pace;
 mod revisions;
@@ -540,7 +541,37 @@ fn bond_cmd(o: &HashMap<String, String>) -> Result<String, String> {
 
 /// closer: 두 예측값(--a, --b) 중 어느 쪽이 n달 뒤 목표(path)에 더 가까웠나. 셋 다 --change n이면 n달 변화율(물가 상승률)
 /// closer 명령과 그림이 함께 쓰는 달: (달, a의 오차, b의 오차)
-fn closer_rows(path: &str, o: &HashMap<String, String>) -> Result<Vec<(String, f64, f64)>, String> {
+/// breadth: 여러 월간 지표(--series a.csv,b.csv, --names) 중 직전 --window개월 고점보다 --drop 이상 내려온 지표 수.
+/// 지금 달, 사건(경로의 0/1 계열, NBER 침체 월) 시작 달과 3달 뒤의 수, 사건 밖 달에서 k개 이상이었던 비율
+fn breadth_rows(o: &HashMap<String, String>) -> Result<(Vec<String>, Vec<(String, usize, Vec<f64>)>), String> {
+    let files: Vec<&str> = o.get("series").ok_or("--series a.csv,b.csv 가 필요")?.split(',').collect();
+    let names: Vec<String> = o.get("names").map(|v| v.split(',').map(String::from).collect()).unwrap_or_else(|| files.iter().map(|f| f.to_string()).collect());
+    let ser = files.iter().map(|f| series::load(f)).collect::<Result<Vec<_>, _>>()?;
+    let window: usize = o.get("window").and_then(|v| v.parse().ok()).unwrap_or(6);
+    let mut rows = breadth::counts(&ser, window, opt_f(o, "drop", 0.005));
+    if let Some(from) = o.get("from") { rows.retain(|r| r.0.as_str() >= &from[..7]); }
+    if rows.is_empty() { return Err("모든 지표가 있는 달이 없음".into()); }
+    Ok((names, rows))
+}
+
+fn breadth_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    let (names, rows) = breadth_rows(o)?;
+    let ev = series::load(path)?;
+    let flag: HashMap<String, f64> = ev.iter().map(|p| (p.date[..7].to_string(), p.value)).collect();
+    let idx: HashMap<&str, usize> = rows.iter().enumerate().map(|(k, r)| (r.0.as_str(), k)).collect();
+    let at = |m: &str, plus: usize| idx.get(m).and_then(|k| rows.get(k + plus)).map(|r| r.1);
+    let st: Vec<String> = breadth::starts(&ev).into_iter().filter(|m| idx.contains_key(m.as_str())).collect();
+    let at0: Vec<f64> = st.iter().filter_map(|m| at(m, 0)).map(|n| n as f64).collect();
+    let items: Vec<String> = st.iter().map(|m| format!("{{\"start\":{},\"count\":{},\"count_3m_later\":{}}}", s(m), num(at(m, 0).map(|n| n as f64)), num(at(m, 3).map(|n| n as f64)))).collect();
+    let calm: Vec<usize> = rows.iter().filter(|r| flag.get(&r.0).copied().unwrap_or(0.0) < 0.5).map(|r| r.1).collect();
+    let share: Vec<String> = (1..=names.len()).map(|k| num(Some(calm.iter().filter(|n| **n >= k).count() as f64 / calm.len().max(1) as f64))).collect();
+    let last = rows.last().unwrap();
+    let now: Vec<String> = names.iter().zip(&last.2).map(|(n, g)| format!("{{\"name\":{},\"below_high\":{}}}", s(n), num(Some(*g)))).collect();
+    Ok(format!("{{\"months\":{},\"first\":{},\"last\":{},\"now\":{},\"now_series\":[{}],\"median_at_start\":{},\"starts\":[{}],\"share_calm_months_at_least\":[{}]}}",
+        rows.len(), s(&rows[0].0), s(&last.0), last.1, now.join(","), num(stats::median(&at0)), items.join(","), share.join(",")))
+}
+
+fn closer_rows(path: &str, o: &HashMap<String, String>) -> Result<Vec<(String, f64, f64, Vec<f64>)>, String> {
     let lag: usize = o.get("change").and_then(|v| v.parse().ok()).unwrap_or(0);
     let prep = |f: &str| -> Result<HashMap<String, f64>, String> { let p = series::load(f)?; Ok(monthly_avg(&if lag > 0 { series::change_over(&p, lag) } else { p }).into_iter().collect()) };
     let (t, a, b) = (prep(path)?, prep(o.get("a").ok_or("--a <csv>")?)?, prep(o.get("b").ok_or("--b <csv>")?)?);
@@ -549,10 +580,13 @@ fn closer_rows(path: &str, o: &HashMap<String, String>) -> Result<Vec<(String, f
     let later = |d: &str| { let (y, m): (i32, i32) = (d[..4].parse().unwrap(), d[5..7].parse().unwrap()); let k = y * 12 + m - 1 + ahead; format!("{}-{:02}", k / 12, k % 12 + 1) };
     // --min-gap x: b가 a보다 x 이상 높은 달만(예: 헤드라인 물가가 근원보다 1%p 이상 높을 때)
     let gap: f64 = o.get("min-gap").and_then(|v| v.parse().ok()).unwrap_or(f64::MIN);
-    let mut keys: Vec<&String> = a.keys().filter(|d| **d >= from && **d <= to && b.contains_key(*d) && t.contains_key(&later(d)) && b[*d] - a[*d] >= gap).collect();
+    // --also c.csv,d.csv: 같은 달(모든 예측이 있는 달)에서 함께 겨룰 예측들(예: 중앙값·절사평균 물가)
+    let also = o.get("also").map(|v| v.split(',').map(prep).collect::<Result<Vec<_>, _>>()).transpose()?.unwrap_or_default();
+    let mut keys: Vec<&String> = a.keys().filter(|d| **d >= from && **d <= to && b.contains_key(*d) && t.contains_key(&later(d)) && b[*d] - a[*d] >= gap
+        && also.iter().all(|c| c.contains_key(*d))).collect();
     keys.sort();
     if keys.is_empty() { return Err("겹치는 달이 없음".into()); }
-    Ok(keys.into_iter().map(|d| { let y = t[&later(d)]; (d.clone(), (a[d] - y).abs(), (b[d] - y).abs()) }).collect())
+    Ok(keys.into_iter().map(|d| { let y = t[&later(d)]; (d.clone(), (a[d] - y).abs(), (b[d] - y).abs(), also.iter().map(|c| (c[d] - y).abs()).collect()) }).collect())
 }
 
 fn closer_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
@@ -562,8 +596,16 @@ fn closer_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String>
     let (ea, eb) = (rows.iter().map(|r| r.1).sum::<f64>(), rows.iter().map(|r| r.2).sum::<f64>());
     let wins = rows.iter().filter(|r| r.1 < r.2).count();
     let keys: Vec<&String> = rows.iter().map(|r| &r.0).collect();
-    Ok(format!("{{\"months\":{},\"first\":{},\"last\":{},\"ahead\":{ahead},\"mae_a\":{},\"mae_b\":{},\"share_a_closer\":{}}}",
-        keys.len(), s(keys[0]), s(keys.last().unwrap()), num(Some(ea / n)), num(Some(eb / n)), num(Some(wins as f64 / n))))
+    // --also 예측마다: 평균 오차, a보다·b보다 가까웠던 달의 비율, 모든 예측 중 가장 가까웠던 달의 비율
+    let also: Vec<String> = o.get("also").map(|v| v.split(',').enumerate().map(|(k, f)| {
+        let e: Vec<f64> = rows.iter().map(|r| r.3[k]).collect();
+        let share = |w: usize| num(Some(w as f64 / n));
+        let best = rows.iter().filter(|r| r.3[k] <= r.1 && r.3[k] <= r.2 && r.3.iter().all(|x| r.3[k] <= *x)).count();
+        format!("{{\"input\":{},\"mae\":{},\"share_closer_than_a\":{},\"share_closer_than_b\":{},\"share_best\":{}}}", s(f), num(Some(e.iter().sum::<f64>() / n)),
+            share(rows.iter().filter(|r| r.3[k] < r.1).count()), share(rows.iter().filter(|r| r.3[k] < r.2).count()), share(best))
+    }).collect()).unwrap_or_default();
+    Ok(format!("{{\"months\":{},\"first\":{},\"last\":{},\"ahead\":{ahead},\"mae_a\":{},\"mae_b\":{},\"share_a_closer\":{},\"also\":[{}]}}",
+        keys.len(), s(keys[0]), s(keys.last().unwrap()), num(Some(ea / n)), num(Some(eb / n)), num(Some(wins as f64 / n)), also.join(",")))
 }
 
 /// seasonal: 해마다 달별 월평균이 그해 평균보다 몇 % 높았나, 달별 중앙값과 높았던 해의 비율
@@ -627,6 +669,18 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             rows.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
             let rows: Vec<(String, f64, bool)> = rows.into_iter().map(|r| (r.1, r.2, r.3)).collect();
             viz::lead(&rows, "", -1.0, o.get("axis").map(String::as_str).unwrap_or("Months from high to new high"), &title)
+        }
+        "breadth" => {
+            // breadth 명령과 같은 셈: 맨 위 '지금' 줄, 그 아래 침체마다 시작 달과 3달 뒤에 꺾인 지표 수(--names-legend "a,b")
+            let (names, rows) = breadth_rows(o)?;
+            let idx: std::collections::HashMap<&str, usize> = rows.iter().enumerate().map(|(k, r)| (r.0.as_str(), k)).collect();
+            let mut r: Vec<(String, usize, Option<usize>, bool)> = vec![(o.get("now").cloned().unwrap_or_else(|| "Now".into()), rows.last().unwrap().1, None, true)];
+            for m in breadth::starts(&pts).iter().rev() {
+                if let Some(&k) = idx.get(m.as_str()) { r.push((m[..4].to_string(), rows[k].1, rows.get(k + 3).map(|x| x.1), false)); }
+            }
+            csv = format!("row,count_at_start,count_3m_later\n{}", r.iter().map(|x| format!("{},{},{}\n", x.0, x.1, x.2.map_or(String::new(), |v| v.to_string()))).collect::<String>());
+            let lg: Vec<String> = o.get("legend").map(|v| v.split(',').map(String::from).collect()).unwrap_or(vec!["At the start".into(), "Three months in".into()]);
+            viz::breadth(&r, names.len(), [&lg[0], lg.get(1).map(String::as_str).unwrap_or("")], &title)
         }
         "catchup" => {
             // 하락마다: 시작 해·금리, '금리 그대로' 경로를 다시 넘기까지 해(진행 중이면 지금까지), 그 금리 액면 채권 듀레이션
@@ -903,7 +957,16 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             csv = format!("month,miss_a,miss_b\n{}", rows.iter().map(|r| format!("{},{:.4},{:.4}\n", r.0, r.1, r.2)).collect::<String>());
             let names: Vec<&str> = o.get("names").map(|v| v.split(',').collect()).unwrap_or(vec!["Forecast A", "Forecast B"]);
             let pts: Vec<(String, f64, bool)> = rows.iter().flat_map(|r| [(r.0.clone(), r.1, true), (r.0.clone(), r.2, false)]).collect();
+            if o.contains_key("also") {
+                // --also가 있으면 경주 그림: 예측마다 평균 오차(점, 100배) 막대 하나. --names는 a,b,also 순서
+                let n = rows.len() as f64;
+                let mut r: Vec<(String, f64)> = vec![(names[0].to_string(), rows.iter().map(|x| x.1).sum::<f64>() / n * 100.0), (names.get(1).copied().unwrap_or("Forecast B").to_string(), rows.iter().map(|x| x.2).sum::<f64>() / n * 100.0)];
+                for k in 0..rows[0].3.len() { r.push((names.get(2 + k).copied().unwrap_or("Other").to_string(), rows.iter().map(|x| x.3[k]).sum::<f64>() / n * 100.0)); }
+                csv = format!("forecast,mean_miss_points\n{}", r.iter().map(|(a, v)| format!("{a},{v:.3}\n")).collect::<String>());
+                viz::race(&r, o.get("suffix").map(String::as_str).unwrap_or(""), &title)
+            } else {
             viz::strip(&pts, [names[0], names.get(1).copied().unwrap_or("Forecast B")], o.get("axis").map(String::as_str), &title)
+            }
         }
         "years" => {
             // revisions 명령과 같은 해마다 평균 수정치, 경기침체 해 음영(--flag), 가장 낮은 해 --marks개 이름표
@@ -1145,12 +1208,13 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "passthrough" => "For every rise or fall of the threshold or more in the leading series within the window, the later change in the following series from the day the threshold was crossed, divided by the size of the leading move (pass-through).",
         "cycles" => "Policy-rate cycles: consecutive target-rate changes in the same direction grouped together; a new cycle starts when the direction reverses.",
         "export" => "Month-end values for the reader tool, carried forward over gaps.",
-        "closer" => "For every month with both forecasts, the absolute gap between each forecast (--a, --b) and the target n months later (--ahead); reported as the mean gap of each and the share of months forecast a was closer. With --change n, all three are n-month percent changes; --min-gap keeps only months where forecast b exceeded forecast a by at least that much.",
+        "closer" => "For every month with both forecasts, the absolute gap between each forecast (--a, --b) and the target n months later (--ahead); reported as the mean gap of each and the share of months forecast a was closer. With --change n, all three are n-month percent changes; --min-gap keeps only months where forecast b exceeded forecast a by at least that much. --also adds more forecasts scored on the same months (only months where every forecast exists), each with its mean gap, the share of months it was closer than a and than b, and the share it was the closest of all.",
         "revisions" => "For every month with both estimates, revision = later estimate minus first print. Reported: mean, mean and median absolute revision, 10th-90th percentile, share revised down, months whose sign flipped, the mean of each calendar year with at least ten months, and that range added to a new first print (--now).",
         "fit" => "Ordinary least squares on monthly averages: the coefficients come from the training months only; every month then gets the value those conditions usually went with (expected) and the actual minus expected (gap). With --change, an input is its percent change from n months earlier; with --ahead n, each month's inputs explain the value n months later; --y-change n turns the explained series into its n-month percent change too.",
         "spells" => "Every stretch of consecutive observations at or above the threshold (or at or below it), with its first and last date, length and most extreme value; the last one may still be under way.",
         "lead" => "Signal episodes: consecutive days at or below the threshold (or at or above it), joined when the gap between them is the gap window or less and no event started in between; days inside an event do not count as signal; lead is the time from an episode's first day to the next start of the event series (a 0-to-1 step, e.g. NBER recession months).",
         "recessions" => "Each run of months flagged 1 in the event series (NBER recession months), with its length; with a second series, its value the month before the start and its highest value from the start to the given months after the end (or to the next recession start, if sooner).",
+        "breadth" => "For each month where every listed series has a value, the number of series at least the drop below their own highest value of the last window months (that month included); compared with the count in each month an event (NBER recession) began and three months later, and with how often months outside events reached each count.",
         "catchup" => "For every drawdown of the bond fund index (threshold below the prior high), the no-change path grows from the high at the yield of that month (semiannual compounding); catch-up is the first later month the actual index is back at or above that path, compared with the modified duration of a par bond at that yield. Months to a new high are counted from the same high.",
         "accel" => "Pace: the change over the last n months, annualized, compared with the 12-month change. For every month the pace ran at least the gap above the 12-month change, we looked up the 12-month change the given months later and counted how often it was higher.",
         "gapfill" => "A missing month is filled with the geometric mean of the months before and after it (the approximation BLS describes for missing CPI data), and, separately, with the month before it raised by one-twelfth of the prior 12-month change (Treasury's fallback rule for inflation-protected bonds); the n-month change is measured from each filled value. To test each method, every earlier same calendar month with data was treated as missing in the same way and its filled change compared with the actual one; the mean error is the method's usual bias, and its smallest and largest errors give the range.",
@@ -1196,6 +1260,7 @@ fn main() {
         ("cycles", Some(p), _) => cycles_cmd(p, &opt).map(|j| with_meta(j, cmd, p.split(',').next().unwrap(), &opt)),
         ("payment", _, _) => payment_cmd(&opt),
         ("catchup", Some(p), _) => catchup_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
+        ("breadth", Some(p), _) => breadth_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("bond", _, _) => bond_cmd(&opt).map(|j| { let mut j = j; j.pop(); format!("{j},\"method\":{}}}", s("A bond fund's value drops at once by about its duration times the rise in yields (duration times the rise; no convexity), then compounds at the higher yield; the no-change path compounds at the old yield. Simplified: the fund's yield moves with the market at once and yields then stay put. Break-even is when the two paths meet.")) }),
         ("export", Some(p), _) => export_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("figure", Some(f), Some(p)) => figure_cmd(f, p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
@@ -1216,5 +1281,32 @@ mod payment_test {
     fn known_payment() {
         // $300,000, 30년, 6% -> $1,798.65 (표준 상환표 값)
         assert!((super::monthly_payment(300000.0, 6.0, 30.0) - 1798.65).abs() < 0.01);
+    }
+}
+
+#[cfg(test)]
+mod closer_test {
+    use std::collections::HashMap;
+    #[test]
+    fn also_scores_on_same_months() {
+        // 목표 t: 달마다 1씩 오르는 지수 대신 수준 그대로(--change 없음), 1달 뒤를 맞힌다. a=정답보다 1 낮음, b=3 높음, c=정답, d는 한 달 빠짐
+        let dir = std::env::temp_dir().join("mkviz_closer_test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let w = |name: &str, vals: &[(&str, f64)]| {
+            let p = dir.join(name);
+            std::fs::write(&p, format!("date,close,unit,source\n{}", vals.iter().map(|(d, v)| format!("{d},{v},x,x\n")).collect::<String>())).unwrap();
+            p.to_str().unwrap().to_string()
+        };
+        let t = w("t.csv", &[("2020-01-01", 10.0), ("2020-02-01", 11.0), ("2020-03-01", 12.0), ("2020-04-01", 13.0)]);
+        let a = w("a.csv", &[("2020-01-01", 10.0), ("2020-02-01", 11.0), ("2020-03-01", 12.0)]);
+        let b = w("b.csv", &[("2020-01-01", 14.0), ("2020-02-01", 15.0), ("2020-03-01", 16.0)]);
+        let c = w("c.csv", &[("2020-01-01", 11.0), ("2020-02-01", 12.0), ("2020-03-01", 13.0)]);
+        let d = w("d.csv", &[("2020-01-01", 11.0), ("2020-03-01", 13.0)]);
+        let o: HashMap<String, String> = [("a", a), ("b", b), ("ahead", "1".into()), ("also", format!("{c},{d}"))].into_iter().map(|(k, v)| (k.to_string(), v)).collect();
+        let rows = super::closer_rows(&t, &o).unwrap();
+        assert_eq!(rows.len(), 2, "d가 없는 2월은 빠진다");
+        assert!(rows.iter().all(|r| (r.1 - 1.0).abs() < 1e-9 && (r.2 - 3.0).abs() < 1e-9 && r.3 == vec![0.0, 0.0]));
+        let j = super::closer_cmd(&t, &o).unwrap();
+        assert!(j.contains("\"share_closer_than_a\":1") && j.contains("\"share_best\":1"), "{j}");
     }
 }

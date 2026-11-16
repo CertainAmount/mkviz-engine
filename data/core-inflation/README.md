@@ -56,6 +56,25 @@ Pace = core's change over the last three months, annualized. For every month sin
 ./engine/target/release/mkviz-engine accel data/series/fred_CPILFESL.csv --short 3 --gap 0.01 --ahead 12 --from 1985-01
 ```
 
+### Test 3: core against the Cleveland Fed's median and trimmed-mean CPI (added Nov. 16, 2026)
+Same split months as Test 1 (headline at least a point above core, since 1985), scoring four guesses for headline inflation a year later on exactly the same 77 months. Median CPI and the 16% trimmed-mean CPI are the Federal Reserve Bank of Cleveland's measures: each month they rank the price changes of about 45 CPI components and take the middle one (median) or average what is left after cutting the top and bottom 8% by weight (16% trimmed mean). Both start in 1983; the Cleveland Fed filled October 2025 in its own index.
+
+| Guess | Average miss, points | Core closer than this guess |
+|---|---|---|
+| Core (CPI less food and energy) | 1.7 | |
+| Trimmed-mean CPI | two | 65% of months |
+| Median CPI | two | 62% of months |
+| Headline | 2.4 | 64% of months |
+
+Across all months since 1985, not just split months, trimmed mean and core were about even (average miss 1.11 and 1.12 points). So the measures built to strip out noise did no better than plain core in the months when energy pushed headline up, which is exactly when people reach for them.
+
+Fall 2026 readings (12 months to October, and July-October at a yearly pace): median CPI 2.8% and 2.9%; trimmed mean 2.9% and 3.6%; core 2.4% to 2.7% and 3.7%. Trimmed mean confirms core's speed-up; median does not.
+
+```
+./engine/target/release/mkviz-engine closer data/macro/fred_CPIAUCSL.csv --a data/macro/fred_CPILFESL.csv --b data/macro/fred_CPIAUCSL.csv --also data/macro/fred_MEDCPIM094SFRBCLE.csv,data/macro/fred_TRMMEANCPIM094SFRBCLE.csv --change 12 --ahead 12 --from 1985-01-01 --min-gap 0.01
+```
+(`--also` added to the engine for this test: extra guesses scored on the same months.)
+
 ### Context in fall 2026
 - Core rose 0.3% in October after seasonal adjustment, as in August and September (BLS). Three-month pace: 1.64% in July, 3.75% in October.
 - Airline fares rose 22% in the year to September (seasonally adjusted); transportation services rose 0.8% in October.
@@ -68,11 +87,13 @@ Pace = core's change over the last three months, annualized. For every month sin
 ### Sources
 - BLS, Consumer Price Index Summary, October 2026: https://www.bls.gov/news.release/cpi.nr0.htm
 - FRED, CPIAUCSL and CPILFESL: https://fred.stlouisfed.org/series/CPILFESL
+- Federal Reserve Bank of Cleveland, Median CPI and 16% trimmed-mean CPI (via FRED MEDCPIM094SFRBCLE, TRMMEANCPIM094SFRBCLE): https://www.clevelandfed.org/indicators-and-data/median-cpi
 - Federal Reserve, Why does the Federal Reserve aim for inflation of 2 percent: https://www.federalreserve.gov/faqs/economy_14400.htm
 
 ### Builds on and leads to
 - Uses the October 2026 estimates from the [October inflation note](https://github.com/CertainAmount/mkviz-engine/tree/main/data/october-inflation-rate).
-- Open: repeat Test 1 for the PCE index; add services-less-rent ("supercore") as a third guess; update Test 2 monthly.
+- Done (Nov. 16, 2026): median and trimmed-mean CPI as extra guesses (Test 3).
+- Open: repeat Test 1 for the PCE index; add services-less-rent ("supercore") as another guess; update Test 2 monthly.
 
 ### Cite
 MKViz (2026). *Core inflation vs headline: which predicts prices better.* https://mkviz.com/core-inflation/ ; code and data: https://github.com/CertainAmount/mkviz-engine/tree/main/data/core-inflation
@@ -81,12 +102,12 @@ MKViz (2026). *Core inflation vs headline: which predicts prices better.* https:
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
 
-## core-vs-headline-miss
+## core-gauge-race
 
-Data: [core-vs-headline-miss.csv](core-vs-headline-miss.csv) · settings: [core-vs-headline-miss.json](core-vs-headline-miss.json)
+Data: [core-gauge-race.csv](core-gauge-race.csv) · settings: [core-gauge-race.json](core-gauge-race.json)
 
-![core-vs-headline-miss](core-vs-headline-miss.svg)
+![core-gauge-race](core-gauge-race.svg)
 
 ```
-./engine/target/release/mkviz-engine figure closer data/series/fred_CPIAUCSL.csv --a data/series/fred_CPILFESL.csv --ahead 12 --axis 'How far the guess missed inflation a year later (points)' --b data/series/fred_CPIAUCSL.csv --change 12 --from 1985-01-01 --min-gap 0.01 --names 'Guess with core,Guess with headline' --title 'Core was usually the closer guess a year later' --to 2025-09-01 --out core-vs-headline-miss.svg
+./engine/target/release/mkviz-engine figure closer data/series/fred_CPIAUCSL.csv --a data/series/fred_CPILFESL.csv --ahead 12 --also data/series/fred_TRMMEANCPIM094SFRBCLE.csv,data/series/fred_MEDCPIM094SFRBCLE.csv --b data/series/fred_CPIAUCSL.csv --change 12 --from 1985-01-01 --min-gap 0.01 --names 'Core,Headline,Trimmed mean,Median' --suffix ' pts' --title 'Average miss a year later, months gas pushed prices up' --out core-gauge-race.svg
 ```

@@ -1281,3 +1281,71 @@ pub fn catchup(rows: &[(String, f64, f64, bool)], title: &str) -> String {
     s.push_str("</svg>");
     s
 }
+
+/// 폭 그림: 줄마다 n개의 동그라미(지표 하나에 하나). 침체마다 시작 달에 이미 꺾인 수(진한 회색)와 3달 뒤까지 꺾인 수(연한 주황),
+/// 맨 위 '지금' 줄은 파랑. "지난 침체는 시작할 때 몇 개가 꺾여 있었나"와 지금을 같은 칸 수로 센다(그림문자, Haroz 외 2015)
+pub fn breadth(rows: &[(String, usize, Option<usize>, bool)], n: usize, names: [&str; 2], title: &str) -> String {
+    const LIGHT: &str = "#f6b89c";
+    let (rh, top, left) = (34.0, 48.0, 92.0);
+    let h = top + rh * rows.len() as f64 + 8.0;
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    let mut lx = left;
+    for (c, nm) in [INK, LIGHT].iter().zip(names) {
+        let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"18\" r=\"7\" fill=\"{c}\"/><text x=\"{:.1}\" y=\"23\" fill=\"{INK}\" font-size=\"14\">{}</text>", lx + 7.0, lx + 19.0, nm.replace('&', "&amp;"));
+        lx += 19.0 + nm.chars().count() as f64 * 7.6 + 18.0;
+    }
+    let gap = ((W - left - R) / n.max(1) as f64).min(40.0);
+    for (k, (lab, now, later, is_now)) in rows.iter().enumerate() {
+        let y = top + rh * k as f64 + rh / 2.0;
+        let ink = if *is_now { BLUE } else { INK };
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{ink}\" font-size=\"14\"{}>{}</text>", left - 14.0, y + 5.0, if *is_now { " font-weight=\"600\"" } else { "" }, lab.replace('&', "&amp;"));
+        for i in 0..n {
+            let fill = if i < *now { if *is_now { BLUE } else { INK } } else if later.map_or(false, |l| i < l) { LIGHT } else { "#fff" };
+            let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{y:.1}\" r=\"10\" fill=\"{fill}\" stroke=\"#cbd5e1\" stroke-width=\"1.5\"/>", left + gap * i as f64 + gap / 2.0);
+        }
+    }
+    s.push_str("</svg>");
+    s
+}
+
+#[cfg(test)]
+mod breadth_test {
+    #[test]
+    fn breadth_fills_now_and_later_circles() {
+        let rows = vec![("Now".to_string(), 1, None, true), ("2008".to_string(), 1, Some(3), false)];
+        let svg = super::breadth(&rows, 6, ["At the start", "Three months in"], "t");
+        assert_eq!(svg.matches("r=\"10\"").count(), 12);
+        assert_eq!(svg.matches("#f6b89c").count(), 1 + 2); // 범례 1 + 2008년 줄 2개
+        assert!(svg.ends_with("</svg>"));
+    }
+}
+
+/// 경주 그림: 예측마다 평균 오차 막대 하나(작은 쪽이 위), 가장 작은 막대만 파랑. "어느 짐작이 가장 덜 빗나갔나"를 길이로(B5)
+pub fn race(rows: &[(String, f64)], unit: &str, title: &str) -> String {
+    let mut r: Vec<&(String, f64)> = rows.iter().collect();
+    r.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    let row = 46.0;
+    let h = T + r.len() as f64 * row + 8.0;
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    let max = r.iter().map(|x| x.1).fold(0.0, f64::max).max(1e-9);
+    let (x0, x1) = (16.0, W - R - 70.0);
+    for (k, (name, v)) in r.iter().enumerate() {
+        let y = T + k as f64 * row;
+        let w = (v / max * (x1 - x0)).max(2.0);
+        let fill = if k == 0 { BLUE } else { GRAY };
+        let _ = write!(s, "<text x=\"{x0}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"14\">{}</text><rect x=\"{x0}\" y=\"{:.1}\" width=\"{w:.1}\" height=\"14\" rx=\"3\" fill=\"{fill}\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{}\" font-size=\"14\" font-weight=\"600\">{v:.1}{unit}</text>",
+            y + 13.0, name.replace('&', "&amp;"), y + 19.0, x0 + w + 6.0, y + 31.0, if k == 0 { BLUE } else { INK });
+    }
+    s.push_str("</svg>");
+    s
+}
+
+#[cfg(test)]
+mod race_test {
+    #[test]
+    fn race_sorts_and_highlights_smallest() {
+        let svg = super::race(&[("B".into(), 2.4), ("A".into(), 1.7)], " pts", "t");
+        let (a, b) = (svg.find(">A<").unwrap(), svg.find(">B<").unwrap());
+        assert!(a < b && svg.contains("1.7 pts") && svg.matches("#2563eb").count() >= 2);
+    }
+}

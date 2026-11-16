@@ -4,7 +4,7 @@
 
 **Question.** What is the US inflation rate right now, is it going up or down, and where does it sit against every month since 1948, when October 2025 was never surveyed?
 
-**Short answer.** Prices rose about 3.9% in the year to October 2026 (the two standard ways to fill the missing month give 3.8% to 3.9% after removing each method's usual bias). From July to October they rose at a 5.7% yearly pace, faster than the yearly rate, so inflation is not going down. Core prices, without food and energy, rose 2.8%, right at their long-run middle; energy rose 20.4%. The yearly rate is higher than in 70% of months since 1948.
+**Short answer.** Prices rose about 3.9% in the year to October 2026 (the two standard ways to fill the missing month give 3.8% to 3.9% after removing each method's usual bias). From July to October they rose at a 5.7% yearly pace, faster than the yearly rate, so inflation is not going down. Core prices, without food and energy, rose about 2.7%, just below their long-run middle (October 2025 filled with the BLS midpoint method and its usual October bias removed; uncorrected fill 2.8%); energy rose 20.4%. The yearly rate is higher than in 70% of months since 1948.
 
 ### Data
 - Consumer Price Index for All Urban Consumers (CPI-U), all items, seasonally adjusted, monthly since January 1947 (BLS via FRED: CPIAUCSL), through October 2026, released Nov. 10, 2026.
@@ -38,7 +38,7 @@ mkviz-engine export data/macro/fred_CPIAUCNS.csv --fill-gaps --out cpi.json
 | Range of the two fills, bias-adjusted | +3.8% to +3.9% |
 | Yearly rate, September 2026 (official) | +3.7% |
 | 3-month pace, all items | +5.7% |
-| Yearly rate, core | +2.8% |
+| Yearly rate, core | +2.7% |
 | 3-month pace, core | +3.7% |
 | Yearly rate, energy | +20.4% |
 

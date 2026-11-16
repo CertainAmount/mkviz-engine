@@ -15,6 +15,7 @@
 | [mortgage-rates-history](https://mkviz.com/mortgage-rates-history/) | [mortgage-rate-recent](mortgage-rates-history/mortgage-rate-recent.csv) | recent | fred_MORTGAGE30US.csv |
 | [mortgage-rates-history](https://mkviz.com/mortgage-rates-history/) | [mortgage-rate-history](mortgage-rates-history/mortgage-rate-history.csv) | tracker | fred_MORTGAGE30US.csv |
 | [mortgage-rates-history](https://mkviz.com/mortgage-rates-history/) | [mortgage-gap-history](mortgage-rates-history/mortgage-gap-history.csv) | tracker | fred_DGS10.csv, fred_MORTGAGE30US.csv |
+| [recession-indicators](https://mkviz.com/recession-indicators/) | [recession-breadth](recession-indicators/recession-breadth.csv) | breadth | fred_CE16OV.csv, fred_CMRMTSPL.csv, fred_DPCERA3M086SBEA.csv, fred_INDPRO.csv, fred_PAYEMS.csv, fred_USREC.csv, fred_W875RX1.csv |
 | [ai-stocks](https://mkviz.com/ai-stocks/) | [ai-vs-dotcom](ai-stocks/ai-vs-dotcom.csv) | paths | fred_NASDAQ100.csv |
 | [ai-stocks](https://mkviz.com/ai-stocks/) | [ai-dotcom-aftermath](ai-stocks/ai-dotcom-aftermath.csv) | paths | fred_NASDAQ100.csv |
 | [ai-stocks](https://mkviz.com/ai-stocks/) | [ai-crash-pictogram](ai-stocks/ai-crash-pictogram.csv) | pictogram |  |
@@ -23,7 +24,7 @@
 | [bond-funds](https://mkviz.com/bond-funds/) | [bond-fund-breakeven](bond-funds/bond-fund-breakeven.csv) | breakeven | fred_DGS10.csv |
 | [bond-funds](https://mkviz.com/bond-funds/) | [bond-fund-catchup](bond-funds/bond-fund-catchup.csv) | catchup | fred_DGS7.csv |
 | [consumer-sentiment](https://mkviz.com/consumer-sentiment/) | [sentiment-gap](consumer-sentiment/sentiment-gap.csv) | fit | fred_CPIAUCSL.csv, fred_UMCSENT.csv, fred_UNRATE.csv |
-| [core-inflation](https://mkviz.com/core-inflation/) | [core-vs-headline-miss](core-inflation/core-vs-headline-miss.csv) | closer | fred_CPIAUCSL.csv, fred_CPILFESL.csv |
+| [core-inflation](https://mkviz.com/core-inflation/) | [core-gauge-race](core-inflation/core-gauge-race.csv) | closer | fred_CPIAUCSL.csv, fred_CPILFESL.csv, fred_MEDCPIM094SFRBCLE.csv, fred_TRMMEANCPIM094SFRBCLE.csv |
 | [dollar-weaker-2026](https://mkviz.com/dollar-weaker-2026/) | [dollar-underwater](dollar-weaker-2026/dollar-underwater.csv) | underwater | fred_DTWEXBGS.csv, fred_TWEXBMTH.csv |
 | [fed-interest-rates](https://mkviz.com/fed-interest-rates/) | [mortgage-after-first-hike](fed-interest-rates/mortgage-after-first-hike.csv) |  |  |
 | [fed-interest-rates](https://mkviz.com/fed-interest-rates/) | [mortgage-rate-band](fed-interest-rates/mortgage-rate-band.csv) |  |  |
