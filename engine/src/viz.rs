@@ -1391,3 +1391,52 @@ mod ladder_test {
         assert!(svg.ends_with("</svg>"));
     }
 }
+
+/// 경보 기간 그림: 신호마다 한 줄, 켜진 달은 진한 칸, 침체 달은 세로 음영. 월 문자열(YYYY-MM) 기준, from~to
+pub fn lights(rows: &[(String, Vec<String>)], rec: &[String], from: &str, to: &str, title: &str) -> String {
+    let idx = |m: &str| -> f64 { let y: f64 = m[..4].parse().unwrap_or(0.0); let mo: f64 = m[5..7].parse().unwrap_or(1.0); y * 12.0 + mo - 1.0 };
+    let (a, b) = (idx(from), idx(to) + 1.0);
+    let (x0, x1) = (16.0, W - R);
+    let x = |m: &str| x0 + (idx(m) - a) / (b - a).max(1.0) * (x1 - x0);
+    let mw = (x1 - x0) / (b - a).max(1.0);
+    let (top, rh) = (T + 8.0, 52.0);
+    let h = top + rh * rows.len() as f64 + 54.0;
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    for m in rec {
+        // 침체 음영은 다른 그림보다 진하게: 막대와 겹쳐 옅으면 읽히지 않았다(2026-11-17 콜드 리드)
+        let _ = write!(s, "<rect x=\"{:.1}\" y=\"{top}\" width=\"{:.2}\" height=\"{:.1}\" fill=\"#cbd5e1\"/>", x(m), mw.max(0.6), rh * rows.len() as f64);
+    }
+    for (k, (name, ms)) in rows.iter().enumerate() {
+        let y = top + rh * k as f64;
+        let _ = write!(s, "<text x=\"{x0}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"14\">{}</text>", y + 16.0, name.replace('&', "&amp;"));
+        let _ = write!(s, "<line x1=\"{x0}\" x2=\"{x1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#e5e7eb\"/>", y + 34.0, y + 34.0);
+        // 이어진 달은 한 막대로(달마다 칸을 그리면 줄무늬로 쪼개져 보였다)
+        let mut i = 0;
+        while i < ms.len() {
+            let mut j = i;
+            while j + 1 < ms.len() && idx(&ms[j + 1]) - idx(&ms[j]) == 1.0 { j += 1; }
+            let _ = write!(s, "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.2}\" height=\"14\" rx=\"2\" fill=\"{BLUE}\"/>", x(&ms[i]), y + 27.0, (mw * (j - i + 1) as f64).max(2.0));
+            i = j + 1;
+        }
+    }
+    // 10년 눈금과 음영 설명
+    let yb = top + rh * rows.len() as f64 + 20.0;
+    let (ya, yz): (i32, i32) = (from[..4].parse().unwrap_or(0), to[..4].parse().unwrap_or(0));
+    for yr in (ya..=yz).filter(|y| y % 10 == 0) {
+        let m = format!("{yr}-01");
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{yb:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"14\">{yr}</text>", x(&m));
+    }
+    let _ = write!(s, "<rect x=\"{x0}\" y=\"{:.1}\" width=\"12\" height=\"12\" fill=\"#cbd5e1\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Recessions</text></svg>", yb + 12.0, x0 + 18.0, yb + 22.0);
+    s
+}
+
+#[cfg(test)]
+mod lights_test {
+    #[test]
+    fn lights_draws_on_months_and_recessions() {
+        let rows = vec![("Curve".to_string(), vec!["2000-01".to_string(), "2000-02".to_string()]), ("Claims".to_string(), vec!["2000-03".to_string()])];
+        let svg = super::lights(&rows, &["2000-03".to_string()], "2000-01", "2000-12", "t");
+        assert_eq!(svg.matches("fill=\"#2563eb\"").count(), 2); // 1~2월은 한 막대
+        assert!(svg.contains("Claims") && svg.ends_with("</svg>"));
+    }
+}

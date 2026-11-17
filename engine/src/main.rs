@@ -3,6 +3,7 @@
 //!
 //! 명령:
 //!   together <usrec.csv> --signals "a.csv threshold=0.2 avg=4 from-low=52;b.csv threshold=0 below" [--k 2 --settle 12 --window 12]   경보가 함께 켜진 구간·뒤따른 침체
+//!   figure lights <usrec.csv> --signals "…" [--labels a,b,c --from YYYY-MM]   경보마다 켜진 달 줄, 침체 음영
 //!   ladder <csv> [--depths 0.05,0.10,0.15,0.20,0.30,0.40,0.50]   지난 하락 중 깊이마다 간 수, 그 깊이에서 멈춘 하락의 회복 일수 중앙값. figure ladder [--labels …]
 //!   drawdowns <csv> [--threshold 0.10] [--deep 0.20] [--flag <csv>] [--forward 91,182,365]
 //!       최고점 대비 threshold 이상 하락한 사례 전부, 바닥·회복·기간, deep 이상(하락장) 갈래 요약,
@@ -590,8 +591,7 @@ fn ladder_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String>
 }
 
 /// together: 여러 경보가 함께 켜졌나. --signals "경로 key=val …;경로 …"(신호마다 load_with 옵션과 threshold, below)
-fn together_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
-    let ev = series::load(path)?;
+fn parse_signals(o: &HashMap<String, String>) -> Result<(Vec<together::Signal>, Vec<String>), String> {
     let mut sigs = Vec::new();
     let mut names = Vec::new();
     for spec in o.get("signals").ok_or("--signals \"경로 threshold=… [below] [avg=4 from-low=52];…\" 가 필요")?.split(';') {
@@ -602,6 +602,12 @@ fn together_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, Strin
         sigs.push(together::Signal { pts: load_with(p, &so)?, th, below: so.contains_key("below") });
         names.push(p.to_string());
     }
+    Ok((sigs, names))
+}
+
+fn together_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    let ev = series::load(path)?;
+    let (sigs, names) = parse_signals(o)?;
     let k = o.get("k").and_then(|v| v.parse().ok()).unwrap_or(2usize);
     let c = together::counts(&sigs);
     let (eps, by) = together::episodes(&c, &ev, k, o.get("settle").and_then(|v| v.parse().ok()).unwrap_or(12), o.get("window").and_then(|v| v.parse().ok()).unwrap_or(12));
@@ -737,6 +743,20 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             let rows: Vec<(String, usize, bool)> = rungs.iter().enumerate().map(|(k, r)| (labels.get(k).cloned().unwrap_or_else(|| format!("{:.0}% or more", depths[k] * 100.0)), r.reached, worst >= r.depth - 1e-12)).collect();
             csv = format!("depth,reached,completed\n{}", rungs.iter().map(|r| format!("{},{},{n}\n", r.depth, r.reached)).collect::<String>());
             viz::ladder(&rows, n, &title)
+        }
+        "lights" => {
+            // 경보 기간 그림: 신호마다 한 줄, 켜진 달을 칠하고 침체 달은 음영(--signals는 together와 같다, --labels "a,b,c", --from YYYY-MM)
+            // "곡선은 한번 켜지면 몇 년 켜져 있어 다른 하나만 켜져도 짝이 된다"를 줄로 보이게(B5)
+            let (sigs, _) = parse_signals(o)?;
+            let labels: Vec<String> = o.get("labels").map(|v| v.split(',').map(String::from).collect()).unwrap_or_default();
+            let maps: Vec<std::collections::BTreeMap<String, bool>> = sigs.iter().map(together::on_months).collect();
+            let from = o.get("from").cloned().unwrap_or_else(|| maps.iter().filter_map(|m| m.keys().next().cloned()).max().unwrap_or_default());
+            let to = maps.iter().filter_map(|m| m.keys().last().cloned()).max().unwrap_or_default();
+            let rec: Vec<String> = pts.iter().filter(|p| p.value >= 0.5).map(|p| p.date[..7].to_string()).filter(|m| *m >= from && *m <= to).collect();
+            let rows: Vec<(String, Vec<String>)> = maps.iter().enumerate().map(|(k, m)| (labels.get(k).cloned().unwrap_or(format!("Signal {}", k + 1)),
+                m.iter().filter(|(mo, on)| **on && **mo >= from).map(|(mo, _)| mo.clone()).collect())).collect();
+            csv = format!("signal,month_on\n{}", rows.iter().flat_map(|(n, ms)| ms.iter().map(move |m| format!("{n},{m}\n"))).collect::<String>());
+            viz::lights(&rows, &rec, &from, &to, &title)
         }
         "breadth" => {
             // breadth 명령과 같은 셈: 맨 위 '지금' 줄, 그 아래 침체마다 시작 달과 3달 뒤에 꺾인 지표 수(--names-legend "a,b")

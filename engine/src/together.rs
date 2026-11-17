@@ -14,15 +14,18 @@ fn add(m: &str, k: i32) -> String {
 }
 
 /// 달마다 켜진 신호 수(모든 신호에 자료가 있는 달만)
+/// 한 신호의 달마다 켜짐(그 달에 한 번이라도 문턱을 넘으면)
+pub fn on_months(s: &Signal) -> BTreeMap<String, bool> {
+    let mut m: BTreeMap<String, bool> = BTreeMap::new();
+    for p in &s.pts {
+        let on = if s.below { p.value <= s.th } else { p.value >= s.th };
+        *m.entry(p.date[..7].to_string()).or_insert(false) |= on;
+    }
+    m
+}
+
 pub fn counts(sigs: &[Signal]) -> BTreeMap<String, usize> {
-    let per: Vec<BTreeMap<String, bool>> = sigs.iter().map(|s| {
-        let mut m: BTreeMap<String, bool> = BTreeMap::new();
-        for p in &s.pts {
-            let on = if s.below { p.value <= s.th } else { p.value >= s.th };
-            *m.entry(p.date[..7].to_string()).or_insert(false) |= on;
-        }
-        m
-    }).collect();
+    let per: Vec<BTreeMap<String, bool>> = sigs.iter().map(on_months).collect();
     per[0].keys().filter(|k| per.iter().all(|m| m.contains_key(*k)))
         .map(|k| (k.clone(), per.iter().filter(|m| m[k]).count())).collect()
 }

@@ -68,3 +68,13 @@ Data: [rw-claims.csv](rw-claims.csv) · settings: [rw-claims.json](rw-claims.jso
 ```
 ./engine/target/release/mkviz-engine figure lead data/series/fred_ICSA.csv --avg 4 --axis 'Time from the jump to the next recession start (orange: within a year)' --event data/series/fred_USREC.csv --from-low 52 --mark 12 --threshold 0.2 --title 'Each jump in jobless claims since 1968: months until the next recession began' --zero-label 'same month' --out rw-claims.svg
 ```
+
+## rw-lights
+
+Data: [rw-lights.csv](rw-lights.csv) · settings: [rw-lights.json](rw-lights.json)
+
+![rw-lights](rw-lights.svg)
+
+```
+./engine/target/release/mkviz-engine figure lights data/series/fred_USREC.csv --from 1982-01 --labels 'Jobless claims up 20% from their low,Sahm rule at 0.5 or more,Yield curve inverted' --signals 'data/series/fred_ICSA.csv threshold=0.2 avg=4 from-low=52;data/series/fred_SAHMREALTIME.csv threshold=0.5;data/series/fred_T10Y3M.csv threshold=0 below' --title 'When each warning light was on, 1982-2026' --out rw-lights.svg
+```
