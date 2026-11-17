@@ -31,7 +31,7 @@ For every month in which all six series have a value, each series is compared wi
 | April 2001 | 2 | 4 |
 | January 2008 | 1 | 3 |
 | March 2020 | 6 | 6 |
-| **Now (August 2026)** | **zero** | |
+| **Now (August 2026)** | **0** | |
 
 Months outside recessions since 1967 with at least k of the six turned down: one or more 45%; two or more 18%; three or more 4%; four or more 2%.
 

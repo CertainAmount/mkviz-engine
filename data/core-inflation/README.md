@@ -62,8 +62,8 @@ Same split months as Test 1 (headline at least a point above core, since 1985), 
 | Guess | Average miss, points | Core closer than this guess |
 |---|---|---|
 | Core (CPI less food and energy) | 1.7 | |
-| Trimmed-mean CPI | two | 65% of months |
-| Median CPI | two | 62% of months |
+| Trimmed-mean CPI | 2 | 65% of months |
+| Median CPI | 2 | 62% of months |
 | Headline | 2.4 | 64% of months |
 
 Across all months since 1985, not just split months, trimmed mean and core were about even (average miss 1.11 and 1.12 points). So the measures built to strip out noise did no better than plain core in the months when energy pushed headline up, which is exactly when people reach for them.

@@ -63,3 +63,34 @@ mod tests {
         assert!(l[1].event.is_none() && l[1].lead_days == 31);
     }
 }
+
+/// 사건마다(침체 시작마다) 신호가 처음 켜진 날까지의 일수: 시작 before일 전부터 시작 after일 뒤 사이에서 가장 이른 신호일.
+/// 음수면 시작 전에 켜졌고, None이면 그 창에서 한 번도 켜지지 않았다(놓침). 신호 자료가 창을 덮지 못하는 사건은 뺀다.
+/// leads()는 '켜진 뒤 사건이 왔나'(헛경보)를 보고, 이것은 '사건마다 제때 켜졌나'(놓침)를 본다. 둘을 함께 써야 성적표가 된다
+pub fn caught(sig: &[Point], th: f64, below: bool, ev: &[Point], before: i64, after: i64) -> Vec<(String, Option<i64>)> {
+    let first = sig.first().map_or(i64::MAX, |p| p.day);
+    let last = sig.last().map_or(i64::MIN, |p| p.day);
+    ev.windows(2).filter(|w| w[0].value < 0.5 && w[1].value >= 0.5).map(|w| &w[1])
+        .filter(|p| p.day - before >= first && p.day + after <= last)
+        .map(|p| {
+            let on = sig.iter().find(|q| q.day >= p.day - before && q.day <= p.day + after && if below { q.value <= th } else { q.value >= th });
+            (p.date.clone(), on.map(|q| q.day - p.day))
+        }).collect()
+}
+
+#[cfg(test)]
+mod caught_test {
+    use super::*;
+    use crate::series::day_number;
+    fn s(v: &[(&str, f64)]) -> Vec<Point> { v.iter().map(|(d, x)| Point { date: d.to_string(), day: day_number(d).unwrap(), value: *x }).collect() }
+    #[test]
+    fn early_late_and_missed_events() {
+        let sig = s(&[("2000-01-01", 0.0), ("2000-06-01", 1.0), ("2001-01-01", 0.0), ("2003-01-01", 0.0), ("2004-01-01", 0.0), ("2005-01-01", 0.0)]);
+        let ev = s(&[("2000-01-01", 0.0), ("2000-09-01", 1.0), ("2000-12-01", 0.0), ("2003-06-01", 1.0), ("2003-09-01", 0.0)]);
+        let c = caught(&sig, 0.5, false, &ev, 365, 91);
+        assert_eq!(c.len(), 1); // 2000-09는 창의 앞(1999-09)이 자료보다 이르다
+        assert_eq!(c[0], ("2003-06-01".to_string(), None));
+        let c = caught(&sig, 0.5, false, &ev, 200, 91);
+        assert_eq!(c[0].1, Some(-92)); // 2000-06-01에 켜짐: 시작 92일 전
+    }
+}

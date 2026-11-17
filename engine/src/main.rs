@@ -2,6 +2,8 @@
 //! 글마다 즉석 계산하지 않고 여기 기능을 늘려 간다(남이 바로 줄 수 없는 분석이 E-E-A-T가 되게, Rust로 빠르고 가볍게).
 //!
 //! 명령:
+//!   together <usrec.csv> --signals "a.csv threshold=0.2 avg=4 from-low=52;b.csv threshold=0 below" [--k 2 --settle 12 --window 12]   경보가 함께 켜진 구간·뒤따른 침체
+//!   ladder <csv> [--depths 0.05,0.10,0.15,0.20,0.30,0.40,0.50]   지난 하락 중 깊이마다 간 수, 그 깊이에서 멈춘 하락의 회복 일수 중앙값. figure ladder [--labels …]
 //!   drawdowns <csv> [--threshold 0.10] [--deep 0.20] [--flag <csv>] [--forward 91,182,365]
 //!       최고점 대비 threshold 이상 하락한 사례 전부, 바닥·회복·기간, deep 이상(하락장) 갈래 요약,
 //!       flag(예: 경기침체) 겹침, 하락선을 넘은 날 이후 N일 변화율.
@@ -67,6 +69,7 @@ mod events;
 mod fit;
 mod bond;
 mod breadth;
+mod together;
 mod gapfill;
 mod pace;
 mod revisions;
@@ -126,23 +129,26 @@ fn drawdowns(path: &str, o: &HashMap<String, String>) -> Result<String, String> 
         let f: Vec<String> = fwd.iter().map(|d| format!("\"{d}\":{}", num(forward::after(&pts, cross, *d)))).collect();
         let _ = write!(
             j,
-            "{}{{\"peak\":{},\"peak_value\":{},\"cross\":{},\"low\":{},\"low_date\":{},\"recovered\":{},\"days_cross_to_low\":{},\"days_peak_to_recover\":{},\"flag\":{},\"forward\":{{{}}}}}",
+            "{}{{\"peak\":{},\"peak_value\":{},\"cross\":{},\"low\":{},\"low_date\":{},\"recovered\":{},\"days_cross_to_low\":{},\"days_peak_to_recover\":{},\"flag\":{},\"back\":{},\"low_at_back\":{},\"forward\":{{{}}}}}",
             if i > 0 { "," } else { "" }, s(&e.peak), num(Some(e.peak_value)), s(&e.cross), num(Some(e.low)), s(&e.low_date),
             e.recovered.as_deref().map(s).unwrap_or("null".into()), e.days_to_cross_low,
             e.days_to_recover.map(|d| d.to_string()).unwrap_or("null".into()),
-            e.flagged.map(|b| b.to_string()).unwrap_or("null".into()), f.join(",")
+            e.flagged.map(|b| b.to_string()).unwrap_or("null".into()), e.back.as_deref().map(s).unwrap_or("null".into()), num(e.low_at_back), f.join(",")
         );
     }
     let sm = episodes::summarize(&eps, deep);
+    // 깊은 선(deep) 전에 문턱 선 위로 되돌아온 완료 사례와 그 뒤 결국 deep까지 간 수: '선을 되찾으면 끝났나'
+    let back: Vec<&episodes::Episode> = eps.iter().filter(|e| e.recovered.is_some() && e.low_at_back.is_some_and(|l| l > -deep)).collect();
+    let back_deep = back.iter().filter(|e| e.low <= -deep).count();
     let flagged_deep = eps.iter().filter(|e| e.recovered.is_some() && e.low <= -deep && e.flagged == Some(true)).count();
     let last = pts.last().unwrap();
     let peak = pts.iter().fold(&pts[0], |a, p| if p.value >= a.value { p } else { a });
     let _ = write!(
         j,
-        "],\"summary\":{{\"threshold\":{th},\"deep\":{deep},\"n\":{},\"stopped\":{},\"deeper\":{},\"median_low_stopped\":{},\"median_low_deeper\":{},\"median_days_recover_stopped\":{},\"median_days_recover_deeper\":{},\"median_days_cross_to_low_stopped\":{},\"deeper_with_flag\":{},\"ci90_days_recover_stopped\":{}}},\"now\":{{\"date\":{},\"value\":{},\"peak\":{},\"peak_value\":{},\"from_peak\":{}}},\"first\":{}}}",
+        "],\"summary\":{{\"threshold\":{th},\"deep\":{deep},\"n\":{},\"stopped\":{},\"deeper\":{},\"median_low_stopped\":{},\"median_low_deeper\":{},\"median_days_recover_stopped\":{},\"median_days_recover_deeper\":{},\"median_days_cross_to_low_stopped\":{},\"deeper_with_flag\":{},\"back_before_deep\":{},\"back_then_deep\":{},\"ci90_days_recover_stopped\":{}}},\"now\":{{\"date\":{},\"value\":{},\"peak\":{},\"peak_value\":{},\"from_peak\":{}}},\"first\":{}}}",
         sm.n, sm.stopped, sm.deeper, num(sm.median_low_stopped), num(sm.median_low_deeper), num(sm.median_recover_stopped),
         num(sm.median_recover_deeper), num(sm.median_cross_to_low_stopped),
-        if o.contains_key("flag") { flagged_deep.to_string() } else { "null".into() },
+        if o.contains_key("flag") { flagged_deep.to_string() } else { "null".into() }, back.len(), back_deep,
         stats::median_ci(&eps.iter().filter(|e| e.recovered.is_some() && e.low > -deep).map(|e| e.days_to_recover.unwrap() as f64).collect::<Vec<_>>(), 0.9, 4000, 42)
             .map(|(a, b)| format!("[{a},{b}]")).unwrap_or("null".into()),
         s(&last.date), num(Some(last.value)), s(&peak.date), num(Some(peak.value)), num(Some(last.value / peak.value - 1.0)),
@@ -341,8 +347,16 @@ fn lead_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
     let items: Vec<String> = rows.iter().map(|r| format!("{{\"start\":{},\"end\":{},\"days\":{},\"event\":{},\"lead_months\":{},\"after_end_months\":{}}}",
         s(&r.start), s(&r.end), r.days, r.event.as_deref().map(s).unwrap_or("null".into()), num(Some(r.lead_days as f64 / 30.44)),
         num(Some((r.lead_days - r.days) as f64 / 30.44)))).collect();
-    Ok(format!("{{\"n\":{},\"followed\":{},\"median_lead_months\":{},\"min_lead_months\":{},\"max_lead_months\":{},\"episodes\":[{}]}}",
-        rows.len(), done.len(), num(stats::median(&done)), num(done.iter().cloned().reduce(f64::min)), num(done.iter().cloned().reduce(f64::max)), items.join(",")))
+    let within = |m: f64| rows.iter().filter(|r| r.event.is_some() && r.lead_days as f64 <= m * 30.44).count();
+    // 침체마다 제때 켜졌나(--before 12 --after 3 개월): 시작 12개월 전~3개월 뒤 사이 첫 신호. 놓친 침체를 세야 헛경보와 함께 성적표가 된다
+    let ev = series::load(o.get("event").ok_or("--event 가 필요")?)?;
+    let th: f64 = o.get("threshold").and_then(|v| v.parse().ok()).unwrap_or(0.0);
+    let mo = |k: &str, d: f64| o.get(k).and_then(|v| v.parse::<f64>().ok()).unwrap_or(d);
+    let c = lead::caught(&load_with(path, o)?, th, o.contains_key("below"), &ev, (mo("before", 12.0) * 30.44) as i64, (mo("after", 3.0) * 30.44) as i64);
+    let caught: Vec<String> = c.iter().map(|(d, x)| format!("{{\"event\":{},\"first_signal_months\":{}}}", s(d), num(x.map(|v| v as f64 / 30.44)))).collect();
+    Ok(format!("{{\"n\":{},\"followed\":{},\"followed_within_12m\":{},\"median_lead_months\":{},\"min_lead_months\":{},\"max_lead_months\":{},\"events_checked\":{},\"events_caught\":{},\"by_event\":[{}],\"episodes\":[{}]}}",
+        rows.len(), done.len(), within(12.0), num(stats::median(&done)), num(done.iter().cloned().reduce(f64::min)), num(done.iter().cloned().reduce(f64::max)),
+        c.len(), c.iter().filter(|x| x.1.is_some()).count(), caught.join(","), items.join(",")))
 }
 
 /// recessions: 사건 계열(USREC 0/1)의 구간마다 시작·끝·개월, --with 계열이 있으면 시작 직전 달 값과
@@ -554,6 +568,51 @@ fn breadth_rows(o: &HashMap<String, String>) -> Result<(Vec<String>, Vec<(String
     Ok((names, rows))
 }
 
+fn ladder_rows(pts: &[series::Point], o: &HashMap<String, String>) -> (Vec<f64>, Vec<episodes::Rung>, usize, Option<episodes::Episode>) {
+    let depths: Vec<f64> = o.get("depths").map(|v| v.split(',').filter_map(|x| x.parse().ok()).collect()).unwrap_or(vec![0.05, 0.10, 0.15, 0.20, 0.30, 0.40, 0.50]);
+    let eps = episodes::drawdowns(pts, depths[0]);
+    let (rungs, n) = episodes::ladder(&eps, &depths);
+    let open = eps.into_iter().last().filter(|e| e.recovered.is_none());
+    (depths, rungs, n, open)
+}
+
+fn ladder_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    let pts = load_with(path, o)?;
+    let (_, rungs, n, open) = ladder_rows(&pts, o);
+    let med = |v: &[i64]| -> Option<f64> { if v.is_empty() { return None; } let mut x = v.to_vec(); x.sort(); let m = x.len() / 2; Some(if x.len() % 2 == 1 { x[m] as f64 } else { (x[m - 1] + x[m]) as f64 / 2.0 }) };
+    let rows: Vec<String> = rungs.iter().map(|r| format!("{{\"depth\":{},\"reached\":{},\"share\":{},\"stopped_here\":{},\"median_days_recover_stopped_here\":{},\"median_days_to_bottom_stopped_here\":{}}}",
+        r.depth, r.reached, num(Some(r.reached as f64 / n.max(1) as f64)), r.stopped_days.len(), num(med(&r.stopped_days)), num(med(&r.fall_days)))).collect();
+    let last = pts.last().ok_or("자료 없음")?;
+    let hi = pts.iter().map(|p| p.value).fold(f64::MIN, f64::max);
+    let now = format!("{{\"date\":{},\"from_peak\":{},\"open_dip\":{}}}", s(&last.date), num(Some(last.value / hi - 1.0)),
+        open.map_or("null".into(), |e| format!("{{\"peak\":{},\"worst\":{},\"worst_date\":{}}}", s(&e.peak), num(Some(e.low)), s(&e.low_date))));
+    Ok(format!("{{\"completed\":{n},\"rows\":[{}],\"now\":{now}}}", rows.join(",")))
+}
+
+/// together: 여러 경보가 함께 켜졌나. --signals "경로 key=val …;경로 …"(신호마다 load_with 옵션과 threshold, below)
+fn together_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    let ev = series::load(path)?;
+    let mut sigs = Vec::new();
+    let mut names = Vec::new();
+    for spec in o.get("signals").ok_or("--signals \"경로 threshold=… [below] [avg=4 from-low=52];…\" 가 필요")?.split(';') {
+        let mut it = spec.split_whitespace();
+        let p = it.next().ok_or("빈 신호")?;
+        let so: HashMap<String, String> = it.map(|kv| { let (k, v) = kv.split_once('=').unwrap_or((kv, "")); (k.to_string(), v.to_string()) }).collect();
+        let th: f64 = so.get("threshold").and_then(|v| v.parse().ok()).ok_or("신호마다 threshold= 가 필요")?;
+        sigs.push(together::Signal { pts: load_with(p, &so)?, th, below: so.contains_key("below") });
+        names.push(p.to_string());
+    }
+    let k = o.get("k").and_then(|v| v.parse().ok()).unwrap_or(2usize);
+    let c = together::counts(&sigs);
+    let (eps, by) = together::episodes(&c, &ev, k, o.get("settle").and_then(|v| v.parse().ok()).unwrap_or(12), o.get("window").and_then(|v| v.parse().ok()).unwrap_or(12));
+    let within = eps.iter().filter(|e| e.lead_months.is_some_and(|m| m <= 12)).count();
+    let last = c.iter().last().map(|(m, n)| format!("{{\"month\":{},\"on\":{n}}}", s(m))).unwrap_or("null".into());
+    Ok(format!("{{\"signals\":[{}],\"k\":{k},\"first\":{},\"episodes_n\":{},\"followed_within_12m\":{within},\"episodes\":[{}],\"events\":[{}],\"now\":{last}}}",
+        names.iter().map(|x| s(x)).collect::<Vec<_>>().join(","), s(c.keys().next().map(String::as_str).unwrap_or("")), eps.len(),
+        eps.iter().map(|e| format!("{{\"start\":{},\"next_event\":{},\"lead_months\":{}}}", s(&e.start), e.next_event.as_deref().map(s).unwrap_or("null".into()), e.lead_months.map_or("null".into(), |m| m.to_string()))).collect::<Vec<_>>().join(","),
+        by.iter().map(|(d, b)| format!("{{\"event\":{},\"k_on_before\":{b}}}", s(d))).collect::<Vec<_>>().join(",")))
+}
+
 fn breadth_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
     let (names, rows) = breadth_rows(o)?;
     let ev = series::load(path)?;
@@ -644,7 +703,7 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             let marks: Vec<(i64, f64)> = if cut < f64::MAX {
                 episodes::drawdowns(&pts, cut).iter().filter(|e| e.recovered.is_some() || e.low_date != pts.last().map(|p| p.date.clone()).unwrap_or_default()).map(|e| (series::day_number(&e.low_date).unwrap_or(0), e.low)).collect()
             } else { vec![] };
-            viz::underwater(&turning::monthly(&pts), &lines, &flag, &marks, &title)
+            viz::underwater(&series::monthly_drawdown(&pts), &lines, &flag, &marks, &title)
         }
         "paths" => {
             let d: Vec<String> = o.get("dates").map(|v| v.split(',').map(String::from).collect()).unwrap_or_default();
@@ -669,6 +728,15 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             rows.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
             let rows: Vec<(String, f64, bool)> = rows.into_iter().map(|r| (r.1, r.2, r.3)).collect();
             viz::lead(&rows, "", -1.0, o.get("axis").map(String::as_str).unwrap_or("Months from high to new high"), &title)
+        }
+        "ladder" => {
+            // ladder 명령과 같은 셈: 깊이마다 지난 하락 중 그만큼 간 수, 지금 하락이 이미 지난 깊이는 파랑(--labels "Fell 5% or more,10%,…")
+            let (depths, rungs, n, open) = ladder_rows(&pts, o);
+            let worst = open.as_ref().map_or(0.0, |e| -e.low);
+            let labels: Vec<String> = o.get("labels").map(|v| v.split(',').map(String::from).collect()).unwrap_or_default();
+            let rows: Vec<(String, usize, bool)> = rungs.iter().enumerate().map(|(k, r)| (labels.get(k).cloned().unwrap_or_else(|| format!("{:.0}% or more", depths[k] * 100.0)), r.reached, worst >= r.depth - 1e-12)).collect();
+            csv = format!("depth,reached,completed\n{}", rungs.iter().map(|r| format!("{},{},{n}\n", r.depth, r.reached)).collect::<String>());
+            viz::ladder(&rows, n, &title)
         }
         "breadth" => {
             // breadth 명령과 같은 셈: 맨 위 '지금' 줄, 그 아래 침체마다 시작 달과 3달 뒤에 꺾인 지표 수(--names-legend "a,b")
@@ -698,7 +766,12 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
         "dots" => {
             let eps = episodes::drawdowns(&pts, opt_f(o, "threshold", 0.10));
             let items: Vec<(i64, f64, bool)> = eps.iter().map(|e| (series::day_number(&e.peak).unwrap(), e.low, e.recovered.is_none())).collect();
-            viz::dots(&items, opt_f(o, "deep", 0.20), &pts[0].date[..4], &pts.last().unwrap().date[..4], &title)
+            // 가장 깊었던 둘에 해와 깊이(--marks n, 기본 2)
+            let mut deep: Vec<&episodes::Episode> = eps.iter().filter(|e| e.recovered.is_some()).collect();
+            deep.sort_by(|a, b| a.low.partial_cmp(&b.low).unwrap());
+            let n: usize = o.get("marks").and_then(|v| v.parse().ok()).unwrap_or(2);
+            let marks: Vec<(i64, f64, String)> = deep.iter().take(n).map(|e| (series::day_number(&e.peak).unwrap(), e.low, e.peak[..4].to_string())).collect();
+            viz::dots(&items, opt_f(o, "deep", 0.20), &pts[0].date[..4], &pts.last().unwrap().date[..4], &title, &marks)
         }
         "response" => {
             let fol = series::load(o.get("follower").ok_or("--follower <csv> 가 필요")?)?;
@@ -1198,7 +1271,7 @@ fn export_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String>
 /// 방법 한 줄(글 끝 "How we did this"의 재료)과 재현 정보.
 fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> String {
     let method = match cmd {
-        "drawdowns" => "Episodes: every close at least the threshold below the prior record, followed to the lowest close and to a new record (peak-to-trough drawdown).",
+        "drawdowns" => "Episodes: every close at least the threshold below the prior record, followed to the lowest close and to a new record (peak-to-trough drawdown). 'Back' is the first later close above the threshold line before a new record; back_before_deep counts completed episodes that got back above it before reaching the deep line, back_then_deep those that still reached it later.",
         "position" => "Rank of the latest value among all observations in the period; 'last at or below' is the most recent earlier date with an equal or lower value.",
         "turning" => "Bull and bear phases dated with the Pagan and Sossounov (2003) rules on month-end values; the last turning point is provisional.",
         "sahm" => "Sahm rule: three-month average unemployment rate minus its low over the prior 12 months; 0.50 point or more signals recession (Sahm 2019).",
@@ -1212,8 +1285,10 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "revisions" => "For every month with both estimates, revision = later estimate minus first print. Reported: mean, mean and median absolute revision, 10th-90th percentile, share revised down, months whose sign flipped, the mean of each calendar year with at least ten months, and that range added to a new first print (--now).",
         "fit" => "Ordinary least squares on monthly averages: the coefficients come from the training months only; every month then gets the value those conditions usually went with (expected) and the actual minus expected (gap). With --change, an input is its percent change from n months earlier; with --ahead n, each month's inputs explain the value n months later; --y-change n turns the explained series into its n-month percent change too.",
         "spells" => "Every stretch of consecutive observations at or above the threshold (or at or below it), with its first and last date, length and most extreme value; the last one may still be under way.",
-        "lead" => "Signal episodes: consecutive days at or below the threshold (or at or above it), joined when the gap between them is the gap window or less and no event started in between; days inside an event do not count as signal; lead is the time from an episode's first day to the next start of the event series (a 0-to-1 step, e.g. NBER recession months).",
+        "lead" => "Signal episodes: consecutive days at or below the threshold (or at or above it), joined when the gap between them is the gap window or less and no event started in between; days inside an event do not count as signal; lead is the time from an episode's first day to the next start of the event series (a 0-to-1 step, e.g. NBER recession months). For each event start, the first day the signal was on from --before months before to --after months after (12 and 3 by default); none means missed.",
         "recessions" => "Each run of months flagged 1 in the event series (NBER recession months), with its length; with a second series, its value the month before the start and its highest value from the start to the given months after the end (or to the next recession start, if sooner).",
+        "together" => "Each signal is on in a month if any of its readings that month crossed its threshold. Episodes are runs of months with at least k signals on, starting outside the event (NBER recession) and outside the settle months after an event ends; for each, the months to the next event start. For each event start, whether at least k were on together in the window months before.",
+        "ladder" => "Every completed decline of at least the first depth from a prior record close (peak to trough, then a new record): how many reached each deeper depth, and the median days from peak to new record for declines whose trough fell between that depth and the next, and the median days from that record to the trough. The decline still under way is reported separately and not counted.",
         "breadth" => "For each month where every listed series has a value, the number of series at least the drop below their own highest value of the last window months (that month included); compared with the count in each month an event (NBER recession) began and three months later, and with how often months outside events reached each count.",
         "catchup" => "For every drawdown of the bond fund index (threshold below the prior high), the no-change path grows from the high at the yield of that month (semiannual compounding); catch-up is the first later month the actual index is back at or above that path, compared with the modified duration of a par bond at that yield. Months to a new high are counted from the same high.",
         "accel" => "Pace: the change over the last n months, annualized, compared with the 12-month change. For every month the pace ran at least the gap above the 12-month change, we looked up the 12-month change the given months later and counted how often it was higher.",
@@ -1261,6 +1336,8 @@ fn main() {
         ("payment", _, _) => payment_cmd(&opt),
         ("catchup", Some(p), _) => catchup_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("breadth", Some(p), _) => breadth_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
+        ("together", Some(p), _) => together_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
+        ("ladder", Some(p), _) => ladder_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("bond", _, _) => bond_cmd(&opt).map(|j| { let mut j = j; j.pop(); format!("{j},\"method\":{}}}", s("A bond fund's value drops at once by about its duration times the rise in yields (duration times the rise; no convexity), then compounds at the higher yield; the no-change path compounds at the old yield. Simplified: the fund's yield moves with the market at once and yields then stay put. Break-even is when the two paths meet.")) }),
         ("export", Some(p), _) => export_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("figure", Some(f), Some(p)) => figure_cmd(f, p, &opt).map(|j| with_meta(j, cmd, p, &opt)),

@@ -51,11 +51,11 @@ Stretches when the 13-week average gap stayed above 2.20 points points for three
 
 | Stretch | Months |
 |---|---|
-| 1980 | four |
+| 1980 | 4 |
 | 1981 to 1983 | 26 |
-| 1986 | nine |
+| 1986 | 9 |
 | 2008 to 2009 | 12 |
-| 2020 | six |
+| 2020 | 6 |
 | 2022 to 2025 | 41 |
 
 Median length 11 months. The 13-week average through Nov. 12 is 2.09 points, still below the line; a few more weeks near this week's gap would put it above.

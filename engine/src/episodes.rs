@@ -15,6 +15,9 @@ pub struct Episode {
     pub days_to_cross_low: i64,
     pub days_to_recover: Option<i64>,
     pub flagged: Option<bool>,
+    /// 문턱 선 위로 처음 되돌아온 날(교차 다음 날부터, 새 기록 전)과 그때까지의 바닥: '선을 되찾으면 끝났나'를 재는 데 쓴다
+    pub back: Option<String>,
+    pub low_at_back: Option<f64>,
 }
 
 /// threshold: 0.10이면 10% 하락. 마지막 사례가 회복 전이면 recovered = None(진행 중).
@@ -39,6 +42,7 @@ pub fn drawdowns(pts: &[Point], threshold: f64) -> Vec<Episode> {
                     Episode {
                         peak: peak.date.clone(), peak_value: peak.value, cross: p.date.clone(), low: dd,
                         low_date: p.date.clone(), recovered: None, days_to_cross_low: 0, days_to_recover: None, flagged: None,
+                        back: None, low_at_back: None,
                     },
                     p.day,
                     p.day,
@@ -51,6 +55,12 @@ pub fn drawdowns(pts: &[Point], threshold: f64) -> Vec<Episode> {
                 e.days_to_cross_low = *low_day - *cross_day;
             }
             _ => {}
+        }
+        if let Some((e, cross_day, _)) = cur.as_mut() {
+            if e.back.is_none() && p.day > *cross_day && dd > -threshold {
+                e.back = Some(p.date.clone());
+                e.low_at_back = Some(e.low);
+            }
         }
     }
     if let Some((e, _, _)) = cur {
@@ -172,5 +182,60 @@ mod spike_tests {
         let d = drops(&parse("d,v\n2020-01-01,100\n2020-01-02,95\n2020-01-03,70\n2020-01-04,60\n"), 2, 0.25);
         assert_eq!(d.len(), 1);
         assert_eq!(d[0].0, 2); // 70 / 100 - 1 = -0.3
+    }
+}
+
+/// 사다리: 지난 하락(threshold 이상, 회복한 것만) 중 각 깊이(depths)까지 내려간 수와, 바닥이 그 깊이와 다음 깊이 사이에서
+/// 멈춘 하락의 회복 일수(고점→새 고점) 목록. 진행 중인 하락은 세지 않고 따로 돌려준다(지금 깊이, 지금까지 바닥).
+pub struct Rung { pub depth: f64, pub reached: usize, pub stopped_days: Vec<i64>, pub fall_days: Vec<i64> }
+
+pub fn ladder(eps: &[Episode], depths: &[f64]) -> (Vec<Rung>, usize) {
+    let done: Vec<&Episode> = eps.iter().filter(|e| e.recovered.is_some()).collect();
+    let rungs = depths.iter().enumerate().map(|(k, d)| {
+        let next = depths.get(k + 1).copied().unwrap_or(f64::INFINITY);
+        Rung {
+            depth: *d,
+            reached: done.iter().filter(|e| -e.low >= *d - 1e-12).count(),
+            stopped_days: done.iter().filter(|e| -e.low >= *d - 1e-12 && -e.low < next - 1e-12).filter_map(|e| e.days_to_recover).collect(),
+            // 하락 자체의 길이(기록 → 바닥): '조정은 얼마나 가나'라는 검색 질문의 답(2026-11-17 콜드 리드)
+            fall_days: done.iter().filter(|e| -e.low >= *d - 1e-12 && -e.low < next - 1e-12)
+                .filter_map(|e| Some(crate::series::day_number(&e.low_date)? - crate::series::day_number(&e.peak)?)).collect(),
+        }
+    }).collect();
+    (rungs, done.len())
+}
+
+#[cfg(test)]
+mod ladder_test {
+    use super::*;
+    fn ep(low: f64, days: Option<i64>) -> Episode {
+        Episode { peak: "2000-01-01".into(), peak_value: 1.0, cross: "2000-01-02".into(), low, low_date: "2000-01-03".into(),
+                  recovered: days.map(|_| "2000-02-01".into()), days_to_cross_low: 0, days_to_recover: days, flagged: None, back: None, low_at_back: None }
+    }
+    #[test]
+    fn counts_reached_depths_and_recovery_by_band() {
+        let eps = vec![ep(-0.06, Some(50)), ep(-0.12, Some(200)), ep(-0.25, Some(700)), ep(-0.08, None)];
+        let (r, n) = ladder(&eps, &[0.05, 0.10, 0.20]);
+        assert_eq!(n, 3); // 진행 중인 하락은 빼고
+        assert_eq!(r.iter().map(|x| x.reached).collect::<Vec<_>>(), vec![3, 2, 1]);
+        assert_eq!(r[0].stopped_days, vec![50]);
+        assert_eq!(r[1].stopped_days, vec![200]);
+        assert_eq!(r[2].stopped_days, vec![700]);
+        assert_eq!(r[0].fall_days, vec![2]); // 2000-01-01 기록 → 2000-01-03 바닥
+    }
+}
+
+#[cfg(test)]
+mod back_test {
+    use super::*;
+    use crate::series::day_number;
+    #[test]
+    fn first_close_back_above_the_line() {
+        let p = |d: &str, v: f64| Point { date: d.to_string(), day: day_number(d).unwrap(), value: v };
+        let pts = vec![p("2000-01-03", 100.0), p("2000-01-04", 88.0), p("2000-01-05", 92.0), p("2000-01-06", 75.0), p("2000-01-07", 101.0)];
+        let e = &drawdowns(&pts, 0.10)[0];
+        assert_eq!(e.back.as_deref(), Some("2000-01-05"));
+        assert!((e.low_at_back.unwrap() + 0.12).abs() < 1e-12);
+        assert!((e.low + 0.25).abs() < 1e-12); // 되찾은 뒤 더 깊어짐
     }
 }

@@ -81,7 +81,8 @@ pub fn underwater(pts: &[Point], lines: &[f64], flag: &[Point], marks_in: &[(i64
             let mut ly = (y(v) + 18.0).min(H - B - 4.0);
             while placed.iter().any(|&(px, py)| (x(d as f64) - px).abs() < 70.0 && (ly - py).abs() < 16.0) { ly += 17.0; }
             placed.push((x(d as f64), ly));
-            let year = pts.iter().find(|p| p.day >= d).map(|p| &p.date[..4]).unwrap_or("");
+            // 바닥이 든 달(달 첫 관측일 ≤ 바닥일인 마지막 점): 1987-12-04 바닥이 다음 달 점을 집어 1988로 적혔다
+            let year = pts.iter().filter(|p| p.day <= d).last().or(pts.first()).map(|p| &p.date[..4]).unwrap_or("");
             // 해와 깊이를 함께(그림만 봐도 '얼마나'가 읽히게, 주석 연구: Borkin 외 2016)
             let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"14\">{year} {}</text>", x(d as f64).clamp(L + 30.0, W - R - 30.0), ly, pct(v));
         }
@@ -89,7 +90,9 @@ pub fn underwater(pts: &[Point], lines: &[f64], flag: &[Point], marks_in: &[(i64
     // 지금 위치: 마지막 점에 점과 'Now'(독자가 '지금은 어디냐'를 바로 찾게)
     if let Some(&(d, v)) = dd.last() {
         if v < 0.0 {
-            let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"5\" fill=\"{BLUE}\" stroke=\"#fff\" stroke-width=\"2\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-weight=\"600\" font-size=\"14\">Now {}</text>", x(d as f64), y(v), x(d as f64) - 8.0, y(v) - 10.0, pct(v));
+            let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"5\" fill=\"{BLUE}\" stroke=\"#fff\" stroke-width=\"2\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-weight=\"600\" font-size=\"14\" stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\">Now {}</text>", x(d as f64), y(v), x(d as f64) - 8.0,
+                // 0% 선 가까이면 점 아래에(위에 두면 기준선·선과 겹쳤다, 2026-11-17 콜드 리드), 흰 테두리로 선 위에서도 읽히게
+                if y(v) - T < 30.0 { y(v) + 22.0 } else { y(v) - 10.0 }, pct(v));
         }
     }
     let (ya, yb) = (&pts[0].date[..4], &pts.last().unwrap().date[..4]);
@@ -343,7 +346,8 @@ pub fn recent(pts: &[Point], title: &str, suffix: &str, decimals: usize, now_lab
 }
 
 /// 사례 점 그림: 사례마다 점 하나(가로 = 시작 연도, 세로 = 깊이). 기준선 하나, 지금 사례만 파랑(Cleveland & McGill: 같은 축 위 위치).
-pub fn dots(items: &[(i64, f64, bool)], line: f64, first_year: &str, last_year: &str, title: &str) -> String {
+/// marks: 이름을 붙일 점(날, 깊이, 해). 기준선·지금 점·가장 깊은 점에 이름표: 그림만 봐도 읽히게(2026-11-17 콜드 리드 두 명이 '이름 없는 점'을 짚음)
+pub fn dots(items: &[(i64, f64, bool)], line: f64, first_year: &str, last_year: &str, title: &str, marks: &[(i64, f64, String)]) -> String {
     let lo = items.iter().map(|i| i.1).fold(0.0, f64::min);
     let lo = (lo * 10.0).floor() / 10.0;
     let (x0, x1) = (items.iter().map(|i| i.0).min().unwrap_or(0) as f64, items.iter().map(|i| i.0).max().unwrap_or(1) as f64);
@@ -356,8 +360,16 @@ pub fn dots(items: &[(i64, f64, bool)], line: f64, first_year: &str, last_year: 
         v -= 0.2;
     }
     let _ = write!(s, "<line x1=\"{L}\" x2=\"{}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{INK}\" stroke-dasharray=\"4 3\"/>", W - R, y(-line), y(-line));
+    let halo = "stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\"";
+    let _ = write!(s, "<text x=\"{}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\" {halo}>Bear market: {}% down</text>", L + 4.0, y(-line) + 16.0, (line * 100.0).round());
     for &(d, v, now) in items {
         let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"{}\" fill=\"{}\" fill-opacity=\"{}\"/>", x(d as f64), y(v), if now { 6 } else { 4 }, if now { BLUE } else { GRAY }, if now { 1.0 } else { 0.8 });
+        if now {
+            let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{BLUE}\" font-weight=\"600\" font-size=\"14\" {halo}>This drop so far {}</text>", x(d as f64) - 10.0, y(v) - 8.0, pct(v));
+        }
+    }
+    for (d, v, yr) in marks {
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\" {halo}>{yr} {}</text>", (x(*d as f64) + 8.0).min(W - R - 70.0), y(*v) + 4.0, pct(*v));
     }
     let _ = write!(s, "<text x=\"{L}\" y=\"{}\" fill=\"{INK}\">{first_year}</text><text x=\"{}\" y=\"{}\" text-anchor=\"end\" fill=\"{INK}\">{last_year}</text></svg>", H - 6.0, W - R, H - 6.0);
     s
@@ -705,7 +717,7 @@ mod more_frames {
     fn band_and_dots() {
         let p = parse("d,v\n2000-01-01,1\n2001-01-01,3\n2002-01-01,2\n");
         assert!(band(&p, "t", false, "%").contains("<circle"));
-        let d = dots(&[(0, -0.15, false), (400, -0.3, true)], 0.2, "1971", "2026", "t");
+        let d = dots(&[(0, -0.15, false), (400, -0.3, true)], 0.2, "1971", "2026", "t", &[(0, -0.15, "1971".to_string())]);
         assert!(d.matches("<circle").count() == 2 && d.contains("#2563eb"));
     }
 }
@@ -1347,5 +1359,35 @@ mod race_test {
         let svg = super::race(&[("B".into(), 2.4), ("A".into(), 1.7)], " pts", "t");
         let (a, b) = (svg.find(">A<").unwrap(), svg.find(">B<").unwrap());
         assert!(a < b && svg.contains("1.7 pts") && svg.matches("#2563eb").count() >= 2);
+    }
+}
+
+/// 사다리 그림: 깊이마다 한 줄, 지난 하락 중 그 깊이까지 간 수(막대 길이 = 몫)와 "k of n". 지금 하락이 이미 지난 깊이는 파랑.
+/// "이만큼 빠졌을 때 더 깊어진 적이 얼마나 되나"를 위에서 아래로 줄어드는 막대로(B5)
+pub fn ladder(rows: &[(String, usize, bool)], n: usize, title: &str) -> String {
+    let row = 46.0;
+    let h = T + rows.len() as f64 * row + 8.0;
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    let (x0, x1) = (16.0, W - R - 92.0);
+    for (k, (name, c, now)) in rows.iter().enumerate() {
+        let y = T + k as f64 * row;
+        let w = (*c as f64 / n.max(1) as f64 * (x1 - x0)).max(2.0);
+        let (fill, ink) = if *now { (BLUE, BLUE) } else { (GRAY, INK) };
+        let _ = write!(s, "<text x=\"{x0}\" y=\"{:.1}\" fill=\"{ink}\" font-size=\"14\">{}</text><rect x=\"{x0}\" y=\"{:.1}\" width=\"{w:.1}\" height=\"14\" rx=\"3\" fill=\"{fill}\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{ink}\" font-size=\"14\" font-weight=\"600\">{c} of {n}</text>",
+            y + 13.0, name.replace('&', "&amp;"), y + 19.0, x0 + w + 6.0, y + 31.0);
+    }
+    s.push_str("</svg>");
+    s
+}
+
+#[cfg(test)]
+mod ladder_test {
+    #[test]
+    fn ladder_marks_reached_rungs_blue() {
+        let rows = vec![("Fell 5% or more".to_string(), 74, true), ("10% or more".to_string(), 26, false)];
+        let svg = super::ladder(&rows, 74, "t");
+        assert!(svg.contains("74 of 74") && svg.contains("26 of 74"));
+        assert_eq!(svg.matches("fill=\"#2563eb\"").count(), 3); // 파랑 줄의 이름·막대·값
+        assert!(svg.ends_with("</svg>"));
     }
 }

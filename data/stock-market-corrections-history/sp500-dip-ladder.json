@@ -1,0 +1,1 @@
+{"frame":"ladder","input":"data/series/index_gspc_long.csv","params":{"labels":"Fell 5% or more,10% or more (correction),15% or more,20% or more (bear market),30% or more,40% or more,50% or more","title":"S&P 500 declines since 1950 that reached each depth"}}

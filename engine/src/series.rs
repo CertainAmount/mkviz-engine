@@ -250,3 +250,38 @@ mod tests {
         assert!((g[0].value - (7.11 - 6.0)).abs() < 1e-9, "{}", g[0].value); // 11-05~11-11의 9, 4, 5 평균 6. 그날(11-12) 값은 빼지 않는다
     }
 }
+
+/// 물속 그림용 월간 계열: 일별 기록 고점 대비 낙폭을 달마다 가장 깊은 값으로(마지막 달은 마지막 날 값), 1 + 낙폭으로 돌려준다.
+/// 달 끝 값만 쓰면 달 중간의 기록(2026-10-06)과 바닥(1987-10-19)을 놓쳐 '지금'이 일별 값과 달랐다(2026-11-17)
+pub fn monthly_drawdown(pts: &[Point]) -> Vec<Point> {
+    let mut peak = f64::MIN;
+    let mut out: Vec<Point> = Vec::new();
+    for (i, p) in pts.iter().enumerate() {
+        peak = peak.max(p.value);
+        let v = p.value / peak;
+        let last = i + 1 == pts.len();
+        match out.last_mut() {
+            Some(l) if l.date[..7] == p.date[..7] => { if last { *l = Point { value: v, ..p.clone() }; } else if v < l.value { l.value = v; } }
+            _ => out.push(Point { value: v, ..p.clone() }),
+        }
+    }
+    // 그림은 받은 값의 누적 최고를 고점으로 삼는다: 맨 앞에 1(첫날이 첫 고점)을 두어 낙폭 값이 그대로 그려지게
+    if let Some(f) = pts.first() { out.insert(0, Point { value: 1.0, day: f.day - 1, ..f.clone() }); }
+    out
+}
+
+#[cfg(test)]
+mod monthly_drawdown_test {
+    use super::*;
+    #[test]
+    fn deepest_in_month_and_latest_last() {
+        let p = |d: &str, v: f64| Point { date: d.to_string(), day: day_number(d).unwrap(), value: v };
+        let pts = vec![p("2020-01-02", 100.0), p("2020-01-15", 110.0), p("2020-01-31", 105.0), p("2020-02-10", 88.0), p("2020-02-28", 99.0), p("2020-03-02", 90.0), p("2020-03-05", 104.5)];
+        let m = monthly_drawdown(&pts);
+        assert_eq!(m.len(), 4);
+        assert!((m[0].value - 1.0).abs() < 1e-12);            // 맨 앞 고점 1
+        assert!((m[1].value - 105.0 / 110.0).abs() < 1e-12);  // 1월: 가장 깊은 값(110 기록 뒤 105)
+        assert!((m[2].value - 0.8).abs() < 1e-12);            // 2월: 88/110 (달 끝 99가 아니라 가장 깊은 값)
+        assert!((m[3].value - 0.95).abs() < 1e-12);           // 마지막 달: 마지막 날 104.5/110
+    }
+}
