@@ -88,3 +88,11 @@ Data: [yc-rounds.csv](yc-rounds.csv) · settings: [yc-rounds.json](yc-rounds.jso
 ```
 ./engine/target/release/mkviz-engine figure rounds data/series/fred_DGS10.csv --event data/series/fred_USREC.csv --labels '1965-66 inversion,1998 inversion,2022-24 inversion' --minus data/series/fred_DGS1.csv --months 60 --starts 1965-09-24,1998-09-18,2022-07-12 --title '10-year minus 1-year Treasury: inverted months after the first inversion' --out yc-rounds.svg
 ```
+
+## yc-stocks
+
+Data: [yc-stocks.csv](yc-stocks.csv) · settings: [yc-stocks.json](yc-stocks.json)
+
+![yc-stocks](yc-stocks.svg)
+
+Drawn from market prices we don't redistribute; the chart data is in the CSV.

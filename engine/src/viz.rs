@@ -730,7 +730,8 @@ mod more_frames {
 
 /// 반응 경로 그림: 사건(선행 지표가 움직이기 시작한 날)을 0일로 맞추고 후행 지표의 변화 경로를 그룹마다 중앙값 선 + 사분위 띠로.
 /// groups: (이름, 색, 사례마다 offsets 길이의 경로). 같은 축에서 오를 때·내릴 때의 모양(빠르기)을 비교한다(B5: 같은 축 위치).
-pub fn response(groups: &[(String, &str, Vec<Vec<f64>>)], offsets: &[i64], title: &str) -> String {
+/// end_values: 끝 이름표 아래 값. 표가 같은 값을 다른 표본(날짜 기준)으로 따로 줄 때는 끈다(--no-end-values: 주 단위 끝값 +14%와 표의 2년 +16.2%가 달라 보였다, 2026-11-18)
+pub fn response(groups: &[(String, &str, Vec<Vec<f64>>)], offsets: &[i64], title: &str, end_values: bool) -> String {
     let q = |v: &mut Vec<f64>, f: f64| -> f64 { v.sort_by(|a, b| a.partial_cmp(b).unwrap()); v[((v.len() - 1) as f64 * f).round() as usize] };
     // offsets마다 (25%, 50%, 75%)
     let stats: Vec<Vec<(f64, f64, f64)>> = groups.iter().map(|(_, _, paths)| {
@@ -754,6 +755,11 @@ pub fn response(groups: &[(String, &str, Vec<Vec<f64>>)], offsets: &[i64], title
                        W - R - 84.0, y(v), y(v), if v.abs() < 1e-9 { INK } else { "#e5e7eb" }, L - 6.0, y(v) + 4.0, pct(v));
         v += step;
     }
+    // 끝 이름표 자리: 두 묶음의 끝값이 가까우면 이름표가 겹쳤다(2026-11-18 역전 뒤 주식 그림). 34px 이상 벌린다
+    let mut ly: Vec<(usize, f64)> = stats.iter().enumerate().map(|(g, st)| (g, y(st.last().unwrap().1))).collect();
+    ly.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    for k in 1..ly.len() { if ly[k].1 - ly[k - 1].1 < 34.0 { ly[k].1 = ly[k - 1].1 + 34.0; } }
+    let label_y = |g: usize| ly.iter().find(|(i, _)| *i == g).map(|t| t.1).unwrap_or(0.0);
     for (g, (name, color, _)) in groups.iter().enumerate() {
         let st = &stats[g];
         let top: Vec<String> = offsets.iter().zip(st).map(|(d, t)| format!("{:.1},{:.1}", x(*d as f64), y(t.2))).collect();
@@ -763,8 +769,10 @@ pub fn response(groups: &[(String, &str, Vec<Vec<f64>>)], offsets: &[i64], title
         let _ = write!(s, "<polyline points=\"{}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"2.5\"/>", mid.join(" "));
         let last = st.last().unwrap().1;
         let _ = write!(s, "<text x=\"{}\" y=\"{:.1}\" fill=\"{color}\" font-weight=\"600\">{}</text><text x=\"{}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"14\">{}{}</text>",
-                       W - R - 80.0, y(last) - 4.0, name.replace('&', "&amp;"), W - R - 80.0, y(last) + 13.0, if last > 0.0 { "+" } else { "" }, pct(last));
+                       W - R - 80.0, label_y(g) - 4.0, name.replace('&', "&amp;"), W - R - 80.0, label_y(g) + 13.0, if !end_values { "" } else if last > 0.0 { "+" } else { "" }, if end_values { pct(last) } else { String::new() });
     }
+    // 띠의 뜻을 그림 안에(두 독자가 띠 범례가 없다고 짚었다, 2026-11-18)
+    let _ = write!(s, "<rect x=\"{}\" y=\"{}\" width=\"14\" height=\"10\" fill=\"{INK}\" fill-opacity=\"0.15\"/><text x=\"{}\" y=\"{}\" fill=\"{INK}\" font-size=\"13\">Shaded: middle half of cases</text>", L + 4.0, T + 2.0, L + 22.0, T + 11.0);
     let _ = write!(s, "<text x=\"{L}\" y=\"{}\" fill=\"{INK}\">0</text><text x=\"{}\" y=\"{}\" text-anchor=\"end\" fill=\"{INK}\">{} weeks</text></svg>",
                    H - 6.0, x(xmax), H - 6.0, offsets.last().unwrap() / 7);
     s
@@ -777,7 +785,7 @@ mod response_test {
     #[test]
     fn response_draws_band_and_median() {
         let g = vec![("Drops".to_string(), BLUE, vec![vec![0.0, -0.05, -0.08], vec![0.0, -0.03, -0.06], vec![0.0, -0.04, -0.07]])];
-        let svg = response(&g, &[0, 7, 14], "t");
+        let svg = response(&g, &[0, 7, 14], "t", true);
         assert!(svg.contains("<polygon") && svg.contains("<polyline") && svg.contains("Drops") && svg.contains("2 weeks"));
     }
 }

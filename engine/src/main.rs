@@ -881,7 +881,7 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
                 (o.get("up-label").cloned().unwrap_or("After big jumps".into()), "#eb6834", path(episodes::spikes(&pts, w, th))),
                 (o.get("down-label").cloned().unwrap_or("After big drops".into()), "#2563eb", path(episodes::drops(&pts, w, th))),
             ];
-            viz::response(&groups, &offsets, &title)
+            viz::response(&groups, &offsets, &title, !o.contains_key("no-end-values"))
         }
         "fan" => {
             // 사건 날짜들 뒤의 경로를 중앙값 선 + 사분위 띠로(강조할 '지금'이 없는 참조군 그림, 예: 중간선거 13번)
@@ -896,7 +896,7 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
                     .map(|p| offsets.iter().map(|d| if *d == 0 { 0.0 } else { forward::after(&pts, p.day, *d).unwrap_or(f64::NAN) }).collect()).collect();
                 groups.insert(0, (o.get("base-label").cloned().unwrap_or("Any time".into()), "#94a3b8", any));
             }
-            viz::response(&groups, &offsets, &title)
+            viz::response(&groups, &offsets, &title, !o.contains_key("no-end-values"))
         }
         "cases" => {
             // 사건마다 한 줄: 도중 최저점(첫 시점까지)·첫 시점·둘째 시점, 세로선은 첫 시점의 기저율 중앙값
