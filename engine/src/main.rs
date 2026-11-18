@@ -4,6 +4,8 @@
 //! 명령:
 //!   together <usrec.csv> --signals "a.csv threshold=0.2 avg=4 from-low=52;b.csv threshold=0 below" [--k 2 --settle 12 --window 12]   경보가 함께 켜진 구간·뒤따른 침체
 //!   figure lights <usrec.csv> --signals "…" [--labels a,b,c --from YYYY-MM]   경보마다 켜진 달 줄, 침체 음영
+//!   figure rounds <spread.csv> --event <usrec.csv> --starts d1,d2 [--labels … --months 60 --threshold 0]   첫 역전 뒤 달마다 뒤집혔나, 침체 시작 달(재역전 그림)
+//!   need <mortgage.csv> --minus <dgs10.csv> --minus-window 7 [--targets 3,4,5,6 --years 5 --near 0.25]   목표 금리에 필요한 10년 국채, 그런 주의 몫, 지금 금리에서 years년 안에 목표까지 간 적. figure need
 //!   ladder <csv> [--depths 0.05,0.10,0.15,0.20,0.30,0.40,0.50]   지난 하락 중 깊이마다 간 수, 그 깊이에서 멈춘 하락의 회복 일수 중앙값. figure ladder [--labels …]
 //!   drawdowns <csv> [--threshold 0.10] [--deep 0.20] [--flag <csv>] [--forward 91,182,365]
 //!       최고점 대비 threshold 이상 하락한 사례 전부, 바닥·회복·기간, deep 이상(하락장) 갈래 요약,
@@ -77,6 +79,7 @@ mod revisions;
 mod forward;
 mod indicators;
 mod lead;
+mod need;
 mod probit;
 mod series;
 mod stats;
@@ -577,6 +580,39 @@ fn ladder_rows(pts: &[series::Point], o: &HashMap<String, String>) -> (Vec<f64>,
     (depths, rungs, n, open)
 }
 
+/// need: 대출 금리(path)와 국채(--minus, 조사 기간 평균 --minus-window)로 주마다 (금리, 국채)를 짝짓는다(need.rs)
+fn need_weeks(path: &str, o: &HashMap<String, String>) -> Result<Vec<need::Week>, String> {
+    let rate = series::load(path)?;
+    let base = series::load(o.get("minus").ok_or("--minus <국채 csv> 가 필요")?)?;
+    let n: i64 = o.get("minus-window").and_then(|v| v.parse().ok()).unwrap_or(7);
+    let gap = series::minus_window(&rate, &base, n);
+    let by: HashMap<&str, f64> = gap.iter().map(|p| (p.date.as_str(), p.value)).collect();
+    Ok(rate.iter().filter_map(|p| by.get(p.date.as_str()).map(|g| need::Week { date: p.date.clone(), day: p.day, rate: p.value, base: p.value - g })).collect())
+}
+
+fn need_run(path: &str, o: &HashMap<String, String>) -> Result<need::Need, String> {
+    let w = need_weeks(path, o)?;
+    if w.is_empty() { return Err("자료 없음".into()); }
+    let targets: Vec<f64> = o.get("targets").map(|v| v.split(',').filter_map(|x| x.parse().ok()).collect()).unwrap_or(vec![3.0, 4.0, 5.0, 6.0]);
+    Ok(need::need(&w, &targets, opt_f(o, "years", 5.0), opt_f(o, "near", 0.25)))
+}
+
+fn need_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    let w = need_weeks(path, o)?;
+    let n = need_run(path, o)?;
+    let last = w.last().unwrap();
+    let opt_s = |v: &Option<String>| v.as_deref().map(s).unwrap_or("null".into());
+    let rows: Vec<String> = n.targets.iter().map(|t| format!(
+        "{{\"target\":{},\"base_needed\":{},\"base_needed_tight_gap\":{},\"base_needed_wide_gap\":{},\"base_share_at_or_below\":{},\"base_last_at_or_below\":{},\"rate_share_at_or_below\":{},\"rate_weeks\":{},\"rate_first\":{},\"rate_last\":{},\"starts_reached\":{}}}",
+        t.target, num(Some(t.base_needed)), num(Some(t.base_needed_tight)), num(Some(t.base_needed_wide)), num(Some(t.base_share)), opt_s(&t.base_last),
+        num(Some(t.rate_share)), t.rate_weeks, opt_s(&t.rate_first), opt_s(&t.rate_last), t.starts_reached)).collect();
+    Ok(format!(
+        "{{\"date\":{},\"rate\":{},\"base\":{},\"weeks\":{},\"first\":{},\"gap_now\":{},\"gap_median\":{},\"gap_q10\":{},\"gap_q90\":{},\"targets\":[{}],\"similar_starts\":{{\"near\":{},\"years\":{},\"weeks\":{},\"years_list\":[{}],\"lowest_after\":{},\"lowest_after_from\":{},\"median_low\":{}}}}}",
+        s(&last.date), num(Some(last.rate)), num(Some(last.base)), w.len(), s(&w[0].date), num(Some(n.gap_now)), num(Some(n.gap_med)), num(Some(n.gap_q10)), num(Some(n.gap_q90)),
+        rows.join(","), opt_f(o, "near", 0.25), opt_f(o, "years", 5.0), n.starts, n.start_years.iter().map(|y| y.to_string()).collect::<Vec<_>>().join(","),
+        num(n.lowest_after), opt_s(&n.lowest_after_from), num(n.median_low)))
+}
+
 fn ladder_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
     let pts = load_with(path, o)?;
     let (_, rungs, n, open) = ladder_rows(&pts, o);
@@ -716,7 +752,11 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             let labels: Vec<String> = o.get("labels").map(|v| v.split(',').map(String::from).collect()).unwrap_or_default();
             viz::paths_with(&pts, &d, o.get("days").and_then(|v| v.parse().ok()).unwrap_or(365), &title, o.contains_key("diff"), &labels)
         }
-        "recent" => { let n = o.get("weeks").and_then(|v| v.parse().ok()).unwrap_or(53usize); viz::recent(&pts[pts.len().saturating_sub(n)..], &title, o.get("suffix").map(String::as_str).unwrap_or(""), o.get("decimals").and_then(|v| v.parse().ok()).unwrap_or(2), o.get("now").map(String::as_str).unwrap_or("Now")) }
+        "recent" => { let n = o.get("weeks").and_then(|v| v.parse().ok()).unwrap_or(53usize);
+            // CSV도 그림에 보이는 기간만(전체 역사를 주면 내려받은 표와 그림이 달랐다, 2026-11-18)
+            let w = &pts[pts.len().saturating_sub(n)..];
+            csv = format!("date,value\n{}", w.iter().map(|p| format!("{},{}\n", p.date, p.value)).collect::<String>());
+            viz::recent(w, &title, o.get("suffix").map(String::as_str).unwrap_or(""), o.get("decimals").and_then(|v| v.parse().ok()).unwrap_or(2), o.get("now").map(String::as_str).unwrap_or("Now"), o.get("line").and_then(|v| v.split_once('|')).and_then(|(a, b)| Some((a.parse().ok()?, b)))) }
         "tracker" => viz::tracker(&pts, &turning::monthly(&pts), &title, o.get("suffix").map(String::as_str).unwrap_or(""), o.get("peaks").and_then(|v| v.parse().ok()).unwrap_or(3), &o.get("years").map(|v| v.split(',').map(String::from).collect::<Vec<_>>()).unwrap_or_default(), o.get("note").map(String::as_str).unwrap_or(""), opt_f(o, "mid", 0.8)),
         "band" => viz::band(&turning::monthly(&pts), &title, o.contains_key("pct"), o.get("suffix").map(String::as_str).unwrap_or("")),
         "recover" => {
@@ -734,6 +774,39 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             rows.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
             let rows: Vec<(String, f64, bool)> = rows.into_iter().map(|r| (r.1, r.2, r.3)).collect();
             viz::lead(&rows, "", -1.0, o.get("axis").map(String::as_str).unwrap_or("Months from high to new high"), &title)
+        }
+        "need" => {
+            // 필요 국채 그림: 목표 금리마다 한 줄, 보통 금리 차일 때 필요한 10년 국채(점)와 금리 차 가운데 80%의 범위(띠), 지금 국채 세로선
+            let n = need_run(path, o)?;
+            let w = need_weeks(path, o)?;
+            let now = w.last().unwrap().base;
+            let rows: Vec<(String, f64, f64, f64, f64)> = n.targets.iter().map(|t| (format!("{}% mortgage", t.target), t.base_needed_wide, t.base_needed, t.base_needed_tight, t.base_share)).collect();
+            csv = format!("target,base_needed_wide_gap,base_needed,base_needed_tight_gap,share_of_weeks_10y_at_or_below\n{}", n.targets.iter().map(|t| format!("{},{:.3},{:.3},{:.3},{:.4}\n", t.target, t.base_needed_wide, t.base_needed, t.base_needed_tight, t.base_share)).collect::<String>());
+            viz::need(&rows, now, &title)
+        }
+        "rounds" => {
+            // 재역전 그림: --starts d1,d2 (첫 역전일), --labels, --months 60, --event <usrec.csv>, 한 달에 하루라도 threshold 이하면 뒤집힌 달
+            let th = opt_f(o, "threshold", 0.0);
+            let months = opt_f(o, "months", 60.0) as usize;
+            let ev = series::load(o.get("event").ok_or("--event <usrec.csv> 가 필요")?)?;
+            let starts: Vec<String> = o.get("starts").ok_or("--starts 가 필요")?.split(',').map(String::from).collect();
+            let labels: Vec<String> = o.get("labels").map(|v| v.split(',').map(String::from).collect()).unwrap_or_default();
+            let ym = |d: &str| -> i64 { d[..4].parse::<i64>().unwrap_or(0) * 12 + d[5..7].parse::<i64>().unwrap_or(1) - 1 };
+            let mut inv: std::collections::BTreeMap<i64, bool> = std::collections::BTreeMap::new();
+            for p in &pts { let e = inv.entry(ym(&p.date)).or_insert(false); *e = *e || p.value <= th; }
+            let last = pts.last().map(|p| ym(&p.date)).unwrap_or(0);
+            let mut rows = Vec::new();
+            csv = String::from("case,month_after_first_inversion,inverted,recession_start\n");
+            for (k, st) in starts.iter().enumerate() {
+                let m0 = ym(st);
+                let on: Vec<bool> = (0..months as i64).take_while(|m| m0 + m <= last).map(|m| inv.get(&(m0 + m)).copied().unwrap_or(false)).collect();
+                // 첫 역전 뒤 처음 0→1이 되는 침체 달
+                let rec = ev.windows(2).find(|w| w[0].value < 0.5 && w[1].value >= 0.5 && ym(&w[1].date) > m0).map(|w| (ym(&w[1].date) - m0) as usize).filter(|&r| r < months);
+                let name = labels.get(k).cloned().unwrap_or_else(|| st[..4].to_string());
+                for (m, v) in on.iter().enumerate() { csv.push_str(&format!("{name},{m},{},{}\n", *v as u8, (Some(m) == rec) as u8)); }
+                rows.push((name, on, rec));
+            }
+            viz::rounds(&rows, months, &title)
         }
         "ladder" => {
             // ladder 명령과 같은 셈: 깊이마다 지난 하락 중 그만큼 간 수, 지금 하락이 이미 지난 깊이는 파랑(--labels "Fell 5% or more,10%,…")
@@ -1308,6 +1381,7 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "lead" => "Signal episodes: consecutive days at or below the threshold (or at or above it), joined when the gap between them is the gap window or less and no event started in between; days inside an event do not count as signal; lead is the time from an episode's first day to the next start of the event series (a 0-to-1 step, e.g. NBER recession months). For each event start, the first day the signal was on from --before months before to --after months after (12 and 3 by default); none means missed.",
         "recessions" => "Each run of months flagged 1 in the event series (NBER recession months), with its length; with a second series, its value the month before the start and its highest value from the start to the given months after the end (or to the next recession start, if sooner).",
         "together" => "Each signal is on in a month if any of its readings that month crossed its threshold. Episodes are runs of months with at least k signals on, starting outside the event (NBER recession) and outside the settle months after an event ends; for each, the months to the next event start. For each event start, whether at least k were on together in the window months before.",
+        "need" => "Each week pairs the 30-year mortgage rate with the 10-year Treasury yield averaged over the days its survey covers; the gap is the difference. For each target rate, the 10-year yield it needs is the target minus the median gap (range: minus the 90th and 10th percentile gaps), with the share of weeks the 10-year was that low. Similar starts are weeks whose rate was within the given distance of this week's, with the full horizon after them in the data, and the lowest rate each reached within it.",
         "ladder" => "Every completed decline of at least the first depth from a prior record close (peak to trough, then a new record): how many reached each deeper depth, and the median days from peak to new record for declines whose trough fell between that depth and the next, and the median days from that record to the trough. The decline still under way is reported separately and not counted.",
         "breadth" => "For each month where every listed series has a value, the number of series at least the drop below their own highest value of the last window months (that month included); compared with the count in each month an event (NBER recession) began and three months later, and with how often months outside events reached each count.",
         "catchup" => "For every drawdown of the bond fund index (threshold below the prior high), the no-change path grows from the high at the yield of that month (semiannual compounding); catch-up is the first later month the actual index is back at or above that path, compared with the modified duration of a par bond at that yield. Months to a new high are counted from the same high.",
@@ -1357,6 +1431,7 @@ fn main() {
         ("catchup", Some(p), _) => catchup_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("breadth", Some(p), _) => breadth_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("together", Some(p), _) => together_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
+        ("need", Some(p), _) => need_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("ladder", Some(p), _) => ladder_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("bond", _, _) => bond_cmd(&opt).map(|j| { let mut j = j; j.pop(); format!("{j},\"method\":{}}}", s("A bond fund's value drops at once by about its duration times the rise in yields (duration times the rise; no convexity), then compounds at the higher yield; the no-change path compounds at the old yield. Simplified: the fund's yield moves with the market at once and yields then stay put. Break-even is when the two paths meet.")) }),
         ("export", Some(p), _) => export_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),

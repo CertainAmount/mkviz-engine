@@ -1,0 +1,1 @@
+{"frame":"need","input":"data/series/fred_MORTGAGE30US.csv","params":{"minus":"data/series/fred_DGS10.csv","minus-window":"7","targets":"3,4,5,6","title":"10-year Treasury yield each mortgage rate needs"}}

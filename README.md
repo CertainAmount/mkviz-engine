@@ -6,15 +6,15 @@ The calculation engine and chart data behind [MKViz](https://mkviz.com), a blog 
 
 Every number in an MKViz article that comes from our own calculation is produced by this engine, and every chart's data is published here so anyone can check it.
 
-![Stock Market Corrections Since 1950: How Often a Dip Goes Deeper](data/stock-market-corrections-history/sp500-dip-ladder.svg)
+![Will Mortgage Rates Ever Get Back to 3%? What It Would Take](data/mortgage-rates-back-to-3-percent/m3-ten-years.svg)
 
 **Latest articles**
 
+- [Will Mortgage Rates Ever Get Back to 3%? What It Would Take](https://mkviz.com/mortgage-rates-back-to-3-percent/) · [data](data/mortgage-rates-back-to-3-percent/)
 - [Stock Market Corrections Since 1950: How Often a Dip Goes Deeper](https://mkviz.com/stock-market-corrections-history/) · [data](data/stock-market-corrections-history/)
 - [Recession Indicators: Are We in a Recession Right Now?](https://mkviz.com/recession-indicators/) · [data](data/recession-indicators/)
 - [Current Inflation Rate: Tracker, Calculator, History Since 1948](https://mkviz.com/inflation-rate-tracker/) · [data](data/inflation-rate-tracker/)
 - [Bond Fund Calculator: Every Loss Since 1969 and Its Recovery](https://mkviz.com/bond-fund-calculator/) · [data](data/bond-fund-calculator/)
-- [Mortgage Rates History Since 1971: Is a 7% Rate High?](https://mkviz.com/mortgage-rates-history/) · [data](data/mortgage-rates-history/)
 
 ## What's here
 

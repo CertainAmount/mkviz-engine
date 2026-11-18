@@ -311,7 +311,8 @@ pub fn tracker(all: &[Point], drawn: &[Point], title: &str, suffix: &str, peaks:
 
 /// 최근 그림(데이터 페이지 맨 위, 2026-11-13): 최근 N개 관측의 선, 그 기간의 최저·최고와 지금에 점과 값, 첫·가운데·끝 달 눈금.
 /// '좋아지나 나빠지나'를 매주 보는 독자용(콜드 리드: 추적기라면 최근 흐름이 먼저 보여야 한다).
-pub fn recent(pts: &[Point], title: &str, suffix: &str, decimals: usize, now_label: &str) -> String {
+/// line: 기준선(값, 이름) 하나를 점선으로(예: 3% 대출 금리). 기간이 1년을 넘으면 최저·최고 이름표에 해를 붙인다(10년 그림에서 "Jan"만으로는 몇 년인지 몰랐다).
+pub fn recent(pts: &[Point], title: &str, suffix: &str, decimals: usize, now_label: &str, line: Option<(f64, &str)>) -> String {
     const HALO: &str = "stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\"";
     const MON: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     let lab = |v: f64| format!("{:.*}{suffix}", decimals, v);
@@ -326,13 +327,18 @@ pub fn recent(pts: &[Point], title: &str, suffix: &str, decimals: usize, now_lab
     let x = |d: f64| left + (d - x0) / (x1 - x0).max(1.0) * (W - left - right - 70.0);
     let y = |v: f64| top + (vmax + pad - v) / (vmax - vmin + 2.0 * pad) * (H - top - B - 10.0);
     let mut s = head(title);
+    if let Some((v, name)) = line {
+        let ly = y(v);
+        let _ = write!(s, "<line x1=\"{left}\" x2=\"{:.1}\" y1=\"{ly:.1}\" y2=\"{ly:.1}\" stroke=\"#eb6834\" stroke-width=\"1.5\" stroke-dasharray=\"4 3\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" font-size=\"13\" fill=\"#eb6834\" {HALO}>{}</text>", W - right - 70.0, W - right - 70.0, ly - 6.0, name.replace('&', "&amp;"));
+    }
+    let long = now.day - pts[0].day > 400;
     let d: Vec<String> = pts.iter().map(|p| format!("{:.1},{:.1}", x(p.day as f64), y(p.value))).collect();
     let _ = write!(s, "<polyline points=\"{}\" fill=\"none\" stroke=\"{GRAY}\" stroke-width=\"2\"/>", d.join(" "));
     for (p, name, below) in [(lo, "Low", true), (hi, "High", false)] {
         if std::ptr::eq(p, now) { continue; }
         let (px, py) = (x(p.day as f64), y(p.value));
         let ty = if below { py + 22.0 } else { py - 10.0 };
-        let _ = write!(s, "<circle cx=\"{px:.1}\" cy=\"{py:.1}\" r=\"4\" fill=\"{INK}\"/><text x=\"{px:.1}\" y=\"{ty:.1}\" text-anchor=\"middle\" font-size=\"14\" fill=\"{INK}\" {HALO}>{name} {} ({})</text>", lab(p.value), &mo(&p.date)[..3]);
+        let _ = write!(s, "<circle cx=\"{px:.1}\" cy=\"{py:.1}\" r=\"4\" fill=\"{INK}\"/><text x=\"{px:.1}\" y=\"{ty:.1}\" text-anchor=\"middle\" font-size=\"14\" fill=\"{INK}\" {HALO}>{name} {} ({})</text>", lab(p.value), if long { mo(&p.date) } else { mo(&p.date)[..3].to_string() });
     }
     let (nx, ny) = (x(now.day as f64), y(now.value));
     let _ = write!(s, "<circle cx=\"{nx:.1}\" cy=\"{ny:.1}\" r=\"6\" fill=\"{BLUE}\"/><text x=\"{:.1}\" y=\"{:.1}\" font-size=\"15\" font-weight=\"600\" fill=\"#0f172a\">{}</text><text x=\"{:.1}\" y=\"{:.1}\" font-size=\"15\" font-weight=\"600\" fill=\"#0f172a\">{}</text>", nx + 10.0, ny - 2.0, now_label.replace('&', "&amp;"), nx + 10.0, ny + 16.0, lab(now.value));
@@ -1438,5 +1444,95 @@ mod lights_test {
         let svg = super::lights(&rows, &["2000-03".to_string()], "2000-01", "2000-12", "t");
         assert_eq!(svg.matches("fill=\"#2563eb\"").count(), 2); // 1~2월은 한 막대
         assert!(svg.contains("Claims") && svg.ends_with("</svg>"));
+    }
+}
+
+/// 필요 국채 그림: 목표 금리마다 한 줄. 띠 = 금리 차가 넓을 때~좁을 때(가운데 80%) 필요한 10년 국채, 점 = 보통 금리 차일 때,
+/// 세로 점선 = 지금 10년 국채. 줄 아래에 '그만큼 낮았던 주의 몫'. rows: (이름, 넓은 차 필요값, 보통, 좁은 차, 몫)
+pub fn need(rows: &[(String, f64, f64, f64, f64)], now: f64, title: &str) -> String {
+    const HALO: &str = "stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\"";
+    let (top, rh) = (T + 30.0, 66.0);
+    let h = top + rh * rows.len() as f64 + 50.0;
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    let lo = rows.iter().map(|r| r.1).fold(0.0_f64, f64::min).floor();
+    let hi = (now.max(rows.iter().map(|r| r.3).fold(0.0, f64::max)) + 0.5).ceil();
+    let (x0, x1) = (16.0, W - R);
+    let x = |v: f64| x0 + (v - lo) / (hi - lo).max(0.1) * (x1 - x0);
+    let bottom = top + rh * rows.len() as f64;
+    for k in (lo as i64)..=(hi as i64) {
+        let xv = x(k as f64);
+        let _ = write!(s, "<line x1=\"{xv:.1}\" x2=\"{xv:.1}\" y1=\"{top}\" y2=\"{bottom:.1}\" stroke=\"#f1f5f9\"/><text x=\"{xv:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{k}%</text>", bottom + 18.0);
+    }
+    for (k, (name, wide, mid, tight, share)) in rows.iter().enumerate() {
+        let y = top + rh * k as f64;
+        let _ = write!(s, "<text x=\"{x0}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"14\" font-weight=\"600\">{}</text>", y + 14.0, name.replace('&', "&amp;"));
+        let (a, b) = (x(*wide), x(*tight));
+        let _ = write!(s, "<rect x=\"{a:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"10\" rx=\"5\" fill=\"#bfdbfe\"/><circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"6\" fill=\"{BLUE}\" stroke=\"#fff\" stroke-width=\"2\"><title>{name}: 10-year near {mid:.1}%</title></circle>",
+            y + 22.0, (b - a).max(2.0), x(*mid), y + 27.0);
+        let _ = write!(s, "<text x=\"{x0}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\" {HALO}>needs the 10-year near {mid:.1}% · that low in {:.0}% of weeks</text>", y + 52.0, share * 100.0);
+    }
+    // 범례: 점 = 보통 금리 차, 띠 = 넓은 차~좁은 차(두 독자가 띠 뜻을 몰랐다, 2026-11-18)
+    let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"5\" fill=\"{BLUE}\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">typical markup</text><rect x=\"{:.1}\" y=\"{:.1}\" width=\"22\" height=\"8\" rx=\"4\" fill=\"#bfdbfe\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">wide to narrow markup</text>",
+        x0 + 5.0, bottom + 34.0, x0 + 14.0, bottom + 38.0, x0 + 128.0, bottom + 30.0, x0 + 156.0, bottom + 38.0);
+    let xn = x(now);
+    let _ = write!(s, "<line x1=\"{xn:.1}\" x2=\"{xn:.1}\" y1=\"{:.1}\" y2=\"{bottom:.1}\" stroke=\"#eb6834\" stroke-width=\"2\" stroke-dasharray=\"4 3\"/><text x=\"{xn:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"#eb6834\" font-size=\"13\" font-weight=\"600\">10-year now {now:.1}%</text></svg>",
+        top - 12.0, top - 16.0);
+    s
+}
+
+#[cfg(test)]
+mod need_fig_test {
+    #[test]
+    fn need_draws_rows_and_now_line() {
+        let rows = vec![("3% mortgage".to_string(), 0.5, 1.3, 1.9, 0.05), ("6% mortgage".to_string(), 3.5, 4.3, 4.9, 0.6)];
+        let svg = super::need(&rows, 5.1, "t");
+        assert!(svg.contains("3% mortgage") && svg.contains("10-year now 5.1%") && svg.contains("that low in 5% of weeks"));
+        assert!(svg.ends_with("</svg>"));
+    }
+}
+
+/// 재역전 그림: 사례마다 한 줄, 첫 역전 달부터 n달. 뒤집힌 달은 파랑, 아닌 달은 옅은 회색, 침체 시작 달에 주황 눈금과 이름.
+/// rows: (이름, 달마다 뒤집혔나, 침체 시작 달 위치(없으면 None)), 자료가 끝난 줄은 짧다.
+pub fn rounds(rows: &[(String, Vec<bool>, Option<usize>)], months: usize, title: &str) -> String {
+    const ORANGE: &str = "#eb6834";
+    let (top, rh) = (T + 6.0, 54.0);
+    let h = top + rh * rows.len() as f64 + 44.0;
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    let (x0, x1) = (16.0, W - R);
+    let mw = (x1 - x0) / months.max(1) as f64;
+    for (k, (name, on, rec)) in rows.iter().enumerate() {
+        let y = top + rh * k as f64;
+        let _ = write!(s, "<text x=\"{x0}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"14\" font-weight=\"600\">{}</text>", y + 14.0, name.replace('&', "&amp;"));
+        for (m, &v) in on.iter().enumerate().take(months) {
+            let _ = write!(s, "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.2}\" height=\"14\" fill=\"{}\"/>", x0 + m as f64 * mw, y + 22.0, mw + 0.3, if v { BLUE } else { "#e2e8f0" });
+        }
+        if let Some(r) = rec {
+            let xr = x0 + *r as f64 * mw;
+            let anchor = if xr > W - 90.0 { "end" } else { "start" };
+            let _ = write!(s, "<line x1=\"{xr:.1}\" x2=\"{xr:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{ORANGE}\" stroke-width=\"3\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"{anchor}\" fill=\"{ORANGE}\" font-size=\"13\" font-weight=\"600\">Recession</text>",
+                y + 18.0, y + 40.0, if anchor == "end" { xr - 4.0 } else { xr + 4.0 }, y + 14.0);
+        } else if on.len() < months {
+            let xe = x0 + on.len() as f64 * mw;
+            let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Now</text>", xe + 4.0, y + 33.0);
+        }
+    }
+    let yb = top + rh * rows.len() as f64 + 4.0;
+    let tick = if months > 48 { 12 } else { 6 };
+    for m in (0..=months).step_by(tick) {
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{yb:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{}</text>", x0 + m as f64 * mw, if m == 0 { "0".to_string() } else { format!("{}y", m / 12) });
+    }
+    let _ = write!(s, "<rect x=\"{x0}\" y=\"{:.1}\" width=\"12\" height=\"12\" fill=\"{BLUE}\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Inverted</text><rect x=\"{:.1}\" y=\"{:.1}\" width=\"12\" height=\"12\" fill=\"#e2e8f0\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Positive</text><text x=\"{x1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">Years after first inverting</text></svg>",
+        yb + 14.0, x0 + 18.0, yb + 24.0, x0 + 90.0, yb + 14.0, x0 + 108.0, yb + 24.0, yb + 24.0);
+    s
+}
+
+#[cfg(test)]
+mod rounds_test {
+    #[test]
+    fn rounds_marks_inverted_months_and_recession() {
+        let rows = vec![("1966".to_string(), vec![true, true, false, true], Some(3)), ("2022".to_string(), vec![true, false], None)];
+        let svg = super::rounds(&rows, 4, "t");
+        assert_eq!(svg.matches("fill=\"#2563eb\"/>").count(), 4 + 1); // 뒤집힌 달 4칸(두 줄) + 범례
+        assert!(svg.contains(">Recession<") && svg.contains(">Now<") && svg.ends_with("</svg>"));
     }
 }
