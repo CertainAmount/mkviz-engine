@@ -120,6 +120,16 @@ MKViz (2026). *When was the last yield curve inversion? Every inversion since 19
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
 
+## yc-measures
+
+Data: [yc-measures.csv](yc-measures.csv) · settings: [yc-measures.json](yc-measures.json)
+
+![yc-measures](yc-measures.svg)
+
+```
+./engine/target/release/mkviz-engine figure lights data/series/fred_USREC.csv --from 2021-06 --labels '10-year minus 2-year inverted (most news),10-year minus 1-year inverted (this article),Recession (NBER)' --signals 'data/series/fred_T10Y2Y.csv threshold=0 below;data/series/fred_DGS10.csv minus=data/series/fred_DGS1.csv threshold=0 below;data/series/fred_USREC.csv threshold=1' --title 'The 2022 inversion on two measures, and no recession since' --out yc-measures.svg
+```
+
 ## yc-lead
 
 Data: [yc-lead.csv](yc-lead.csv) · settings: [yc-lead.json](yc-lead.json)

@@ -1368,6 +1368,11 @@ fn payment_cmd(o: &HashMap<String, String>) -> Result<String, String> {
     let loan = opt_f(o, "loan", 300000.0);
     let years = opt_f(o, "years", 30.0);
     let rates: Vec<f64> = o.get("rates").ok_or("--rates a,b 가 필요")?.split(',').filter_map(|x| x.parse().ok()).collect();
+    // --interest-only: 카드·HELOC처럼 이자만 내는 잔액의 달 이자(잔액 × 연이율 / 12). 금리가 오를 때 '월 얼마 더'를 보이려고(2026-11-18)
+    if o.contains_key("interest-only") {
+        let p: Vec<String> = rates.iter().map(|r| format!("{{\"rate\":{r},\"monthly_interest\":{}}}", num(Some((loan * r / 100.0 / 12.0 * 100.0).round() / 100.0)))).collect();
+        return Ok(format!("{{\"balance\":{loan},\"payments\":[{}],\"method\":\"Interest-only monthly cost: balance x annual rate / 12.\"}}", p.join(",")));
+    }
     let p: Vec<String> = rates.iter().map(|r| format!("{{\"rate\":{r},\"monthly\":{}}}", num(Some((monthly_payment(loan, *r, years) * 100.0).round() / 100.0)))).collect();
     Ok(format!("{{\"loan\":{loan},\"years\":{years},\"payments\":[{}],\"method\":\"Fixed-rate monthly payment: loan x r / (1 - (1 + r)^-n), r = annual rate / 12, n = months.\"}}", p.join(",")))
 }

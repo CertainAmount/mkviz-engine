@@ -1430,7 +1430,8 @@ pub fn lights(rows: &[(String, Vec<String>)], rec: &[String], from: &str, to: &s
     let (x0, x1) = (16.0, W - R);
     let x = |m: &str| x0 + (idx(m) - a) / (b - a).max(1.0) * (x1 - x0);
     let mw = (x1 - x0) / (b - a).max(1.0);
-    let (top, rh) = (T + 8.0, 52.0);
+    let short = b - a < 120.0; // 짧은 기간 그림은 막대 아래 날짜 줄 자리를 둔다
+    let (top, rh) = (T + 8.0, if short { 72.0 } else { 52.0 });
     let h = top + rh * rows.len() as f64 + 70.0;
     let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
     for m in rec {
@@ -1441,23 +1442,37 @@ pub fn lights(rows: &[(String, Vec<String>)], rec: &[String], from: &str, to: &s
         let y = top + rh * k as f64;
         let _ = write!(s, "<text x=\"{x0}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"14\">{}</text>", y + 16.0, name.replace('&', "&amp;"));
         let _ = write!(s, "<line x1=\"{x0}\" x2=\"{x1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#e5e7eb\"/>", y + 34.0, y + 34.0);
+        // 빈 줄은 '없음'을 글로(침체 줄이 비어 있으면 그 빈칸이 결론이다, 2026-11-18)
+        if ms.is_empty() {
+            let _ = write!(s, "<text x=\"{x0}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\" font-style=\"italic\">None in this period</text>", y + 39.0);
+        }
         // 이어진 달은 한 막대로(달마다 칸을 그리면 줄무늬로 쪼개져 보였다)
         let mut i = 0;
         while i < ms.len() {
             let mut j = i;
             while j + 1 < ms.len() && idx(&ms[j + 1]) - idx(&ms[j]) == 1.0 { j += 1; }
             let _ = write!(s, "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.2}\" height=\"14\" rx=\"2\" fill=\"{BLUE}\"/>", x(&ms[i]), y + 27.0, (mw * (j - i + 1) as f64).max(2.0));
+            // 기간이 짧은 그림(10년 미만)에서 긴 막대엔 처음·끝 달 이름(두 측정의 날짜 차이를 그림으로, 2026-11-18)
+            if short && j - i >= 6 {
+                const MON: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                let lab = |m: &str| format!("{} {}", MON[m[5..7].parse::<usize>().unwrap_or(1) - 1], &m[..4]);
+                let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">{} to {}</text>", x(&ms[i]), y + 58.0, lab(&ms[i]), lab(&ms[j]));
+            }
             i = j + 1;
         }
     }
     // 10년 눈금과 음영 설명
     let yb = top + rh * rows.len() as f64 + 20.0;
     let (ya, yz): (i32, i32) = (from[..4].parse().unwrap_or(0), to[..4].parse().unwrap_or(0));
-    for yr in (ya..=yz).filter(|y| y % 10 == 0) {
+    let every = if yz - ya < 10 { 1 } else { 10 }; // 짧은 기간은 해마다 눈금
+    for yr in (ya..=yz).filter(|y| y % every == 0 && format!("{y}-01").as_str() >= from) {
         let m = format!("{yr}-01");
         let _ = write!(s, "<text x=\"{:.1}\" y=\"{yb:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"14\">{yr}</text>", x(&m));
     }
-    let _ = write!(s, "<rect x=\"{x0}\" y=\"{:.1}\" width=\"12\" height=\"12\" fill=\"#cbd5e1\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Recessions</text></svg>", yb + 12.0, x0 + 18.0, yb + 22.0);
+    if !rec.is_empty() {
+        let _ = write!(s, "<rect x=\"{x0}\" y=\"{:.1}\" width=\"12\" height=\"12\" fill=\"#cbd5e1\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Recessions</text>", yb + 12.0, x0 + 18.0, yb + 22.0);
+    }
+    s.push_str("</svg>");
     s
 }
 
@@ -1635,7 +1650,7 @@ pub fn strips(rows: &[(String, Vec<(String, f64)>)], unit: &str, refline: Option
     let step = [1.0, 2.0, 2.5, 5.0, 10.0].iter().map(|m| m * mag).find(|st| span / st <= 6.0).unwrap_or(raw);
     let mut t = (lo / step).ceil() * step;
     while t <= hi + 1e-9 {
-        let lab = if unit == "%" { format!("{:.0}%", t * 100.0) } else { format!("{t:.0}") };
+        let lab = if unit == "%" { format!("{:.0}%", t * 100.0) } else { format!("{t:.0}{unit}") }; // 단위를 눈금에(독자가 단위를 못 읽었다)
         let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"12\">{lab}</text>", x(t), bottom + 20.0);
         t += step;
     }

@@ -53,6 +53,7 @@
 | [recession-watch](https://mkviz.com/recession-watch/) | [rw-board](recession-watch/rw-board.csv) | board | fred_UNRATE.csv |
 | [recession-watch](https://mkviz.com/recession-watch/) | [rw-claims](recession-watch/rw-claims.csv) | lead | fred_ICSA.csv, fred_USREC.csv |
 | [recession-watch](https://mkviz.com/recession-watch/) | [rw-lights](recession-watch/rw-lights.csv) | lights | fred_ICSA.csv, fred_SAHMREALTIME.csv, fred_T10Y3M.csv, fred_USREC.csv |
+| [yield-curve-inversion](https://mkviz.com/yield-curve-inversion/) | [yc-measures](yield-curve-inversion/yc-measures.csv) | lights | fred_DGS1.csv, fred_DGS10.csv, fred_T10Y2Y.csv, fred_USREC.csv |
 | [yield-curve-inversion](https://mkviz.com/yield-curve-inversion/) | [yc-lead](yield-curve-inversion/yc-lead.csv) | lead | fred_DGS1.csv, fred_DGS10.csv, fred_USREC.csv |
 | [yield-curve-inversion](https://mkviz.com/yield-curve-inversion/) | [yc-rounds](yield-curve-inversion/yc-rounds.csv) | rounds | fred_DGS1.csv, fred_DGS10.csv, fred_USREC.csv |
 | [yield-curve-inversion](https://mkviz.com/yield-curve-inversion/) | [yc-now](yield-curve-inversion/yc-now.csv) | recent | fred_DGS1.csv, fred_DGS10.csv |
