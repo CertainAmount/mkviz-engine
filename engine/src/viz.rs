@@ -1431,7 +1431,7 @@ pub fn lights(rows: &[(String, Vec<String>)], rec: &[String], from: &str, to: &s
     let x = |m: &str| x0 + (idx(m) - a) / (b - a).max(1.0) * (x1 - x0);
     let mw = (x1 - x0) / (b - a).max(1.0);
     let (top, rh) = (T + 8.0, 52.0);
-    let h = top + rh * rows.len() as f64 + 54.0;
+    let h = top + rh * rows.len() as f64 + 70.0;
     let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
     for m in rec {
         // 침체 음영은 다른 그림보다 진하게: 막대와 겹쳐 옅으면 읽히지 않았다(2026-11-17 콜드 리드)
@@ -1606,5 +1606,80 @@ mod falls_test {
         let svg = super::falls(&rows, &[(3.0, "3%".to_string()), (5.0, "5%".to_string())], 7.11, "t");
         assert_eq!(svg.matches("fill-opacity=\"0.45\"").count(), 3);
         assert!(svg.contains("Now 7.11%") && svg.contains(">1998-2002<") && svg.ends_with("</svg>"));
+    }
+}
+
+
+/// 점 띠 그림: 줄(묶음)마다 사례별 값을 점으로, 기준선(0 또는 '보통') 하나, 줄마다 중앙값 표시와 '몇 개 중 몇 개 위'.
+/// 한 줄에 점 한 종류만 둔다(점 세 종류×11줄은 읽히지 않았다, 2026-11-18 콜드 리드).
+pub fn strips(rows: &[(String, Vec<(String, f64)>)], unit: &str, refline: Option<(f64, &str)>, title: &str) -> String {
+    // 줄 이름 아래 점 띠, 0선·기준선은 점 띠 구간에만(이름 글자와 겹쳤다), 범례는 맨 아래 따로(2026-11-18 휴대폰 확인)
+    let (top, rh) = (T + 22.0, 76.0);
+    let h = top + rh * rows.len() as f64 + 54.0;
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    let all: Vec<f64> = rows.iter().flat_map(|r| r.1.iter().map(|p| p.1)).chain(refline.map(|r| r.0)).chain([0.0]).collect();
+    let (mut lo, mut hi) = (all.iter().cloned().fold(f64::MAX, f64::min), all.iter().cloned().fold(f64::MIN, f64::max));
+    let pad = (hi - lo).max(1e-9) * 0.06;
+    lo -= pad;
+    hi += pad;
+    let (x0, x1) = (16.0, W - R);
+    let x = |v: f64| x0 + (v - lo) / (hi - lo) * (x1 - x0);
+    let bottom = top + rh * rows.len() as f64;
+    let fmt = |v: f64| if unit == "%" { format!("{}{:.0}%", if v > 0.0 { "+" } else { "" }, v * 100.0) } else { format!("{}{:.1}{unit}", if v > 0.0 { "+" } else { "" }, v) };
+    let z = x(0.0);
+    let _ = write!(s, "<text x=\"{z:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">no change</text>", top - 4.0);
+    // 눈금(두 독자가 점 띠에 눈금이 없어 크기를 못 읽었다, 2026-11-18): 둥근 값 4~6개를 맨 아래에
+    let span = hi - lo;
+    let raw = span / 5.0;
+    let mag = 10f64.powf(raw.log10().floor());
+    let step = [1.0, 2.0, 2.5, 5.0, 10.0].iter().map(|m| m * mag).find(|st| span / st <= 6.0).unwrap_or(raw);
+    let mut t = (lo / step).ceil() * step;
+    while t <= hi + 1e-9 {
+        let lab = if unit == "%" { format!("{:.0}%", t * 100.0) } else { format!("{t:.0}") };
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"12\">{lab}</text>", x(t), bottom + 20.0);
+        t += step;
+    }
+    if let Some((v, name)) = refline {
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{BLUE}\" font-size=\"13\">{}</text>", x(v), top - 4.0, name.replace('&', "&amp;"));
+    }
+    for (k, (name, pts)) in rows.iter().enumerate() {
+        let y = top + rh * k as f64;
+        let up = pts.iter().filter(|p| p.1 > 0.0).count();
+        let mut v: Vec<f64> = pts.iter().map(|p| p.1).collect();
+        v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let med = if v.is_empty() { 0.0 } else if v.len() % 2 == 1 { v[v.len() / 2] } else { (v[v.len() / 2 - 1] + v[v.len() / 2]) / 2.0 };
+        let _ = write!(s, "<text x=\"{x0}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"14\" font-weight=\"600\">{}</text><text x=\"{x1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">up in {up} of {} · middle {}</text>",
+            y + 16.0, name.replace('&', "&amp;"), y + 16.0, pts.len(), fmt(med));
+        let cy = y + 46.0;
+        let _ = write!(s, "<line x1=\"{x0}\" x2=\"{x1}\" y1=\"{cy:.1}\" y2=\"{cy:.1}\" stroke=\"#eef2f7\"/><line x1=\"{z:.1}\" x2=\"{z:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{INK}\"/>", cy - 16.0, cy + 16.0);
+        if let Some((rv, _)) = refline {
+            let xr = x(rv);
+            let _ = write!(s, "<line x1=\"{xr:.1}\" x2=\"{xr:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{BLUE}\" stroke-dasharray=\"4 3\"/>", cy - 16.0, cy + 16.0);
+        }
+        for (j, (lab, val)) in pts.iter().enumerate() {
+            let jitter = ((j * 7919) % 9) as f64 - 4.0;
+            let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"6\" fill=\"{BLUE}\" fill-opacity=\"0.55\" stroke=\"#fff\"><title>{lab}: {}</title></circle>", x(*val), cy + jitter, fmt(*val));
+        }
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#0f172a\" stroke-width=\"3\"/>", x(med), x(med), cy - 12.0, cy + 12.0);
+        // 양 끝 점에 해(어느 사례인지 찾을 수 없었다)
+        if let (Some(mn), Some(mx)) = (pts.iter().min_by(|a, b| a.1.partial_cmp(&b.1).unwrap()), pts.iter().max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())) {
+            for (p, anchor, dx) in [(mn, "start", -6.0), (mx, "end", 6.0)] {
+                let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"{anchor}\" fill=\"{INK}\" font-size=\"12\">{}</text>", x(p.1) + dx, cy + 22.0, &p.0[..4.min(p.0.len())]);
+            }
+        }
+    }
+    let ly = bottom + 46.0;
+    let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#0f172a\" stroke-width=\"3\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">middle case</text><circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"6\" fill=\"{BLUE}\" fill-opacity=\"0.55\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">one case</text></svg>",
+        x0 + 4.0, x0 + 4.0, ly - 10.0, ly + 4.0, x0 + 12.0, ly + 1.0, x0 + 120.0, ly - 3.0, x0 + 130.0, ly + 1.0);
+    s
+}
+
+#[cfg(test)]
+mod strips_test {
+    #[test]
+    fn strips_counts_up_and_marks_median() {
+        let rows = vec![("A".to_string(), vec![("1".to_string(), 1.0), ("2".to_string(), -0.5), ("3".to_string(), 2.0)])];
+        let svg = super::strips(&rows, " pt", None, "t");
+        assert!(svg.contains("up in 2 of 3") && svg.contains("middle +1.0 pt") && svg.ends_with("</svg>"));
     }
 }

@@ -1,12 +1,23 @@
-case,worst_along_way,change_365d,change_730d
-1965,-0.1721,-0.1351,0.0841
-1967,-0.0828,0.1258,-0.0409
-1973,-0.2033,-0.1310,-0.2534
-1978,-0.1169,0.0391,0.1782
-1980,-0.0602,-0.0389,-0.0263
-1989,-0.0070,0.1278,0.1623
-1998,-0.0595,0.3092,0.4161
-2000,-0.2144,-0.2005,-0.2041
-2005,-0.0261,0.1355,0.1749
-2019,-0.2011,-0.2011,0.4070
-2022,-0.0633,0.1711,0.4624
+set,date,change
+1 year after the curve inverted,1965-09-24,-0.1351
+1 year after the curve inverted,1967-12-06,0.1258
+1 year after the curve inverted,1973-03-09,-0.1310
+1 year after the curve inverted,1978-08-18,0.0391
+1 year after the curve inverted,1980-09-12,-0.0389
+1 year after the curve inverted,1989-01-25,0.1278
+1 year after the curve inverted,1998-09-18,0.3092
+1 year after the curve inverted,2000-03-17,-0.2005
+1 year after the curve inverted,2005-12-27,0.1355
+1 year after the curve inverted,2019-03-22,-0.2011
+1 year after the curve inverted,2022-07-12,0.1711
+2 years after,1965-09-24,0.0841
+2 years after,1967-12-06,-0.0409
+2 years after,1973-03-09,-0.2534
+2 years after,1978-08-18,0.1782
+2 years after,1980-09-12,-0.0263
+2 years after,1989-01-25,0.1623
+2 years after,1998-09-18,0.4161
+2 years after,2000-03-17,-0.2041
+2 years after,2005-12-27,0.1749
+2 years after,2019-03-22,0.4070
+2 years after,2022-07-12,0.4624

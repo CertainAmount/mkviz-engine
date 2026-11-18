@@ -70,11 +70,38 @@ Higher a year later in six of 11; median +3.9% at one year against +10.5% from a
 
 **The 10-year minus 2-year gap in 2026:** +0.72% on Jan. 2, a high of +0.74% on Feb. 9, a low of +0.20% on Sept. 21, and +0.30% on Nov. 17.
 
+**Prime rate after inversions and after recessions** (FRED DPRIME, change in points one year later):
+
+```
+./engine/target/release/mkviz-engine figure strips data/macro/fred_DPRIME.csv --diff --days 365 --sets "Year after the curve inverted=<11 first inverted days>;Year after a recession began=1970-01-01,1973-12-01,1980-02-01,1981-08-01,1990-08-01,2001-04-01,2008-01-01,2020-03-01" --out yc-prime.svg
+./engine/target/release/mkviz-engine figure strips data/macro/index_gspc_long.csv --days 365 --sets "1 year after the curve inverted=<11 days>;2 years after@730=<11 days>" --out yc-stocks.svg
+./engine/target/release/mkviz-engine figure recent data/macro/fred_DGS10.csv --minus data/macro/fred_DGS1.csv --weeks 500 --line "0|Below this line: inverted" --out yc-now.svg
+```
+
+| Year after the curve inverted | Prime change | Year after a recession began | Prime change |
+|---|---|---|---|
+| Sep 1965 | +1.50 | Jan 1970 | -1.75 |
+| Dec 1967 | +0.50 | Dec 1973 | +0.75 |
+| Mar 1973 | +2.50 | Feb 1980 | +4.75 |
+| Aug 1978 | +3.00 | Aug 1981 | -5.50 |
+| Sep 1980 | +8.25 | Aug 1990 | -1.50 |
+| Jan 1989 | -0.50 | Apr 2001 | -3.25 |
+| Sep 1998 | -0.25 | Jan 2008 | -4.00 |
+| Mar 2000 | -0.25 | Mar 2020 | -1.50 |
+| Dec 2005 | +1.00 | | |
+| Mar 2019 | -2.25 | | |
+| Jul 2022 | +3.50 | | |
+
+Higher a year after the inversion began in seven of 11 (median 1.00 points point); lower a year after a recession began in six of eight (median -1.60 points). The 1980 cases are the Volcker years, when the Fed pushed rates up again after the short 1980 recession.
+
+**10-year minus 1-year in 2026:** 0.72 on Jan. 2, a low of 0.41 on June 29, a high of +0.86% on Oct. 7, and +0.50% on Nov. 16. On this measure the 2022 inversion ran from July 12, 2022 to Dec. 10, 2024.
+
 ### Limits
 - Eight recessions and ten inversions are a small sample; the two long-wait cases are two.
 - NBER dates recessions after the fact; a recession that began recently would not show yet.
 - Episode counts depend on the joining window: with a one-year window the 1965-69 days form one episode.
 - Constant-maturity yields are Treasury estimates, not traded prices.
+- The prime rate follows the Fed's target almost one for one; it shows the direction of variable-rate costs, not any one lender's rate or margin.
 - The stock test has eleven cases and overlapping windows (1965 and 1967, 1998 and 2000); it shows the spread of outcomes, not an expected return.
 
 ### Sources
@@ -120,7 +147,17 @@ Data: [yc-now.csv](yc-now.csv) · settings: [yc-now.json](yc-now.json)
 ![yc-now](yc-now.svg)
 
 ```
-./engine/target/release/mkviz-engine figure recent data/series/fred_T10Y2Y.csv --line '0|Below this line: inverted' --suffix ' pt' --title '10-year minus 2-year Treasury yield, last two years' --weeks 500 --out yc-now.svg
+./engine/target/release/mkviz-engine figure recent data/series/fred_DGS10.csv --line '0|Below this line: inverted' --minus data/series/fred_DGS1.csv --suffix ' pt' --title '10-year minus 1-year Treasury yield, last two years' --weeks 500 --out yc-now.svg
+```
+
+## yc-prime
+
+Data: [yc-prime.csv](yc-prime.csv) · settings: [yc-prime.json](yc-prime.json)
+
+![yc-prime](yc-prime.svg)
+
+```
+./engine/target/release/mkviz-engine figure strips data/series/fred_DPRIME.csv --days 365 --diff --sets 'Year after the curve inverted=1965-09-24,1967-12-06,1973-03-09,1978-08-18,1980-09-12,1989-01-25,1998-09-18,2000-03-17,2005-12-27,2019-03-22,2022-07-12;Year after a recession began=1970-01-01,1973-12-01,1980-02-01,1981-08-01,1990-08-01,2001-04-01,2008-01-01,2020-03-01' --title 'Change in the prime rate, in points' --out yc-prime.svg
 ```
 
 ## yc-stocks
@@ -129,6 +166,4 @@ Data: [yc-stocks.csv](yc-stocks.csv) · settings: [yc-stocks.json](yc-stocks.jso
 
 ![yc-stocks](yc-stocks.svg)
 
-```
-./engine/target/release/mkviz-engine figure cases data/series/fred_CPIAUCSL.csv --dates 1965-09-24,1967-12-06,1973-03-09,1978-08-18,1980-09-12,1989-01-25,1998-09-18,2000-03-17,2005-12-27,2019-03-22,2022-07-12 --forward 365,730 --names 'Worst dip,1 year,2 years' --title 'S&P 500 after the first day of each yield curve inversion' --out yc-stocks.svg
-```
+Drawn from market prices we don't redistribute; the chart data is in the CSV.
