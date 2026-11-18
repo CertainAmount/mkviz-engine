@@ -1,0 +1,1 @@
+{"frame":"savings","input":"data/series/fred_MORTGAGE30US.csv","params":{"drop":"4.2","loan":"400000","marks":"6%:1.11,5%:2.11,4%:3.11,3%:4.11","title":"Monthly saving on a $400,000 loan as the rate falls from today's 7.11%"}}

@@ -1,0 +1,1 @@
+{"frame":"falls","input":"data/series/fred_MORTGAGE30US.csv","params":{"lines":"3,5","minus":"data/series/fred_DGS10.csv","minus-window":"7","near":"0.25","title":"Lowest 30-year rate within five years of each week with a rate like today's","years":"5"}}

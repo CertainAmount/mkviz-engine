@@ -5,6 +5,7 @@
 //!   together <usrec.csv> --signals "a.csv threshold=0.2 avg=4 from-low=52;b.csv threshold=0 below" [--k 2 --settle 12 --window 12]   경보가 함께 켜진 구간·뒤따른 침체
 //!   figure lights <usrec.csv> --signals "…" [--labels a,b,c --from YYYY-MM]   경보마다 켜진 달 줄, 침체 음영
 //!   figure rounds <spread.csv> --event <usrec.csv> --starts d1,d2 [--labels … --months 60 --threshold 0]   첫 역전 뒤 달마다 뒤집혔나, 침체 시작 달(재역전 그림)
+//!   figure falls <mortgage.csv> --minus <dgs10.csv> [--years 5 --near 0.25 --lines 3,5]   지금 금리와 비슷했던 주마다 N년 안 최저 금리 점(시작 해 묶음 줄), 기준선·지금 금리
 //!   need <mortgage.csv> --minus <dgs10.csv> --minus-window 7 [--targets 3,4,5,6 --years 5 --near 0.25]   목표 금리에 필요한 10년 국채, 그런 주의 몫, 지금 금리에서 years년 안에 목표까지 간 적. figure need
 //!   ladder <csv> [--depths 0.05,0.10,0.15,0.20,0.30,0.40,0.50]   지난 하락 중 깊이마다 간 수, 그 깊이에서 멈춘 하락의 회복 일수 중앙값. figure ladder [--labels …]
 //!   drawdowns <csv> [--threshold 0.10] [--deep 0.20] [--flag <csv>] [--forward 91,182,365]
@@ -807,6 +808,21 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
                 rows.push((name, on, rec));
             }
             viz::rounds(&rows, months, &title)
+        }
+        "falls" => {
+            // 하락 기록 그림(need와 같은 정의): 지금 금리 ± near에서 시작한 주마다 years년 안 최저 금리, 해가 이어지는 시작 주끼리 한 줄(1년 넘게 끊기면 새 줄)
+            let w = need_weeks(path, o)?;
+            let lows = need::similar_lows(&w, opt_f(o, "years", 5.0), opt_f(o, "near", 0.25));
+            // 시작 해마다 한 줄(묶으면 1993~2002가 한 줄로 뭉쳐 1998~2002의 5.21% 몰림이 안 보였다)
+            let mut rows: Vec<(String, Vec<f64>)> = Vec::new();
+            for (d, v) in &lows {
+                let y = &d[..4];
+                if rows.last().map_or(true, |r| r.0 != y) { rows.push((y.to_string(), vec![])); }
+                rows.last_mut().unwrap().1.push(*v);
+            }
+            let lines: Vec<(f64, String)> = o.get("lines").map(|v| v.split(',').filter_map(|x| x.parse::<f64>().ok().map(|f| (f, format!("{f}%")))).collect()).unwrap_or(vec![(3.0, "3%".into()), (5.0, "5%".into())]);
+            csv = format!("start_week,lowest_rate_within_years\n{}", lows.iter().map(|(d, v)| format!("{d},{v}\n")).collect::<String>());
+            viz::falls(&rows, &lines, w.last().unwrap().rate, &title)
         }
         "ladder" => {
             // ladder 명령과 같은 셈: 깊이마다 지난 하락 중 그만큼 간 수, 지금 하락이 이미 지난 깊이는 파랑(--labels "Fell 5% or more,10%,…")

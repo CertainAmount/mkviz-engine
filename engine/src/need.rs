@@ -45,6 +45,16 @@ pub struct Need {
     pub median_low: Option<f64>, // years년 안 최저 금리의 중앙값
 }
 
+/// 지금 금리 ± near에서 시작해 years년 뒤가 자료 안에 다 있는 주마다 (시작 날짜, 그 기간 최저 금리)
+pub fn similar_lows(w: &[Week], years: f64, near: f64) -> Vec<(String, f64)> {
+    let now = w.last().unwrap();
+    let horizon = (years * 365.25) as i64;
+    w.iter().enumerate()
+        .filter(|(_, x)| (x.rate - now.rate).abs() <= near && x.day + horizon <= now.day)
+        .map(|(i, x)| (x.date.clone(), w[i..].iter().take_while(|y| y.day <= x.day + horizon).map(|y| y.rate).fold(f64::MAX, f64::min)))
+        .collect()
+}
+
 pub fn need(w: &[Week], targets: &[f64], years: f64, near: f64) -> Need {
     let gaps: Vec<f64> = w.iter().map(|x| x.rate - x.base).collect();
     let now = w.last().unwrap();

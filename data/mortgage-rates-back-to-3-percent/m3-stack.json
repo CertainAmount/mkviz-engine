@@ -1,0 +1,1 @@
+{"frame":"stack","input":"data/series/fred_MORTGAGE30US.csv","params":{"base":"data/series/fred_DGS10.csv","dates":"2016-07-07,2021-01-07,2026-11-12","labels":"Jul 2016,Jan 2021,Nov 2026","names":"10-year Treasury,Markup","title":"30-year mortgage rate split into the 10-year Treasury and the markup","typical":"1.67","window":"7"}}

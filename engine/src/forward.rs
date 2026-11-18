@@ -22,7 +22,9 @@ pub fn worst(pts: &[Point], start_day: i64, days: i64) -> Option<f64> {
     if pts.last()?.day < pts[i].day + days {
         return None;
     }
-    pts[i..].iter().take_while(|p| p.day <= pts[i].day + days).map(|p| p.value / pts[i].value - 1.0).reduce(f64::min)
+    // 끝은 after()가 쓰는 날(start+days 이후 첫 관측)까지 넣는다: 2019-03-22 + 1년이 주말이라 1년 값(3/23)이 도중 최저보다 낮게 나왔다(2026-11-18 검증)
+    let end = pts[i..].iter().find(|p| p.day >= pts[i].day + days).map_or(pts[i].day + days, |p| p.day);
+    pts[i..].iter().take_while(|p| p.day <= end).map(|p| p.value / pts[i].value - 1.0).reduce(f64::min)
 }
 
 #[cfg(test)]

@@ -24,6 +24,9 @@
 ./engine/target/release/mkviz-engine figure recent data/macro/fred_MORTGAGE30US.csv --weeks 522 --suffix % --line "3|3% line" --out m3-ten-years.svg
 ./engine/target/release/mkviz-engine spells data/macro/fred_MORTGAGE30US.csv --threshold 3 --below
 ./engine/target/release/mkviz-engine payment --loan 400000 --rates 7.11,6,5,4,3
+./engine/target/release/mkviz-engine figure stack data/macro/fred_MORTGAGE30US.csv --base data/macro/fred_DGS10.csv --window 7 --dates 2016-07-07,2021-01-07,2026-11-12 --labels "Jul 2016,Jan 2021,Nov 2026" --typical 1.67 --out m3-stack.svg
+./engine/target/release/mkviz-engine figure falls data/macro/fred_MORTGAGE30US.csv --minus data/macro/fred_DGS10.csv --minus-window 7 --years 5 --near 0.25 --lines 3,5 --out m3-falls.svg
+./engine/target/release/mkviz-engine figure savings data/macro/fred_MORTGAGE30US.csv --loan 400000 --drop 4.2 --marks "6%:1.11,5%:2.11,4%:3.11,3%:4.11" --out m3-savings.svg
 ```
 
 ### Results
@@ -51,6 +54,20 @@ Similar starts (rate within 0.25 point of 7.11%, five years after):
 Median five-year low across all 196 weeks: 5.61%. Since October 2022 the rate has been within 0.25 point of today's in 53 weeks; its lowest week since then was 5.98% (Feb. 26, 2026).
 
 Payments on $400,000: $2,691 at 7.11%, $2,398 at 6%, $2,147 at 5%, $1,910 at 4%, $1,686 at 3%.
+
+Rate split into the 10-year (seven-day average before the survey) and the markup:
+
+| Week | 10-year | Markup | 30-year rate |
+|---|---|---|---|
+| Jul 7, 2016 | 1.43% | 1.99 points | 3.41% |
+| Jan 7, 2021 (record low) | 0.97% | 1.68 points | 2.65% |
+| Nov 12, 2026 | 4.89% | 2.22 points | 7.11% |
+
+At this week's 10-year and the median markup, the rate would be 6.56%: today's markup adds about half a point, but the 10-year is the part that would have to move for 3%.
+
+Five-year lows by start year (figure m3-falls, one dot per start week): 1971-72 all near 7.2-7.4%; 1993-96 at 6.49-6.74%; 1997 near 5.9-6.3%; 1998 between 5.21% and 5.9%; 1999-2002 all at 5.21% (June 2003). The lows step down as the start date moves toward the 2001 recession, then stop at one floor.
+
+Monthly saving on $400,000 as the rate falls from 7.11%: $293 at 6%, $544 at 5%, $781 at 4%, $1,004 at 3%; about $244 per point on average, close to a straight line.
 
 ### Limits
 - The gap is not fixed. It was narrow in parts of the 2010s and 2020-21 partly because the Federal Reserve was buying mortgage bonds; if the Fed bought them again, a 3% rate would need a less extreme 10-year yield (the 10th-percentile gap gives 1.76%).
@@ -84,6 +101,16 @@ Data: [m3-ten-years.csv](m3-ten-years.csv) · settings: [m3-ten-years.json](m3-t
 ./engine/target/release/mkviz-engine figure recent data/series/fred_MORTGAGE30US.csv --line '3|3% line' --suffix '%' --title '30-year mortgage rate, last 10 years' --weeks 522 --out m3-ten-years.svg
 ```
 
+## m3-stack
+
+Data: [m3-stack.csv](m3-stack.csv) · settings: [m3-stack.json](m3-stack.json)
+
+![m3-stack](m3-stack.svg)
+
+```
+./engine/target/release/mkviz-engine figure stack data/series/fred_MORTGAGE30US.csv --base data/series/fred_DGS10.csv --dates 2016-07-07,2021-01-07,2026-11-12 --labels 'Jul 2016,Jan 2021,Nov 2026' --names '10-year Treasury,Markup' --title '30-year mortgage rate split into the 10-year Treasury and the markup' --typical 1.67 --window 7 --out m3-stack.svg
+```
+
 ## m3-need
 
 Data: [m3-need.csv](m3-need.csv) · settings: [m3-need.json](m3-need.json)
@@ -92,4 +119,24 @@ Data: [m3-need.csv](m3-need.csv) · settings: [m3-need.json](m3-need.json)
 
 ```
 ./engine/target/release/mkviz-engine figure need data/series/fred_MORTGAGE30US.csv --minus data/series/fred_DGS10.csv --minus-window 7 --targets 3,4,5,6 --title '10-year Treasury yield each mortgage rate needs' --out m3-need.svg
+```
+
+## m3-falls
+
+Data: [m3-falls.csv](m3-falls.csv) · settings: [m3-falls.json](m3-falls.json)
+
+![m3-falls](m3-falls.svg)
+
+```
+./engine/target/release/mkviz-engine figure falls data/series/fred_MORTGAGE30US.csv --lines 3,5 --minus data/series/fred_DGS10.csv --minus-window 7 --near 0.25 --title 'Lowest 30-year rate within five years of each week with a rate like today'\''s' --years 5 --out m3-falls.svg
+```
+
+## m3-savings
+
+Data: [m3-savings.csv](m3-savings.csv) · settings: [m3-savings.json](m3-savings.json)
+
+![m3-savings](m3-savings.svg)
+
+```
+./engine/target/release/mkviz-engine figure savings data/series/fred_MORTGAGE30US.csv --drop 4.2 --loan 400000 --marks '6%:1.11,5%:2.11,4%:3.11,3%:4.11' --title 'Monthly saving on a $400,000 loan as the rate falls from today'\''s 7.11%' --out m3-savings.svg
 ```
