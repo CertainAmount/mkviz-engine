@@ -12,6 +12,7 @@
 - Rate: Freddie Mac's weekly 30-year fixed average for that quarter or week.
 - 30% line: the common rule of thumb for housing costs; not a lending rule.
 - Private mortgage insurance (PMI): required by most lenders on conventional loans with less than 20% down; Freddie Mac puts it at roughly $30 to $70 a month per $100,000 borrowed, depending on credit and down payment. FHA loans charge their own premium and are not modeled here.
+- Re-scan: every quarter from 1984 to Q3 2026 was tested against the 30% line (20% down). Three long stretches qualify (1984-92, about a year around 2006, mid-2022 to early 2025). Left out: Q4 1994, a single quarter just above 30%, not counted as a stretch.
 
 ### Data
 - Census median sales price of houses sold (FRED: MSPUS), quarterly 1963-Q3 2026.
