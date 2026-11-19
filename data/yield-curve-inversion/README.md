@@ -6,6 +6,10 @@
 
 **Short answer.** The 10-year minus 2-year spread was inverted from April 2022 to early September 2024 (888 days days, the longest since 1976), and no recession has started in the 55 months since it began. On the longer 10-year minus 1-year spread (from 1962), the curve was inverted in the 12 months before each of eight recessions, but only three of 10 finished inversions had a recession within 12 months of first inverting (median wait about 18 months). The two long waits before 2022 (from late 1965, and 1998) ended only after the curve inverted a second time.
 
+### Definitions
+- Inversion: a day the 10-year Treasury yield is at or below a shorter one. Two shorter yields are commonly used: the 2-year (FRED T10Y2Y, from 1976, the one most news quotes) and the 1-year (DGS10 minus DGS1, from 1962). Both went below zero for good in July 2022; the 2-year also dipped on Apr. 1 and 4, 2022, so its count starts there (888 days to Sept. 5, 2024); the 1-year ran to Dec. 10, 2024. This note uses the 1-year for every historical count so the 1960s are included; the post shows both side by side once (yc-measures).
+- Prime rate: the bank prime loan rate (FRED DPRIME), the base for most US card and home equity rates.
+
 ### Data
 - 10-year and 1-year Treasury constant-maturity yields, daily since Jan. 2, 1962 (FRED: DGS10, DGS1), through Nov. 16, 2026.
 - 10-year minus 2-year (T10Y2Y, from June 1976) and 10-year minus 3-month (T10Y3M, from 1982), through Nov. 17, 2026.

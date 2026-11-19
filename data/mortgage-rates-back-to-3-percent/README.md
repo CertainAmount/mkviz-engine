@@ -6,6 +6,10 @@
 
 **Short answer.** In 2,903 weekly readings since April 1971, the rate was at or below 3% in 56, all between July 2020 and November 2021. Those weeks did not have an unusually narrow gap over the 10-year Treasury (median 1.64 points points, close to the long-run 1.67 points); they had a 10-year yield near or below 1.3%, which happened in no other year since 1971. At the median gap, a 3% mortgage needs the 10-year near 1.33%; it is now about 4.89%. Of 196 earlier weeks with a rate within 0.25 point of today's, none fell below 5.21% within five years.
 
+### Definitions
+- Mortgage rate: Freddie Mac's weekly 30-year fixed average (a survey of offered rates for strong borrowers), not a quote.
+- Markup (gap): that rate minus the 10-year Treasury yield averaged over the seven days the survey covers; other sites often use the release-day close, which counts Treasury moves after the survey as gap changes.
+
 ### Data
 - Freddie Mac Primary Mortgage Market Survey, 30-year fixed, weekly since April 2, 1971 (FRED: MORTGAGE30US), through Nov. 12, 2026.
 - 10-year Treasury constant-maturity yield, daily since 1962 (Federal Reserve H.15 via FRED: DGS10), through Nov. 16, 2026.

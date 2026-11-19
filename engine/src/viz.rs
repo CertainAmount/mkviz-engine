@@ -1640,7 +1640,8 @@ pub fn strips(rows: &[(String, Vec<(String, f64)>)], unit: &str, refline: Option
     let (x0, x1) = (16.0, W - R);
     let x = |v: f64| x0 + (v - lo) / (hi - lo) * (x1 - x0);
     let bottom = top + rh * rows.len() as f64;
-    let fmt = |v: f64| if unit == "%" { format!("{}{:.0}%", if v > 0.0 { "+" } else { "" }, v * 100.0) } else { format!("{}{:.1}{unit}", if v > 0.0 { "+" } else { "" }, v) };
+    // 반올림해서 0이면 부호 없이 0('-0.0 pt'가 나왔다)
+    let fmt = |v: f64| if unit == "%" { let r = (v * 100.0).round(); if r == 0.0 { "0%".to_string() } else { format!("{}{:.0}%", if r > 0.0 { "+" } else { "" }, r) } } else { let r = (v * 10.0).round() / 10.0; if r == 0.0 { format!("0.0{unit}") } else { format!("{}{:.1}{unit}", if r > 0.0 { "+" } else { "" }, r) } };
     let z = x(0.0);
     let _ = write!(s, "<text x=\"{z:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">no change</text>", top - 4.0);
     // 눈금(두 독자가 점 띠에 눈금이 없어 크기를 못 읽었다, 2026-11-18): 둥근 값 4~6개를 맨 아래에
@@ -1696,5 +1697,146 @@ mod strips_test {
         let rows = vec![("A".to_string(), vec![("1".to_string(), 1.0), ("2".to_string(), -0.5), ("3".to_string(), 2.0)])];
         let svg = super::strips(&rows, " pt", None, "t");
         assert!(svg.contains("up in 2 of 3") && svg.contains("middle +1.0 pt") && svg.ends_with("</svg>"));
+    }
+}
+
+
+/// 사건 전후 그림: 사건일을 0으로 맞춰 앞 before일부터 뒤 after일까지, 사건일 값 대비 변화(수준 차이). 사례마다 옅은 선, 중앙값 굵은 선, 0일 세로선.
+/// '움직임이 사건 전에 일어났나 뒤에 일어났나'를 한 그림으로(2026-11-19 연준 첫 인하와 대출 금리).
+pub fn around(paths: &[(String, Vec<(f64, f64)>)], before: f64, after: f64, unit: &str, event_label: &str, title: &str, highlight: &[(String, String)]) -> String {
+    let all: Vec<f64> = paths.iter().flat_map(|p| p.1.iter().map(|q| q.1)).collect();
+    let (mut lo, mut hi) = (all.iter().cloned().fold(0.0_f64, f64::min), all.iter().cloned().fold(0.0_f64, f64::max));
+    let pad = (hi - lo).max(0.1) * 0.08;
+    lo -= pad;
+    hi += pad;
+    let (l, r, t, b) = (66.0, 34.0, T + 22.0, 40.0); // 왼쪽 눈금 글자의 부호가 잘렸다
+    let x = |d: f64| l + (d + before) / (before + after) * (W - l - r);
+    let y = |v: f64| t + (hi - v) / (hi - lo) * (H - t - b);
+    let mut s = head(title);
+    // 가로 눈금(값)
+    let span = hi - lo;
+    let step = [0.25, 0.5, 1.0, 2.0].iter().cloned().find(|st| span / st <= 6.0).unwrap_or(2.0);
+    let mut v = (lo / step).ceil() * step;
+    while v <= hi + 1e-9 {
+        let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{}{v:.1}{unit}</text>",
+            W - r, y(v), y(v), if v.abs() < 1e-9 { INK } else { "#eef2f7" }, l - 4.0, y(v) + 4.0, if v > 0.0 { "+" } else { "" });
+        v += step;
+    }
+    // 사례 선
+    for (_, p) in paths {
+        let d: Vec<String> = p.iter().map(|q| format!("{:.1},{:.1}", x(q.0), y(q.1))).collect();
+        let _ = write!(s, "<polyline points=\"{}\" fill=\"none\" stroke=\"{GRAY}\" stroke-width=\"1.2\" stroke-opacity=\"0.6\"/>", d.join(" "));
+    }
+    // 짚을 사례: 주황 선과 끝 이름(예: 예상 못 한 1987 인하)
+    for (key, _) in highlight {
+        if let Some((_, p)) = paths.iter().find(|p| &p.0 == key) {
+            let d: Vec<String> = p.iter().map(|q| format!("{:.1},{:.1}", x(q.0), y(q.1))).collect();
+            let _ = write!(s, "<polyline points=\"{}\" fill=\"none\" stroke=\"#eb6834\" stroke-width=\"2\"/>", d.join(" "));
+        }
+    }
+    // 중앙값 선: 30일 간격 칸마다 각 사례의 가장 가까운 값
+    let mut med = Vec::new();
+    let mut dd = -before;
+    while dd <= after + 1e-9 {
+        let mut vals: Vec<f64> = paths.iter().filter_map(|p| p.1.iter().min_by(|a, b| (a.0 - dd).abs().partial_cmp(&(b.0 - dd).abs()).unwrap()).filter(|q| (q.0 - dd).abs() <= 20.0).map(|q| q.1)).collect();
+        if !vals.is_empty() {
+            vals.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            let n = vals.len();
+            med.push((dd, if n % 2 == 1 { vals[n / 2] } else { (vals[n / 2 - 1] + vals[n / 2]) / 2.0 }));
+        }
+        dd += 15.0;
+    }
+    let md: Vec<String> = med.iter().map(|q| format!("{:.1},{:.1}", x(q.0), y(q.1))).collect();
+    let _ = write!(s, "<polyline points=\"{}\" fill=\"none\" stroke=\"{BLUE}\" stroke-width=\"3\"/>", md.join(" "));
+    // 0일 세로선과 이름
+    let x0 = x(0.0);
+    let _ = write!(s, "<line x1=\"{x0:.1}\" x2=\"{x0:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{INK}\" stroke-width=\"1.5\" stroke-dasharray=\"4 3\"/><text x=\"{x0:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\" font-weight=\"600\">{}</text>",
+        t - 6.0, H - b, t - 10.0, event_label.replace('&', "&amp;"));
+    // 가로축: 3달마다 눈금(독자가 '3달 전' 값을 그림에서 찾지 못했다, 2026-11-19)
+    let mut m = -(before / 30.4).round() as i64;
+    while (m as f64) * 30.4 <= after + 20.0 {
+        if m % 3 == 0 && m != 0 {
+            let d = (m as f64 * 30.4).clamp(-before, after);
+            let lab = if m < 0 { format!("{m} mo") } else { format!("+{m} mo") };
+            let anchor = "middle"; // 끝 눈금도 가운데: 오른쪽 여백을 넓혀 +9·+12가 붙지 않게
+            let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#eef2f7\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"{anchor}\" fill=\"{INK}\" font-size=\"13\">{lab}</text>", x(d), x(d), t, H - b, x(d), H - b + 18.0);
+        }
+        m += 1;
+    }
+    // 범례
+    let ly = H - 8.0;
+    let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{BLUE}\" stroke-width=\"3\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">middle case</text><line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{GRAY}\" stroke-width=\"1.5\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">each cycle</text>",
+        l + 18.0, ly - 4.0, ly - 4.0, l + 24.0, ly, l + 120.0, l + 138.0, ly - 4.0, ly - 4.0, l + 144.0, ly);
+    let mut lx = l + 240.0;
+    for (_, name) in highlight {
+        let _ = write!(s, "<line x1=\"{lx:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#eb6834\" stroke-width=\"2\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">{}</text>", lx + 18.0, ly - 4.0, ly - 4.0, lx + 24.0, ly, name.replace('&', "&amp;"));
+        lx += 30.0 + name.len() as f64 * 7.0;
+    }
+    s.push_str("</svg>");
+    s
+}
+
+#[cfg(test)]
+mod around_test {
+    #[test]
+    fn around_draws_event_line_and_median() {
+        let paths = vec![("a".to_string(), vec![(-90.0, 0.5), (0.0, 0.0), (90.0, 0.1)]), ("b".to_string(), vec![(-90.0, 0.3), (0.0, 0.0), (90.0, -0.1)])];
+        let svg = super::around(&paths, 182.0, 365.0, " pt", "First cut", "t", &[("a".to_string(), "Case A".to_string())]);
+        assert!(svg.contains(">Case A<") && svg.contains("-3 mo"));
+        assert!(svg.contains(">First cut<") && svg.contains("middle case") && svg.ends_with("</svg>"));
+    }
+}
+
+
+/// 여러 계열 선 그림(수준): 같은 단위(%)의 계열 2~4개를 한 축에, 끝에 이름, 날짜 하나에 세로 표시(예: 연준 첫 인하일).
+/// 기준금리가 내려도 10년 국채·대출 금리가 오른 구간처럼 '따로 움직인다'를 위치로 보이려고(2026-11-19)
+pub fn lines(series: &[(String, Vec<(i64, f64)>)], mark: Option<(i64, &str)>, ticks: &[(i64, String)], title: &str) -> String {
+    const COLORS: [&str; 4] = ["#2563eb", "#eb6834", "#0f172a", "#16a34a"];
+    let all: Vec<f64> = series.iter().flat_map(|s| s.1.iter().map(|p| p.1)).collect();
+    let (mut lo, mut hi) = (all.iter().cloned().fold(f64::MAX, f64::min), all.iter().cloned().fold(f64::MIN, f64::max));
+    let pad = (hi - lo).max(0.1) * 0.08;
+    lo -= pad;
+    hi += pad;
+    let d0 = series.iter().flat_map(|s| s.1.first().map(|p| p.0)).min().unwrap_or(0);
+    let d1 = series.iter().flat_map(|s| s.1.last().map(|p| p.0)).max().unwrap_or(1);
+    let (l, r, t, b) = (44.0, 130.0, T + 22.0, 30.0);
+    let x = |d: i64| l + (d - d0) as f64 / (d1 - d0).max(1) as f64 * (W - l - r);
+    let y = |v: f64| t + (hi - v) / (hi - lo) * (H - t - b);
+    let mut s = head(title);
+    let mut v = lo.ceil();
+    while v <= hi + 1e-9 {
+        let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#eef2f7\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{v:.0}%</text>", W - r, y(v), y(v), l - 4.0, y(v) + 4.0);
+        v += 1.0;
+    }
+    if let Some((md, name)) = mark {
+        let xm = x(md);
+        let _ = write!(s, "<line x1=\"{xm:.1}\" x2=\"{xm:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{GRAY}\" stroke-dasharray=\"4 3\"/><text x=\"{xm:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\" font-weight=\"600\">{}</text>", t - 4.0, H - b, t - 8.0, name.replace('&', "&amp;"));
+    }
+    // 끝 이름표 자리: 겹치면 18px 이상 벌린다
+    let mut ends: Vec<(usize, f64)> = series.iter().enumerate().filter_map(|(k, s)| s.1.last().map(|p| (k, y(p.1)))).collect();
+    ends.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    for k in 1..ends.len() { if ends[k].1 - ends[k - 1].1 < 18.0 { ends[k].1 = ends[k - 1].1 + 18.0; } }
+    for (k, (name, pts)) in series.iter().enumerate() {
+        let c = COLORS[k % COLORS.len()];
+        let d: Vec<String> = pts.iter().map(|p| format!("{:.1},{:.1}", x(p.0), y(p.1))).collect();
+        let _ = write!(s, "<polyline points=\"{}\" fill=\"none\" stroke=\"{c}\" stroke-width=\"2.5\"/>", d.join(" "));
+        let ly = ends.iter().find(|e| e.0 == k).map(|e| e.1).unwrap_or(0.0);
+        let lastv = pts.last().map(|p| p.1).unwrap_or(0.0);
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"{c}\" font-size=\"13\" font-weight=\"600\">{} {lastv:.2}%</text>", W - r + 6.0, ly + 4.0, name.replace('&', "&amp;"));
+    }
+    for (d, lab) in ticks {
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{lab}</text>", x(*d), H - 8.0);
+    }
+    s.push_str("</svg>");
+    s
+}
+
+#[cfg(test)]
+mod lines_test {
+    #[test]
+    fn lines_draws_each_series_and_mark() {
+        let sers = vec![("Fed".to_string(), vec![(0, 5.5), (100, 4.5)]), ("10-year".to_string(), vec![(0, 3.8), (100, 4.6)])];
+        let svg = super::lines(&sers, Some((50, "First cut")), &[(0, "Jun".into())], "t");
+        assert!(svg.contains("Fed 4.50%") && svg.contains("10-year 4.60%") && svg.contains(">First cut<") && svg.ends_with("</svg>"));
     }
 }

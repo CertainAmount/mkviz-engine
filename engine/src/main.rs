@@ -7,6 +7,7 @@
 //!   figure rounds <spread.csv> --event <usrec.csv> --starts d1,d2 [--labels … --months 60 --threshold 0]   첫 역전 뒤 달마다 뒤집혔나, 침체 시작 달(재역전 그림)
 //!   figure falls <mortgage.csv> --minus <dgs10.csv> [--years 5 --near 0.25 --lines 3,5]   지금 금리와 비슷했던 주마다 N년 안 최저 금리 점(시작 해 묶음 줄), 기준선·지금 금리
 //!   figure strips <csv> --sets "이름=d1,d2;이름=d3" [--days 365 --diff --unit " pt" --ref "0.105|typical year"]   묶음마다 사건 뒤 변화 점 띠, 위로 간 수·중앙값
+//!   figure around <csv> --dates d1,d2 [--before 182 --after 365 --event-label "First cut" --unit " pt"]   사건일에 맞춘 전후 변화(사례 선 + 중앙값 + 0일 선)
 //!   need <mortgage.csv> --minus <dgs10.csv> --minus-window 7 [--targets 3,4,5,6 --years 5 --near 0.25]   목표 금리에 필요한 10년 국채, 그런 주의 몫, 지금 금리에서 years년 안에 목표까지 간 적. figure need
 //!   ladder <csv> [--depths 0.05,0.10,0.15,0.20,0.30,0.40,0.50]   지난 하락 중 깊이마다 간 수, 그 깊이에서 멈춘 하락의 회복 일수 중앙값. figure ladder [--labels …]
 //!   drawdowns <csv> [--threshold 0.10] [--deep 0.20] [--flag <csv>] [--forward 91,182,365]
@@ -836,7 +837,7 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
                 let (name, days) = match name.rsplit_once('@') { Some((n, d)) => (n, d.parse().unwrap_or(days)), None => (name, days) };
                 let pts_: Vec<(String, f64)> = ds.split(',').filter_map(|d| {
                     let e = series::day_number(d)?;
-                    let v = if diff { forward::after_diff(&pts, e, days)? } else { forward::after(&pts, e, days)? };
+                    let v = if diff && o.contains_key("base-prior") { forward::after_diff_prior(&pts, e, days)? } else if diff { forward::after_diff(&pts, e, days)? } else { forward::after(&pts, e, days)? };
                     Some((d.to_string(), v))
                 }).collect();
                 rows.push((name.to_string(), pts_));
@@ -844,6 +845,53 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             csv = format!("set,date,change\n{}", rows.iter().flat_map(|(n, ps)| ps.iter().map(move |(d, v)| format!("{n},{d},{v:.4}\n"))).collect::<String>());
             let refl = o.get("ref").and_then(|v| v.split_once('|')).and_then(|(a, b)| Some((a.parse::<f64>().ok()?, b)));
             viz::strips(&rows, if diff { o.get("unit").map(String::as_str).unwrap_or(" pt") } else { "%" }, refl, &title)
+        }
+        "around" => {
+            // 사건 전후: --dates 사건일들, --before 182 --after 365, 사건일 값 대비 수준 차이(금리 %p). 사례 선 + 중앙값 + 0일 세로선(--event-label)
+            let before = opt_f(o, "before", 182.0);
+            let after = opt_f(o, "after", 365.0);
+            let dates: Vec<&str> = o.get("dates").ok_or("--dates 가 필요")?.split(',').collect();
+            let mut paths = Vec::new();
+            csv = String::from("event,day_offset,change\n");
+            for d in &dates {
+                let e = series::day_number(d).ok_or("날짜 형식")?;
+                let base = pts.iter().filter(|p| p.day <= e).last().map(|p| p.value).ok_or("사건일 이전 자료 없음")?;
+                let p: Vec<(f64, f64)> = pts.iter().filter(|p| p.day as f64 >= e as f64 - before && p.day as f64 <= e as f64 + after).map(|p| ((p.day - e) as f64, p.value - base)).collect();
+                for (od, v) in &p { csv.push_str(&format!("{d},{od},{v:.3}\n")); }
+                paths.push((d.to_string(), p));
+            }
+            {
+                // --highlight "날짜|이름;날짜|이름"
+                let hl: Vec<(String, String)> = o.get("highlight").map(String::as_str).unwrap_or("").split(';').filter_map(|h| h.split_once('|')).map(|(d, n)| (d.to_string(), n.to_string())).collect();
+                viz::around(&paths, before, after, o.get("unit").map(String::as_str).unwrap_or(" pt"), o.get("event-label").map(String::as_str).unwrap_or("Event"), &title, &hl)
+            }
+        }
+        "lines" => {
+            // 여러 계열 선(수준): --series "경로|이름;경로|이름" (이 명령의 csv가 첫 계열), --from --to, --mark "YYYY-MM-DD|이름"
+            let from = o.get("from").and_then(|d| series::day_number(d)).unwrap_or(i64::MIN);
+            let to = o.get("to").and_then(|d| series::day_number(d)).unwrap_or(i64::MAX);
+            let mut sers: Vec<(String, Vec<(i64, f64)>)> = Vec::new();
+            let first_name = o.get("name").cloned().unwrap_or("Series".into());
+            sers.push((first_name, pts.iter().filter(|p| p.day >= from && p.day <= to).map(|p| (p.day, p.value)).collect()));
+            for spec in o.get("series").map(String::as_str).unwrap_or("").split(';').filter(|x| !x.is_empty()) {
+                let (path, name) = spec.split_once('|').unwrap_or((spec, spec));
+                let sp = series::load(path)?;
+                sers.push((name.to_string(), sp.iter().filter(|p| p.day >= from && p.day <= to).map(|p| (p.day, p.value)).collect()));
+            }
+            csv = format!("series,date_day,value\n{}", sers.iter().flat_map(|(n, ps)| ps.iter().map(move |(d, v)| format!("{n},{d},{v}\n"))).collect::<String>());
+            let mark = o.get("mark").and_then(|m| m.split_once('|')).and_then(|(d, n)| Some((series::day_number(d)?, n)));
+            // 눈금: 3달마다 '월 해'
+            const MON: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            let firsts: Vec<&series::Point> = pts.iter().filter(|p| p.day >= from && p.day <= to).collect();
+            let mut ticks = Vec::new();
+            let mut last_m = String::new();
+            for p in &firsts {
+                let m = &p.date[..7];
+                if m != last_m && (m[5..7].parse::<usize>().unwrap_or(1) - 1) % 3 == 0 { ticks.push((p.day, format!("{} {}", MON[m[5..7].parse::<usize>().unwrap_or(1) - 1], &m[2..4]))); }
+                last_m = m.to_string();
+            }
+            let ticks: Vec<(i64, String)> = ticks.into_iter().map(|(d, l)| (d, l.replacen(' ', " '", 1))).collect();
+            viz::lines(&sers, mark, &ticks, &title)
         }
         "ladder" => {
             // ladder 명령과 같은 셈: 깊이마다 지난 하락 중 그만큼 간 수, 지금 하락이 이미 지난 깊이는 파랑(--labels "Fell 5% or more,10%,…")

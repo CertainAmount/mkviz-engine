@@ -40,3 +40,10 @@ mod tests {
         assert!((worst(&p, day_number("2020-01-01").unwrap(), 30).unwrap() + 0.1).abs() < 1e-9);
     }
 }
+
+/// after_diff와 같되 기준을 사건일 '이전이거나 같은 날'의 마지막 관측으로(주간 조사처럼 사건일이 관측 사이에 있을 때, 사건 전후 그림과 같은 기준, 2026-11-19)
+pub fn after_diff_prior(pts: &[Point], start_day: i64, days: i64) -> Option<f64> {
+    let base = pts.iter().filter(|p| p.day <= start_day).last()?;
+    let j = pts.iter().position(|p| p.day >= start_day + days)?;
+    Some(pts[j].value - base.value)
+}

@@ -28,11 +28,13 @@
 | [consumer-sentiment](https://mkviz.com/consumer-sentiment/) | [sentiment-gap](consumer-sentiment/sentiment-gap.csv) | fit | fred_CPIAUCSL.csv, fred_UMCSENT.csv, fred_UNRATE.csv |
 | [core-inflation](https://mkviz.com/core-inflation/) | [core-gauge-race](core-inflation/core-gauge-race.csv) | closer | fred_CPIAUCSL.csv, fred_CPILFESL.csv, fred_MEDCPIM094SFRBCLE.csv, fred_TRMMEANCPIM094SFRBCLE.csv |
 | [dollar-weaker-2026](https://mkviz.com/dollar-weaker-2026/) | [dollar-underwater](dollar-weaker-2026/dollar-underwater.csv) | underwater | fred_DTWEXBGS.csv, fred_TWEXBMTH.csv |
+| [fed-rate-cut-mortgage-rates](https://mkviz.com/fed-rate-cut-mortgage-rates/) | [cut-around](fed-rate-cut-mortgage-rates/cut-around.csv) | around | fred_MORTGAGE30US.csv |
+| [fed-rate-cut-mortgage-rates](https://mkviz.com/fed-rate-cut-mortgage-rates/) | [cut-lines](fed-rate-cut-mortgage-rates/cut-lines.csv) | lines | fred_DFEDTARU.csv, fred_DGS10.csv, fred_MORTGAGE30US.csv |
 | [fed-interest-rates](https://mkviz.com/fed-interest-rates/) | [mortgage-after-first-hike](fed-interest-rates/mortgage-after-first-hike.csv) |  |  |
 | [fed-interest-rates](https://mkviz.com/fed-interest-rates/) | [mortgage-rate-band](fed-interest-rates/mortgage-rate-band.csv) |  |  |
+| [first-time-home-buyers](https://mkviz.com/first-time-home-buyers/) | [home-first-time-pictogram](first-time-home-buyers/home-first-time-pictogram.csv) | pictogram |  |
 | [first-time-home-buyers](https://mkviz.com/first-time-home-buyers/) | [home-payment-grid](first-time-home-buyers/home-payment-grid.csv) | grid | fred_MEHOINUSA646N.csv, fred_MSPUS.csv |
 | [first-time-home-buyers](https://mkviz.com/first-time-home-buyers/) | [home-payment-spells](first-time-home-buyers/home-payment-spells.csv) | spells | fred_MEHOINUSA646N.csv, fred_MORTGAGE30US.csv, fred_MSPUS.csv |
-| [first-time-home-buyers](https://mkviz.com/first-time-home-buyers/) | [home-first-time-pictogram](first-time-home-buyers/home-first-time-pictogram.csv) | pictogram |  |
 | [fuel-prices](https://mkviz.com/fuel-prices/) | [gas-calendar](fuel-prices/gas-calendar.csv) | calendar | fred_GASREGW.csv |
 | [fuel-prices](https://mkviz.com/fuel-prices/) | [gas-year-rules](fuel-prices/gas-year-rules.csv) | timeline |  |
 | [oil-prices-falling](https://mkviz.com/oil-prices-falling/) | [gas-after-oil-moves](oil-prices-falling/gas-after-oil-moves.csv) |  |  |

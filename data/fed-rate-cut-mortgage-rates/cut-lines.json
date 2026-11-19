@@ -1,0 +1,1 @@
+{"frame":"lines","input":"data/series/fred_DFEDTARU.csv","params":{"from":"2024-06-01","mark":"2024-09-18|Fed's first cut","name":"Fed rate","series":"data/series/fred_DGS10.csv|10-year;data/series/fred_MORTGAGE30US.csv|Mortgage","title":"Fed target rate, 10-year Treasury yield and 30-year mortgage rate, 2024-25","to":"2025-01-31"}}

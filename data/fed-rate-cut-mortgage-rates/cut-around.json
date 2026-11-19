@@ -1,0 +1,1 @@
+{"frame":"around","input":"data/series/fred_MORTGAGE30US.csv","params":{"after":"365","before":"182","dates":"1984-09-20,1987-11-04,1989-06-06,1995-07-06,1998-09-29,2001-01-03,2007-09-18,2019-08-01,2024-09-19","event-label":"Fed's first cut","highlight":"1987-11-04|1987, after the crash","title":"30-year mortgage rate around the Fed's first rate cut, change in points"}}
