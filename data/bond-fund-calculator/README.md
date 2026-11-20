@@ -4,7 +4,7 @@
 
 **Question.** How deep have bond fund losses been since 1969, how long did each take to earn back, and where does the loss that began in 2020 stand?
 
-**Short answer.** A fund holding 7-year Treasury notes, with interest reinvested, fell 15 times by 5% or more since July 1969. The 14 that ended took a median of 11 months from high to new high, and none took longer than 34. The loss that began in July 2020 reached 19.0% by October 2023 and, 75 months after the high, the fund is still 8.7% below it.
+**Short answer.** A fund holding 7-year Treasury notes, with interest reinvested, fell 15 times by 5% or more since July 1969. The 14 that ended took a median of 11 months from high to new high, and none took longer than 34. The loss that began in July 2020 reached 19.0% by October 2023 and, 76 months after the high, the fund is still 8.4% below it.
 
 ### Data
 - 7-year Treasury constant-maturity yield, daily since July 1, 1969 (Federal Reserve H.15 via FRED: DGS7), through Nov. 12, 2026.
@@ -12,7 +12,7 @@
 ### Method
 - A bond fund's total return is rebuilt from the yield, month by month (constant-maturity method after Swinkels 2019, who treats the bond as a par bond with a duration-convexity approximation; we reprice it in full). At each month-end the fund buys a 7-year note at par with a coupon equal to that day's yield. One month later it prices that note at the new month-end yield with 7 years less one month left (semiannual compounding) and adds one month of interest. The index starts at 100 in July 1969.
 - A drawdown is every stretch when the index closes at least 5% below its prior high, followed to its lowest month-end and to the first month-end at a new high. Recovery time is high to new high.
-- "If yields hold" is the years a fund 8.7% below its high needs to get back at today's yield: ln(1 / (1 − loss)) / ln(1 + yield).
+- "If yields hold" is the years a fund 8.4% below its high needs to get back at today's yield: ln(1 / (1 − loss)) / ln(1 + yield).
 - No fees, taxes or credit risk: the result is a Treasury-only fund. A typical core bond fund also holds mortgage and corporate bonds and has a duration near six years, close to this 7-year note's.
 
 ```
@@ -41,11 +41,11 @@ mkviz-engine export data/macro/fred_DGS7.csv --bond-return 7 --out bond.json
 | Oct. 2010 | March 2011 | 5% | July 2011 | 9 |
 | July 2012 | Dec. 2013 | 7% | Jan. 2015 | 30 |
 | July 2016 | April 2018 | 7% | May 2019 | 34 |
-| July 2020 | Oct. 2023 | 19.0% | not yet | 75 so far |
+| July 2020 | Oct. 2023 | 19.0% | not yet | 76 so far |
 
 Only three drawdowns went past 10%: 1979-80 (13.3%), 1980-81 (11.6%) and the current one.
 
-The 7-year yield was 0.39% at the July 2020 high and 5.02% on Nov. 12, 2026 (3.86% a year earlier; past-year range 3.72% to 5.19%). Over the past 12 months the fund returned -3.0%. If the yield held at today's level, the fund would regain its 2020 high in about 1.9 years.
+The 7-year yield was 0.39% at the July 2020 high and 4.96% on Nov. 12, 2026 (3.86% a year earlier; past-year range 3.72% to 5.19%). Over the past 12 months the fund returned -2.0%. If the yield held at today's level, the fund would regain its 2020 high in about 1.8 years.
 
 ### Past test
 Losses that started at yields near 9% to 10% around 1980 were made up by interest in under two years; the two that started near 1% in 2012 and 2016 took close to three. The 2020 high came at a yield under half a percent: the fund had almost no interest cushion when yields rose more than four points. That is why this drawdown is both the deepest and the longest in the record. The three longest recoveries (2012, 2016, 2020) all started with the 7-year yield below 1.5%; the link is loose above that (the 1998 loss, starting at 4.4%, took 22 months). The method was checked on two fixed cases in the engine tests: with a flat yield the fund grows by exactly a month's interest, and a one-point rise in a 7-year yield costs close to the note's duration.

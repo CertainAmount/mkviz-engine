@@ -893,6 +893,33 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             let ticks: Vec<(i64, String)> = ticks.into_iter().map(|(d, l)| (d, l.replacen(' ', " '", 1))).collect();
             viz::lines(&sers, mark, &ticks, &title)
         }
+        "rowdots" => {
+            // 줄마다 이름과 값들: --rows "Computers:-0.093,0.097,-0.007;Toys:…" --marks "Usual year,This year,Holiday dip" (입력 csv는 쓰지 않는다)
+            let rows: Vec<(String, Vec<f64>)> = o.get("rows").ok_or("--rows 가 필요")?.split(';').filter_map(|r| r.split_once(':')).map(|(n, v)| (n.to_string(), v.split(',').filter_map(|x| x.trim().parse().ok()).collect())).collect();
+            let marks: Vec<String> = o.get("marks").map(|m| m.split(',').map(String::from).collect()).unwrap_or_default();
+            csv = format!("row,{}\n{}", marks.join(","), rows.iter().map(|(n, v)| format!("{n},{}\n", v.iter().map(|x| format!("{x}")).collect::<Vec<_>>().join(","))).collect::<String>());
+            viz::rowdots(&rows, &marks, &title)
+        }
+        "intrayear" => {
+            // 해마다: 그해 최고 종가에서 그 뒤 최저 종가까지(그해 안), 전해 마지막 종가 대비 그해 등락(첫해는 첫 종가 대비). --line 0.10
+            let line = opt_f(o, "line", 0.10);
+            let mut rows: Vec<(i32, f64, f64)> = Vec::new();
+            let mut prev_close: Option<f64> = None;
+            let mut i = 0;
+            while i < pts.len() {
+                let yr: i32 = pts[i].date[..4].parse().unwrap_or(0);
+                let mut j = i;
+                while j < pts.len() && pts[j].date[..4].parse::<i32>().unwrap_or(0) == yr { j += 1; }
+                let (mut hi, mut dd) = (f64::MIN, 0.0_f64);
+                for p in &pts[i..j] { hi = hi.max(p.value); dd = dd.min(p.value / hi - 1.0); }
+                let base = prev_close.unwrap_or(pts[i].value);
+                rows.push((yr, dd, pts[j - 1].value / base - 1.0));
+                prev_close = Some(pts[j - 1].value);
+                i = j;
+            }
+            csv = format!("year,intra_year_drop,year_change\n{}", rows.iter().map(|r| format!("{},{:.4},{:.4}\n", r.0, r.1, r.2)).collect::<String>());
+            viz::intrayear(&rows, line, &title)
+        }
         "ladder" => {
             // ladder 명령과 같은 셈: 깊이마다 지난 하락 중 그만큼 간 수, 지금 하락이 이미 지난 깊이는 파랑(--labels "Fell 5% or more,10%,…")
             let (depths, rungs, n, open) = ladder_rows(&pts, o);
@@ -1472,6 +1499,8 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "recessions" => "Each run of months flagged 1 in the event series (NBER recession months), with its length; with a second series, its value the month before the start and its highest value from the start to the given months after the end (or to the next recession start, if sooner).",
         "together" => "Each signal is on in a month if any of its readings that month crossed its threshold. Episodes are runs of months with at least k signals on, starting outside the event (NBER recession) and outside the settle months after an event ends; for each, the months to the next event start. For each event start, whether at least k were on together in the window months before.",
         "need" => "Each week pairs the 30-year mortgage rate with the 10-year Treasury yield averaged over the days its survey covers; the gap is the difference. For each target rate, the 10-year yield it needs is the target minus the median gap (range: minus the 90th and 10th percentile gaps), with the share of weeks the 10-year was that low. Similar starts are weeks whose rate was within the given distance of this week's, with the full horizon after them in the data, and the lowest rate each reached within it.",
+        "rowdots" => "Values given on the command line, one row per item, drawn on one percentage axis with a zero line; each row's marks are joined by a light bar from lowest to highest.",
+        "intrayear" => "For each calendar year: the deepest fall from that year's highest close to a later close in the same year, and the change from the prior year's last close to the year's last close (the first year starts from its first close; the latest year is year to date).",
         "ladder" => "Every completed decline of at least the first depth from a prior record close (peak to trough, then a new record): how many reached each deeper depth, and the median days from peak to new record for declines whose trough fell between that depth and the next, and the median days from that record to the trough. The decline still under way is reported separately and not counted.",
         "breadth" => "For each month where every listed series has a value, the number of series at least the drop below their own highest value of the last window months (that month included); compared with the count in each month an event (NBER recession) began and three months later, and with how often months outside events reached each count.",
         "catchup" => "For every drawdown of the bond fund index (threshold below the prior high), the no-change path grows from the high at the yield of that month (semiannual compounding); catch-up is the first later month the actual index is back at or above that path, compared with the modified duration of a par bond at that yield. Months to a new high are counted from the same high.",

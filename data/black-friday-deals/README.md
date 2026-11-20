@@ -1,10 +1,16 @@
-# [Black Friday Deals: Is November Really the Cheapest Month?](https://mkviz.com/black-friday-deals/)
+# [Black Friday Deals: Is It the Cheapest Time to Buy This Year?](https://mkviz.com/black-friday-deals/)
 
 ## Research note
 
 **Question.** Are prices really lowest around Black Friday? For the things people buy in the holiday season, which month is cheapest once each item's normal price trend is set aside?
 
 **Short answer.** At the median, December was a little cheaper than November relative to October for toys, appliances, TVs and computers; phones bottomed in November by a hair; clothing fell every year into December and was lower again in January in 21 of 30 years. Year by year, December beat November in about half to two-thirds of years for most items, so the gap is small. For electronics the steady monthly decline (TVs about 1.1% a month since 1995, 0.75% in the last decade) is about as large as the holiday dip; computers have fallen much more slowly since about 2016.
+
+### Definitions
+- Price: the CPI-U item index, U.S. city average, not seasonally adjusted. It prices the same quality of product (quality changes are adjusted out) and averages collections over the whole month, so it shows the season, not a single sale day.
+- Holiday dip: the median change from October to each later month after removing the item's own trend (ratio to a centered 2x12 moving average), years 1995 (1997 for three series) to 2025.
+- This year vs usual: the change from September 2025 to September 2026 (October 2025 is missing because of the 2025 shutdown, so September is the latest month with a year-earlier match), against the median September-to-September change for 2000-2019.
+- Re-scan: all six item series and the all-items index were measured; every year with a full October-to-February window is in the medians (years whose window crosses the missing October 2025 are skipped). The usual-year median uses every September pair from 2000 to 2019; none left out.
 
 ### Data
 - Consumer Price Index for All Urban Consumers (CPI-U), U.S. city average, not seasonally adjusted, BLS. Apparel (CUUR0000SAA), toys (CUUR0000SERE01), major appliances (CUUR0000SEHK), televisions (CUUR0000SERA01), smartphones (CUUR0000SEEE04), computers and peripherals (CUUR0000SEEE01), all items (CUUR0000SA0).
@@ -39,6 +45,21 @@ Median change from October, net of each item's trend:
 | Computers and peripherals (CUUR0000SEEE01) | -0.96% | -0.2% (63% of years lower) | -0.7% (56% of years lower) | +0.1% (48% of years lower) | +0.4% (44% of years lower) | 27 |
 | All items (CUUR0000SA0) | +0.30% | -0.2% (84% of years lower) | -0.4% (88% of years lower) | -0.3% (85% of years lower) | -0.2% (78% of years lower) | 68 |
 
+### This year vs a usual year
+
+| Item | Sept 2025 to Sept 2026 | Usual year (median 2000-2019) | Oct-to-Dec dip, net of trend |
+|---|---|---|---|
+| Computers | +9.7% | -9.3% | -0.7% |
+| Toys | +6.6% | -6.0% | -0.7% |
+| Clothing | +3.4% | -0.4% | -4.1% |
+| Appliances | -1.0% | -1.2% | -0.8% |
+| TVs | -1.9% | -15.4% | -0.9% |
+| Phones | -12.7% | -6.9% | -0.4% |
+
+```
+./engine/target/release/mkviz-engine figure rowdots <any csv> --rows "Computers:-0.093,0.097,-0.0075;Toys:-0.06,0.066,-0.0073;Clothing:-0.004,0.034,-0.041;Appliances:-0.012,-0.01,-0.0084;TVs:-0.154,-0.019,-0.0089;Phones:-0.069,-0.127,-0.0038" --marks "Usual year,This year,Holiday dip" --out bf-trend-vs-sale.svg
+```
+
 ### Year by year
 - Years December was below November, net of trend: toys 19 of 30, appliances 16 of 27, TVs 16 of 30, phones 14 of 27, computers 14 of 27, clothing 30 of 30.
 - Clothing: January below December in 21 of 30 years. Appliances: January below December in 2 of 27; toys 8 of 30.
@@ -66,6 +87,16 @@ MKViz (2026). *Black Friday prices: which month is cheapest, by item.* https://m
 ## Charts
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
+
+## bf-trend-vs-sale
+
+Data: [bf-trend-vs-sale.csv](bf-trend-vs-sale.csv) · settings: [bf-trend-vs-sale.json](bf-trend-vs-sale.json)
+
+![bf-trend-vs-sale](bf-trend-vs-sale.svg)
+
+```
+./engine/target/release/mkviz-engine figure rowdots data/series/bls_CUUR0000SA0.csv --marks 'Usual year,This year,Holiday dip' --rows 'Computers:-0.093,0.097,-0.0075;Toys:-0.06,0.066,-0.0073;Clothing:-0.004,0.034,-0.041;Appliances:-0.012,-0.01,-0.0084;TVs:-0.154,-0.019,-0.0089;Phones:-0.069,-0.127,-0.0038' --title 'Price change: a usual year, this year (Sept to Sept), and the Oct-to-Dec holiday dip' --out bf-trend-vs-sale.svg
+```
 
 ## holiday-price-season
 

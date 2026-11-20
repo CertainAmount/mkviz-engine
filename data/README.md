@@ -22,6 +22,7 @@
 | [ai-stocks](https://mkviz.com/ai-stocks/) | [ai-dotcom-aftermath](ai-stocks/ai-dotcom-aftermath.csv) | paths | fred_NASDAQ100.csv |
 | [ai-stocks](https://mkviz.com/ai-stocks/) | [ai-crash-pictogram](ai-stocks/ai-crash-pictogram.csv) | pictogram |  |
 | [binance-hack](https://mkviz.com/binance-hack/) | [exchange-hacks-timeline](binance-hack/exchange-hacks-timeline.csv) | timeline |  |
+| [black-friday-deals](https://mkviz.com/black-friday-deals/) | [bf-trend-vs-sale](black-friday-deals/bf-trend-vs-sale.csv) | rowdots | bls_CUUR0000SA0.csv |
 | [black-friday-deals](https://mkviz.com/black-friday-deals/) | [holiday-price-season](black-friday-deals/holiday-price-season.csv) | season | bls_CUUR0000SA0.csv, bls_CUUR0000SAA.csv, bls_CUUR0000SEEE01.csv, bls_CUUR0000SEEE04.csv, bls_CUUR0000SEHK.csv, bls_CUUR0000SERA01.csv, bls_CUUR0000SERE01.csv |
 | [bond-funds](https://mkviz.com/bond-funds/) | [bond-fund-breakeven](bond-funds/bond-fund-breakeven.csv) | breakeven | fred_DGS10.csv |
 | [bond-funds](https://mkviz.com/bond-funds/) | [bond-fund-catchup](bond-funds/bond-fund-catchup.csv) | catchup | fred_DGS7.csv |
@@ -40,6 +41,7 @@
 | [oil-prices-falling](https://mkviz.com/oil-prices-falling/) | [gas-after-oil-moves](oil-prices-falling/gas-after-oil-moves.csv) |  |  |
 | [gold-price](https://mkviz.com/gold-price/) | [gold-underwater](gold-price/gold-underwater.csv) | underwater | wb_gold.csv |
 | [gold-price](https://mkviz.com/gold-price/) | [gold-during-crashes](gold-price/gold-during-crashes.csv) | during | fred_NASDAQCOM.csv, wb_gold.csv |
+| [how-long-do-corrections-last](https://mkviz.com/how-long-do-corrections-last/) | [sp-intrayear](how-long-do-corrections-last/sp-intrayear.csv) | intrayear | index_gspc_long.csv |
 | [jobs-report-revisions](https://mkviz.com/jobs-report-revisions/) | [jobs-revisions-years](jobs-report-revisions/jobs-revisions-years.csv) | years | bls_ces_first.csv, bls_ces_third.csv, fred_USREC.csv |
 | [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [nasdaq-after-midterms](stocks-after-midterm-elections/nasdaq-after-midterms.csv) | fan | fred_NASDAQCOM.csv |
 | [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [midterm-cases](stocks-after-midterm-elections/midterm-cases.csv) | cases |  |

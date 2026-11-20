@@ -42,11 +42,11 @@
 
 All in percentage points against the last weekly reading on or before the cut. Before the cut: the rate had fallen in eight of nine (1984 only barely, after a mid-1984 peak); 1987 rose into the cut. Two of the "higher" cases after the cut are nearly flat (2019 at three months, 2001 at a year).
 
-Refinance payback on $400,000 at 7.11%: a half-point drop saves $134 a month (60 months to earn back 2% closing costs, 150 at 5%); a one-point drop saves $264 (30 and 76 months). On $250,000 or from 7.4% the months are within one of these, since saving and costs both scale with the loan.
+Refinance payback on $400,000 at 7.28%: a half-point drop saves $134 a month (59 months to earn back 2% closing costs, 149 at 5%); a one-point drop saves $266 (30 and 75 months). On $250,000 or from 7.4% the months are within one of these, since saving and costs both scale with the loan.
 
 The 2024 case: the rate fell 0.78 points point in the three months before the Sept. 18 cut and rose 0.63 points point in the three months after. The Atlanta Fed notes that from September 2024 to January 2025 the fed funds rate fell about 0.80 points while the 10-year Treasury yield rose about 0.90 points.
 
-Today: the Fed raised its target range in September 2026 to an upper limit of 4.00%; the 30-year rate was 7.11% in the week of Nov. 12, 2026; the next decision is Dec. 9, 2026.
+Today: the Fed raised its target range in September 2026 to an upper limit of 4.00%; the 30-year rate was 7.28% in the week of Nov. 19, 2026; the next decision is Dec. 9, 2026.
 
 ### Limits
 - Nine cycles. Several first cuts came with recessions or crises (2001, 2007, 2019-20), when Treasury yields fell for other reasons too.

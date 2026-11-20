@@ -1840,3 +1840,105 @@ mod lines_test {
         assert!(svg.contains("Fed 4.50%") && svg.contains("10-year 4.60%") && svg.contains(">First cut<") && svg.ends_with("</svg>"));
     }
 }
+
+
+/// 해마다 그해 안의 가장 깊은 하락(그해 최고 종가에서 그 뒤 최저 종가, 막대 아래로)과 그해 등락(점).
+/// '조정은 몇 년에 한 번 오나'와 '그래도 그해는 올랐나'를 한 그림에(2026-11-20). line: 짚을 하락 깊이(예: 0.10)
+pub fn intrayear(rows: &[(i32, f64, f64)], line: f64, title: &str) -> String {
+    let lo = rows.iter().map(|r| r.1.min(r.2)).fold(-0.1_f64, f64::min).min(-line) * 1.08;
+    let hi = rows.iter().map(|r| r.2).fold(0.1_f64, f64::max) * 1.08;
+    let (l, r, t, b) = (44.0, 16.0, T + 22.0, 46.0);
+    let n = rows.len().max(1) as f64;
+    let bw = (W - l - r) / n;
+    let x = |i: usize| l + i as f64 * bw;
+    let y = |v: f64| t + (hi - v) / (hi - lo) * (H - t - b);
+    let mut s = head(title);
+    for v in [-0.4_f64, -0.2, 0.0, 0.2, 0.4] {
+        if v < lo || v > hi { continue; }
+        let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{}{:.0}%</text>",
+            W - r, y(v), y(v), if v == 0.0 { INK } else { "#eef2f7" }, l - 4.0, y(v) + 4.0, if v > 0.0 { "+" } else { "" }, v * 100.0);
+    }
+    // 짚는 깊이 선
+    let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{INK}\" stroke-dasharray=\"3 3\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\" font-weight=\"600\">-{:.0}%</text>",
+        W - r, y(-line), y(-line), l - 4.0, y(-line) + 4.0, line * 100.0);
+    for (i, (_, drop, ret)) in rows.iter().enumerate() {
+        let c = if -drop >= 0.20 { "#1e3a8a" } else if -drop >= line { BLUE } else { GRAY }; // 20% 넘은 해는 짙게: 13해를 그림에서 바로 센다(설계 검토 2026-11-20)
+        let _ = write!(s, "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"{c}\"/>", x(i) + 0.5, y(0.0), (bw - 1.0).max(1.0), y(*drop) - y(0.0));
+        let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"2\" fill=\"#eb6834\"/>", x(i) + bw / 2.0, y(*ret));
+    }
+    // 마지막 해가 진행 중이면 'so far'(설계 검토: 셈은 1950~2025인데 그림엔 2026이 있다)
+    if let Some((yr, _, ret)) = rows.last() {
+        if *yr >= 2026 {
+            let i = rows.len() - 1;
+            let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"12\">{yr} so far</text>", x(i) + bw, y(ret.max(0.0)) - 10.0);
+        }
+    }
+    // 가로축: 10년마다
+    for (i, (yr, _, _)) in rows.iter().enumerate() {
+        if yr % 10 == 0 {
+            let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{yr}</text>", x(i) + bw / 2.0, H - b + 16.0);
+        }
+    }
+    let ly = H - 8.0;
+    let _ = write!(s, "<rect x=\"{l}\" y=\"{:.1}\" width=\"10\" height=\"10\" fill=\"{BLUE}\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">fell {:.0}%+ within the year</text><circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"4\" fill=\"#eb6834\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">how the year ended</text><rect x=\"{:.1}\" y=\"{:.1}\" width=\"10\" height=\"10\" fill=\"#1e3a8a\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">20%+</text></svg>",
+        ly - 10.0, l + 14.0, ly, line * 100.0, l + 214.0, ly - 4.0, l + 222.0, ly, l + 360.0, ly - 10.0, l + 374.0, ly);
+    s
+}
+
+#[cfg(test)]
+mod intrayear_test {
+    #[test]
+    fn intrayear_marks_deep_years() {
+        let rows = vec![(1990, -0.2, -0.06), (1991, -0.06, 0.26)];
+        let svg = super::intrayear(&rows, 0.10, "t");
+        assert!(svg.contains("#2563eb") && svg.contains("how the year ended") && svg.ends_with("</svg>"));
+    }
+}
+
+
+/// 줄마다 이름 하나, 같은 축(%)에 표시 여러 개(예: 평소 1년 변화 · 올해 변화 · 연말 할인 폭). 0 세로선.
+/// '할인이 1년 추세보다 작다'를 위치로 보이려고(설계 검토 2026-11-20). 값은 비율(0.097 = 9.7%)
+pub fn rowdots(rows: &[(String, Vec<f64>)], marks: &[String], title: &str) -> String {
+    const C: [&str; 4] = ["#94a3b8", "#2563eb", "#eb6834", "#0f172a"];
+    let all: Vec<f64> = rows.iter().flat_map(|r| r.1.iter().cloned()).collect();
+    let lo = all.iter().cloned().fold(0.0_f64, f64::min) * 1.1;
+    let hi = all.iter().cloned().fold(0.0_f64, f64::max) * 1.1;
+    let (l, r, t, b) = (118.0, 20.0, T + 22.0, 52.0);
+    let x = |v: f64| l + (v - lo) / (hi - lo).max(1e-9) * (W - l - r);
+    let rh = (H - t - b) / rows.len().max(1) as f64;
+    let mut s = head(title);
+    let step = [0.02_f64, 0.05, 0.1].iter().cloned().find(|st| (hi - lo) / st <= 8.0).unwrap_or(0.1);
+    let mut v = (lo / step).ceil() * step;
+    while v <= hi + 1e-9 {
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{t}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"12\">{}{:.0}%</text>",
+            x(v), x(v), H - b, if v.abs() < 1e-9 { INK } else { "#eef2f7" }, x(v), H - b + 14.0, if v > 1e-9 { "+" } else { "" }, if v.abs() < 1e-9 { 0.0 } else { v * 100.0 });
+        v += step;
+    }
+    for (i, (name, vals)) in rows.iter().enumerate() {
+        let y = t + rh * (i as f64 + 0.5);
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{}</text>", l - 8.0, y + 4.0, name.replace('&', "&amp;"));
+        let (mn, mx) = vals.iter().fold((f64::MAX, f64::MIN), |a, &v| (a.0.min(v), a.1.max(v)));
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{y:.1}\" y2=\"{y:.1}\" stroke=\"#e2e8f0\" stroke-width=\"2\"/>", x(mn), x(mx));
+        for (k, v) in vals.iter().enumerate() {
+            let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{y:.1}\" r=\"5\" fill=\"{}\" stroke=\"#fff\" stroke-width=\"1.5\"/>", x(*v), C[k % C.len()]);
+        }
+    }
+    let ly = H - 10.0;
+    let mut lx = l;
+    for (k, m) in marks.iter().enumerate() {
+        let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"5\" fill=\"{}\"/><text x=\"{:.1}\" y=\"{ly:.1}\" fill=\"{INK}\" font-size=\"13\">{}</text>", lx + 5.0, ly - 4.0, C[k % C.len()], lx + 14.0, m.replace('&', "&amp;"));
+        lx += 26.0 + m.len() as f64 * 7.0;
+    }
+    s.push_str("</svg>");
+    s
+}
+
+#[cfg(test)]
+mod rowdots_test {
+    #[test]
+    fn dots_draws_rows_and_legend() {
+        let rows = vec![("Computers".to_string(), vec![-0.09, 0.097, -0.007])];
+        let svg = super::rowdots(&rows, &["Usual year".into(), "This year".into(), "Holiday dip".into()], "t");
+        assert!(svg.contains(">Computers<") && svg.contains(">Holiday dip<") && svg.ends_with("</svg>"));
+    }
+}
