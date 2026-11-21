@@ -1,0 +1,1 @@
+{"frame":"around","input":"data/series/fred_DGS2.csv","params":{"after":"91","before":"91","dates":"1994-02-04,1997-03-25,1999-06-30,2004-06-30,2015-12-16,2022-03-16,2026-09-17","event-label":"First hike","highlight":"2026-09-17|2026","unit":" pt"}}

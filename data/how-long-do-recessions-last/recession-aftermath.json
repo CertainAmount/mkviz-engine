@@ -1,0 +1,1 @@
+{"frame":"aftermath","input":"data/series/fred_USREC.csv","params":{"after":"36","from":"1948-01-01","recover":"data/series/fred_PAYEMS.csv","with":"data/series/fred_UNRATE.csv"}}

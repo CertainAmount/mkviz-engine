@@ -6,15 +6,15 @@ The calculation engine and chart data behind [MKViz](https://mkviz.com), a blog 
 
 Every number in an MKViz article that comes from our own calculation is produced by this engine, and every chart's data is published here so anyone can check it.
 
-![How Often Do Stock Market Corrections Happen? More Years Than Not](data/how-long-do-corrections-last/sp-intrayear.svg)
+![How Long Do Recessions Last? 10 Months. The Jobs Take Longer](data/how-long-do-recessions-last/recession-aftermath.svg)
 
 **Latest articles**
 
+- [How Long Do Recessions Last? 10 Months. The Jobs Take Longer](https://mkviz.com/how-long-do-recessions-last/) · [data](data/how-long-do-recessions-last/)
 - [How Often Do Stock Market Corrections Happen? More Years Than Not](https://mkviz.com/how-long-do-corrections-last/) · [data](data/how-long-do-corrections-last/)
 - [How Do Fed Rate Cuts Affect Mortgage Rates? The Drop Comes First](https://mkviz.com/fed-rate-cut-mortgage-rates/) · [data](data/fed-rate-cut-mortgage-rates/)
 - [Will Mortgage Rates Ever Get Back to 3%? What It Would Take](https://mkviz.com/mortgage-rates-back-to-3-percent/) · [data](data/mortgage-rates-back-to-3-percent/)
 - [Stock Market Corrections Since 1950: How Often a Dip Goes Deeper](https://mkviz.com/stock-market-corrections-history/) · [data](data/stock-market-corrections-history/)
-- [Recession Indicators: Are We in a Recession Right Now?](https://mkviz.com/recession-indicators/) · [data](data/recession-indicators/)
 
 ## What's here
 

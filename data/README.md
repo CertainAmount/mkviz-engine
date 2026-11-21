@@ -31,8 +31,8 @@
 | [dollar-weaker-2026](https://mkviz.com/dollar-weaker-2026/) | [dollar-underwater](dollar-weaker-2026/dollar-underwater.csv) | underwater | fred_DTWEXBGS.csv, fred_TWEXBMTH.csv |
 | [fed-rate-cut-mortgage-rates](https://mkviz.com/fed-rate-cut-mortgage-rates/) | [cut-around](fed-rate-cut-mortgage-rates/cut-around.csv) | around | fred_MORTGAGE30US.csv |
 | [fed-rate-cut-mortgage-rates](https://mkviz.com/fed-rate-cut-mortgage-rates/) | [cut-lines](fed-rate-cut-mortgage-rates/cut-lines.csv) | lines | fred_DFEDTARU.csv, fred_DGS10.csv, fred_MORTGAGE30US.csv |
-| [fed-interest-rates](https://mkviz.com/fed-interest-rates/) | [mortgage-after-first-hike](fed-interest-rates/mortgage-after-first-hike.csv) |  |  |
-| [fed-interest-rates](https://mkviz.com/fed-interest-rates/) | [mortgage-rate-band](fed-interest-rates/mortgage-rate-band.csv) |  |  |
+| [fed-interest-rates](https://mkviz.com/fed-interest-rates/) | [fed-vs-10y-mortgage](fed-interest-rates/fed-vs-10y-mortgage.csv) | rowdots | fred_DGS10.csv |
+| [fed-interest-rates](https://mkviz.com/fed-interest-rates/) | [fed-2y-around-hike](fed-interest-rates/fed-2y-around-hike.csv) | around | fred_DGS2.csv |
 | [first-time-home-buyers](https://mkviz.com/first-time-home-buyers/) | [home-first-time-pictogram](first-time-home-buyers/home-first-time-pictogram.csv) | pictogram |  |
 | [first-time-home-buyers](https://mkviz.com/first-time-home-buyers/) | [home-payment-grid](first-time-home-buyers/home-payment-grid.csv) | grid | fred_MEHOINUSA646N.csv, fred_MSPUS.csv |
 | [first-time-home-buyers](https://mkviz.com/first-time-home-buyers/) | [home-payment-spells](first-time-home-buyers/home-payment-spells.csv) | spells | fred_MEHOINUSA646N.csv, fred_MORTGAGE30US.csv, fred_MSPUS.csv |
@@ -42,6 +42,7 @@
 | [gold-price](https://mkviz.com/gold-price/) | [gold-underwater](gold-price/gold-underwater.csv) | underwater | wb_gold.csv |
 | [gold-price](https://mkviz.com/gold-price/) | [gold-during-crashes](gold-price/gold-during-crashes.csv) | during | fred_NASDAQCOM.csv, wb_gold.csv |
 | [how-long-do-corrections-last](https://mkviz.com/how-long-do-corrections-last/) | [sp-intrayear](how-long-do-corrections-last/sp-intrayear.csv) | intrayear | index_gspc_long.csv |
+| [how-long-do-recessions-last](https://mkviz.com/how-long-do-recessions-last/) | [recession-aftermath](how-long-do-recessions-last/recession-aftermath.csv) | aftermath | fred_PAYEMS.csv, fred_UNRATE.csv, fred_USREC.csv |
 | [jobs-report-revisions](https://mkviz.com/jobs-report-revisions/) | [jobs-revisions-years](jobs-report-revisions/jobs-revisions-years.csv) | years | bls_ces_first.csv, bls_ces_third.csv, fred_USREC.csv |
 | [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [nasdaq-after-midterms](stocks-after-midterm-elections/nasdaq-after-midterms.csv) | fan | fred_NASDAQCOM.csv |
 | [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [midterm-cases](stocks-after-midterm-elections/midterm-cases.csv) | cases |  |

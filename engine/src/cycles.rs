@@ -9,6 +9,8 @@ pub struct Cycle {
     pub start: String,
     pub end: String,
     pub moves: usize,
+    /// 사이클의 두 번째 움직임 날짜(첫 인상 뒤 언제 다시 올렸나, 없으면 None)
+    pub second: Option<String>,
     pub from: f64,
     pub to: f64,
 }
@@ -25,9 +27,10 @@ pub fn cycles(pts: &[Point]) -> Vec<Cycle> {
             Some(c) if c.up == up => {
                 c.end = w[1].date.clone();
                 c.moves += 1;
+                if c.moves == 2 { c.second = Some(w[1].date.clone()); }
                 c.to = w[1].value;
             }
-            _ => out.push(Cycle { up, start: w[1].date.clone(), end: w[1].date.clone(), moves: 1, from: w[0].value, to: w[1].value }),
+            _ => out.push(Cycle { up, start: w[1].date.clone(), end: w[1].date.clone(), moves: 1, second: None, from: w[0].value, to: w[1].value }),
         }
     }
     out
@@ -45,5 +48,6 @@ mod tests {
         assert_eq!(c.len(), 3);
         assert_eq!((c[0].up, c[0].moves, c[0].start.as_str(), c[0].end.as_str()), (true, 2, "2020-02-01", "2020-03-01"));
         assert!(!c[1].up && c[2].up && c[2].start == "2020-06-01");
+        assert_eq!((c[0].second.as_deref(), c[2].second.as_deref()), (Some("2020-03-01"), None));
     }
 }

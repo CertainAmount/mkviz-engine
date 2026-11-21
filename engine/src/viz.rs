@@ -1898,7 +1898,7 @@ mod intrayear_test {
 
 /// 줄마다 이름 하나, 같은 축(%)에 표시 여러 개(예: 평소 1년 변화 · 올해 변화 · 연말 할인 폭). 0 세로선.
 /// '할인이 1년 추세보다 작다'를 위치로 보이려고(설계 검토 2026-11-20). 값은 비율(0.097 = 9.7%)
-pub fn rowdots(rows: &[(String, Vec<f64>)], marks: &[String], title: &str) -> String {
+pub fn rowdots(rows: &[(String, Vec<f64>)], marks: &[String], points: bool, title: &str) -> String {
     const C: [&str; 4] = ["#94a3b8", "#2563eb", "#eb6834", "#0f172a"];
     let all: Vec<f64> = rows.iter().flat_map(|r| r.1.iter().cloned()).collect();
     let lo = all.iter().cloned().fold(0.0_f64, f64::min) * 1.1;
@@ -1907,11 +1907,14 @@ pub fn rowdots(rows: &[(String, Vec<f64>)], marks: &[String], title: &str) -> St
     let x = |v: f64| l + (v - lo) / (hi - lo).max(1e-9) * (W - l - r);
     let rh = (H - t - b) / rows.len().max(1) as f64;
     let mut s = head(title);
-    let step = [0.02_f64, 0.05, 0.1].iter().cloned().find(|st| (hi - lo) / st <= 8.0).unwrap_or(0.1);
+    // points: 값이 %p(금리 변화)일 때 눈금을 1 pt 단위로
+    let steps: &[f64] = if points { &[0.5, 1.0, 2.0] } else { &[0.02, 0.05, 0.1] };
+    let step = steps.iter().cloned().find(|st| (hi - lo) / st <= 8.0).unwrap_or(steps[steps.len() - 1]);
     let mut v = (lo / step).ceil() * step;
     while v <= hi + 1e-9 {
-        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{t}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"12\">{}{:.0}%</text>",
-            x(v), x(v), H - b, if v.abs() < 1e-9 { INK } else { "#eef2f7" }, x(v), H - b + 14.0, if v > 1e-9 { "+" } else { "" }, if v.abs() < 1e-9 { 0.0 } else { v * 100.0 });
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{t}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"12\">{}</text>",
+            x(v), x(v), H - b, if v.abs() < 1e-9 { INK } else { "#eef2f7" }, x(v), H - b + 14.0,
+            if v.abs() < 1e-9 { "0".to_string() } else if points { format!("{}{} pt", if v > 0.0 { "+" } else { "" }, v) } else { format!("{}{:.0}%", if v > 0.0 { "+" } else { "" }, v * 100.0) });
         v += step;
     }
     for (i, (name, vals)) in rows.iter().enumerate() {
@@ -1938,7 +1941,59 @@ mod rowdots_test {
     #[test]
     fn dots_draws_rows_and_legend() {
         let rows = vec![("Computers".to_string(), vec![-0.09, 0.097, -0.007])];
-        let svg = super::rowdots(&rows, &["Usual year".into(), "This year".into(), "Holiday dip".into()], "t");
+        let svg = super::rowdots(&rows, &["Usual year".into(), "This year".into(), "Holiday dip".into()], false, "t");
+        assert!(svg.contains(">+5%<"));
+        let pts = super::rowdots(&[("1994".to_string(), vec![3.0, 1.59, 1.83])], &["Fed".into()], true, "t");
+        assert!(pts.contains(">+1 pt<") && !pts.contains("%<"));
         assert!(svg.contains(">Computers<") && svg.contains(">Holiday dip<") && svg.ends_with("</svg>"));
+    }
+}
+
+/// 침체 뒤 그림: 줄마다 침체 하나. 회색 막대 = 공식 침체(시작→끝), 파랑 막대 = 끝→일자리가 시작 전 고점을 되찾은 달,
+/// 주황 눈금 = 실업률이 가장 높았던 달. "공식 끝"과 "일자리로 느끼는 끝"의 차이를 같은 달 축에서 길이로 읽게(B5)
+pub fn aftermath(rows: &[(String, f64, Option<f64>, f64)], title: &str) -> String {
+    const ORANGE: &str = "#ea580c";
+    let (row, leg) = (24.0, 46.0);
+    let h = T + leg + rows.len() as f64 * row + B + 8.0;
+    let max = rows.iter().map(|r| r.1 + r.2.unwrap_or(0.0)).fold(12.0, f64::max);
+    let xmax = (max / 12.0).ceil() * 12.0;
+    let (l, r) = (48.0, 34.0);
+    let x = |v: f64| l + v / xmax * (W - l - r);
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    let _ = write!(s, "<rect x=\"2\" y=\"{:.1}\" width=\"16\" height=\"10\" rx=\"2\" fill=\"{GRAY}\"/><text x=\"24\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Recession</text>\
+<rect x=\"104\" y=\"{:.1}\" width=\"16\" height=\"10\" rx=\"2\" fill=\"{BLUE}\"/><text x=\"126\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">After the end, until jobs were back</text>\
+<line x1=\"2\" x2=\"2\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{ORANGE}\" stroke-width=\"3\"/><text x=\"10\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Unemployment rate at its peak</text>",
+                   T + 2.0, T + 11.0, T + 2.0, T + 11.0, T + 19.0, T + 32.0, T + 30.0);
+    let top = T + leg;
+    let mut v = 0.0;
+    while v <= xmax + 1e-9 {
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{top}\" y2=\"{:.1}\" stroke=\"#eef2f7\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{}</text>",
+                       x(v), x(v), h - B, x(v), h - B + 16.0, if v == 0.0 { "Start".to_string() } else { format!("{} yr", v / 12.0) });
+        v += 12.0;
+    }
+    for (k, (name, months, back, peak)) in rows.iter().enumerate() {
+        let y = top + k as f64 * row + 6.0;
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"14\">{}</text><rect x=\"{l}\" y=\"{y:.1}\" width=\"{:.1}\" height=\"12\" rx=\"2\" fill=\"{GRAY}\"/>",
+                       l - 8.0, y + 11.0, name.replace('&', "&amp;"), (x(*months) - l - 1.0).max(2.0));
+        let end = match back {
+            Some(b) => { let _ = write!(s, "<rect x=\"{:.1}\" y=\"{y:.1}\" width=\"{:.1}\" height=\"12\" rx=\"2\" fill=\"{BLUE}\"/>", x(*months) + 1.0, (x(months + b) - x(*months) - 1.0).max(2.0)); months + b }
+            None => *months,
+        };
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{ORANGE}\" stroke-width=\"3\" stroke-linecap=\"round\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">{}</text>",
+                       x(*peak), x(*peak), y - 3.0, y + 15.0, x(end.max(*peak)) + 6.0, y + 11.0, back.map_or(String::new(), |b| format!("+{b:.0} mo")));
+    }
+    s.push_str("</svg>");
+    s
+}
+
+#[cfg(test)]
+mod aftermath_test {
+    #[test]
+    fn aftermath_draws_two_bars_and_tick_per_row() {
+        let rows = vec![("2008".to_string(), 18.0, Some(59.0), 21.0), ("2020".to_string(), 2.0, Some(26.0), 1.0)];
+        let svg = super::aftermath(&rows, "t");
+        assert_eq!(svg.matches("fill=\"#2563eb\"").count(), 1 + 2);
+        assert!(svg.contains(">+59 mo<") && svg.contains(">+26 mo<"));
+        assert!(svg.ends_with("</svg>"));
     }
 }
