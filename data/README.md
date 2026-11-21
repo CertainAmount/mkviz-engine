@@ -32,7 +32,7 @@
 | [fed-rate-cut-mortgage-rates](https://mkviz.com/fed-rate-cut-mortgage-rates/) | [cut-around](fed-rate-cut-mortgage-rates/cut-around.csv) | around | fred_MORTGAGE30US.csv |
 | [fed-rate-cut-mortgage-rates](https://mkviz.com/fed-rate-cut-mortgage-rates/) | [cut-lines](fed-rate-cut-mortgage-rates/cut-lines.csv) | lines | fred_DFEDTARU.csv, fred_DGS10.csv, fred_MORTGAGE30US.csv |
 | [fed-interest-rates](https://mkviz.com/fed-interest-rates/) | [fed-vs-10y-mortgage](fed-interest-rates/fed-vs-10y-mortgage.csv) | rowdots | fred_DGS10.csv |
-| [fed-interest-rates](https://mkviz.com/fed-interest-rates/) | [fed-2y-around-hike](fed-interest-rates/fed-2y-around-hike.csv) | around | fred_DGS2.csv |
+| [fed-interest-rates](https://mkviz.com/fed-interest-rates/) | [fed-2y-before-hike](fed-interest-rates/fed-2y-before-hike.csv) | hbars | fred_DGS2.csv |
 | [first-time-home-buyers](https://mkviz.com/first-time-home-buyers/) | [home-first-time-pictogram](first-time-home-buyers/home-first-time-pictogram.csv) | pictogram |  |
 | [first-time-home-buyers](https://mkviz.com/first-time-home-buyers/) | [home-payment-grid](first-time-home-buyers/home-payment-grid.csv) | grid | fred_MEHOINUSA646N.csv, fred_MSPUS.csv |
 | [first-time-home-buyers](https://mkviz.com/first-time-home-buyers/) | [home-payment-spells](first-time-home-buyers/home-payment-spells.csv) | spells | fred_MEHOINUSA646N.csv, fred_MORTGAGE30US.csv, fred_MSPUS.csv |

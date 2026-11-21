@@ -16,12 +16,13 @@
 - NBER recession months via FRED (USREC), monthly, through Oct. 2026.
 - BLS total nonfarm payrolls (FRED PAYEMS), monthly, 1939 to Oct. 2026.
 - BLS unemployment rate (FRED UNRATE), monthly, 1948 to Oct. 2026.
+- DOL initial jobless claims (FRED ICSA), weekly, 1967 to Nov. 14, 2026 (4-week average).
 - NBER Business Cycle Dating Committee announcements (dates of each peak and trough announcement).
 
 ### Method
 
 ```
-./engine/target/release/mkviz-engine recessions data/macro/fred_USREC.csv --with data/macro/fred_UNRATE.csv --after 36 --from 1948-01-01 --recover data/macro/fred_PAYEMS.csv
+./engine/target/release/mkviz-engine recessions data/macro/fred_USREC.csv --with data/macro/fred_UNRATE.csv --after 36 --from 1948-01-01 --recover data/macro/fred_PAYEMS.csv --claims data/macro/fred_ICSA.csv
 ./engine/target/release/mkviz-engine figure aftermath data/macro/fred_USREC.csv --with data/macro/fred_UNRATE.csv --after 36 --from 1948-01-01 --recover data/macro/fred_PAYEMS.csv --out recession-aftermath.svg
 ```
 
@@ -56,9 +57,26 @@ When NBER announced each date (announcement month minus the dated month):
 
 In three of the last four recessions (1990-91, 2001, 2020) the start was announced in or after the month the recession ended.
 
+Claims back down versus jobs back (recessions since weekly claims began in 1967). 'Halfway down': the first week after the claims peak (start to a year after the end) when the 4-week average was below the midpoint between its low of the year before the start and that peak.
+
+| Recession | Claims peak | Halfway down | Jobs back | Months from halfway down to jobs back |
+|---|---|---|---|---|
+| 1970 | May 1970 | March 1972 | May 1971 | -10 (jobs first) |
+| 1973-75 | Feb. 1975 | Dec. 1975 | Jan. 1976 | 1 |
+| 1980 | June 1980 | Sept. 1980 | Dec. 1980 | 3 |
+| 1981-82 | Oct. 1982 | Dec. 1982 | Nov. 1983 | 11 |
+| 1990-91 | March 1991 | May 1992 | Feb. 1993 | 9 |
+| 2001 | Oct. 2001 | Nov. 2003 | Feb. 2005 | 15 |
+| 2007-09 | March 2009 | Jan. 2010 | May 2014 | 52 |
+| 2020 | April 2020 | May 2020 | June 2022 | 25 |
+| Median | | | | 10 |
+
+This tests the author's unwind order (restore contributions when claims are halfway down, keep cash and stay off credit for months): in seven of eight, jobs came back after claims had halved, by a median of about 10 months.
+
 ### Limits
 - Twelve recessions; the four since 1990 differ from the eight before in many ways at once (labor force growth, the mix of industries, the 2020 shutdown), so the split is a pattern, not a cause.
 - Payrolls are revised; the series used is today's vintage, not what people saw at the time.
+- The claims test uses the author's own threshold (half the rise); other thresholds move the dates.
 - Jobs back at the old high is not the same as a full recovery: the population and labor force kept growing.
 
 ### Sources

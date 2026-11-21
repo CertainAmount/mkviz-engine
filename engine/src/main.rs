@@ -367,7 +367,7 @@ fn lead_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
 }
 
 /// 침체 한 번: 시작·끝 날짜, 달 수, --with 계열(시작 직전 값, 최고값, 최고 달), --recover 계열(되찾은 달, 끝 뒤 몇 달)
-struct Recession { start: String, end: String, months: f64, with: Option<(f64, f64, String)>, back: Option<Option<(String, f64)>> }
+struct Recession { start: String, end: String, months: f64, with: Option<(f64, f64, String)>, back: Option<Option<(String, f64)>>, half: Option<(String, String)> }
 
 /// recessions: 사건 계열(USREC 0/1)의 구간마다 시작·끝·개월, --with 계열이 있으면 시작 직전 달 값과
 /// 시작부터 끝 뒤 --after개월(기본 24)까지의 최고값, 그 차이(실업률이면 침체가 몇 %p 올렸나)
@@ -376,6 +376,11 @@ fn recession_rows(path: &str, o: &HashMap<String, String>) -> Result<Vec<Recessi
     if let Some(from) = o.get("from").and_then(|d| series::day_number(d)) { ev.retain(|p| p.day >= from); }
     let with = match o.get("with") { Some(w) => Some(series::load(w)?), None => None };
     let rec = match o.get("recover") { Some(w) => Some(series::load(w)?), None => None };
+    // 주간 청구는 4주 평균으로(load_with의 --avg와 같은 뜻)
+    let claims = match o.get("claims") {
+        Some(w) => { let raw = series::load(w)?; Some(raw.iter().enumerate().skip(3).map(|(k, p)| series::Point { day: p.day, date: p.date.clone(), value: raw[k - 3..=k].iter().map(|q| q.value).sum::<f64>() / 4.0 }).collect::<Vec<_>>()) }
+        None => None,
+    };
     let after = opt_f(o, "after", 24.0) * 30.44;
     let mut rows = Vec::new();
     let mut i = 0;
@@ -397,7 +402,15 @@ fn recession_rows(path: &str, o: &HashMap<String, String>) -> Result<Vec<Recessi
             if top == f64::MIN { return None; }
             Some(r.iter().find(|p| p.day > b.day && p.value >= top).map(|h| (h.date.clone(), ((h.day - b.day) as f64 / 30.44).round())))
         });
-        rows.push(Recession { start: a.date.clone(), end: b.date.clone(), months: (i - s0) as f64, with: with_v, back });
+        // --claims: 주간 청구 4주 평균의 시작 전 1년 최저, 시작~끝 1년 뒤(다음 침체 전) 최고, 그 뒤 처음 오른 폭의 절반 넘게 내려온 날
+        let half = claims.as_ref().and_then(|c| {
+            let lo = c.iter().filter(|p| p.day >= a.day - 365 && p.day < a.day).map(|p| p.value).fold(f64::MAX, f64::min);
+            let pk = c.iter().filter(|p| p.day >= a.day && (p.day as f64) <= (b.day as f64 + 365.0).min(next - 1.0)).max_by(|x, y| x.value.partial_cmp(&y.value).unwrap())?;
+            if lo == f64::MAX { return None; }
+            let h = c.iter().find(|p| p.day > pk.day && p.value <= lo + (pk.value - lo) / 2.0)?;
+            Some((pk.date.clone(), h.date.clone()))
+        });
+        rows.push(Recession { start: a.date.clone(), end: b.date.clone(), months: (i - s0) as f64, with: with_v, back, half });
     }
     Ok(rows)
 }
@@ -419,13 +432,20 @@ fn recessions_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, Str
             Some(None) => ",\"back_date\":null,\"back_after_end\":null".to_string(),
             None => String::new(),
         };
-        format!("{{\"start\":{},\"end\":{},\"months\":{}{extra}{back}}}", s(&r.start), s(&r.end), r.months)
+        let half = match (&r.half, &r.back) {
+            (Some((pk, h)), Some(Some((bd, _)))) => format!(",\"claims_peak\":{},\"claims_half\":{},\"half_to_jobs_back\":{}", s(pk), s(h), months_between(h, bd)),
+            (Some((pk, h)), _) => format!(",\"claims_peak\":{},\"claims_half\":{}", s(pk), s(h)),
+            _ => String::new(),
+        };
+        format!("{{\"start\":{},\"end\":{},\"months\":{}{extra}{back}{half}}}", s(&r.start), s(&r.end), r.months)
     }).collect();
     let peaks_after: Vec<f64> = rows.iter().filter_map(|r| r.with.as_ref().map(|w| months_between(&r.end, &w.2) as f64)).collect();
     let backs: Vec<f64> = rows.iter().filter_map(|r| r.back.as_ref().and_then(|b| b.as_ref().map(|x| x.1))).collect();
     let peak_med = if o.contains_key("with") { format!(",\"median_peak_after_end\":{}", num(stats::median(&peaks_after))) } else { String::new() };
+    let halves: Vec<f64> = rows.iter().filter_map(|r| match (&r.half, &r.back) { (Some((_, h)), Some(Some((bd, _)))) => Some(months_between(h, bd) as f64), _ => None }).collect();
+    let half_med = if o.contains_key("claims") { format!(",\"median_half_to_jobs_back\":{}", num(stats::median(&halves))) } else { String::new() };
     let back_med = if o.contains_key("recover") { format!(",\"median_back_after_end\":{}", num(stats::median(&backs))) } else { String::new() };
-    Ok(format!("{{\"n\":{},\"median_months\":{},\"median_rise\":{}{peak_med}{back_med},\"recessions\":[{}]}}", rows.len(), num(stats::median(&months)), num(stats::median(&rises)), items.join(",")))
+    Ok(format!("{{\"n\":{},\"median_months\":{},\"median_rise\":{}{peak_med}{back_med}{half_med},\"recessions\":[{}]}}", rows.len(), num(stats::median(&months)), num(stats::median(&rises)), items.join(",")))
 }
 
 /// fit: 월평균으로 맞춘 y와 x들(달이 모두 있는 달만), 학습 기간 계수, 지금 차이와 학습 기간 안 가장 큰 음·양 차이
@@ -1314,6 +1334,13 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             }
             viz::aftermath(&out, &title)
         }
+        "hbars" => {
+            // 가로 막대: --rows "1994:0.22;…" --line "0.25|The first hike" --highlight 2026 --unit " pt" (입력 csv는 쓰지 않는다)
+            let rows: Vec<(String, f64)> = o.get("rows").ok_or("--rows 가 필요")?.split(';').filter_map(|r| r.split_once(':')).filter_map(|(n, v)| Some((n.to_string(), v.trim().parse().ok()?))).collect();
+            let line = o.get("line").and_then(|l| l.split_once('|')).and_then(|(v, n)| Some((v.trim().parse().ok()?, n.to_string())));
+            csv = format!("row,value\n{}", rows.iter().map(|(n, v)| format!("{n},{v}\n")).collect::<String>());
+            viz::hbars(&rows, line, o.get("highlight").map_or("", String::as_str), o.get("unit").map_or("", String::as_str), &title)
+        }
         "timeline" => {
             // --items "해|사건|결과|good·mixed·bad;…" (글의 주장 장부에 출처가 있는 사실만 넣는다)
             let it: Vec<(String, String, String, String)> = o.get("items").ok_or("--items 가 필요")?.split(';').filter_map(|x| {
@@ -1545,9 +1572,10 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "fit" => "Ordinary least squares on monthly averages: the coefficients come from the training months only; every month then gets the value those conditions usually went with (expected) and the actual minus expected (gap). With --change, an input is its percent change from n months earlier; with --ahead n, each month's inputs explain the value n months later; --y-change n turns the explained series into its n-month percent change too.",
         "spells" => "Every stretch of consecutive observations at or above the threshold (or at or below it), with its first and last date, length and most extreme value; the last one may still be under way.",
         "lead" => "Signal episodes: consecutive days at or below the threshold (or at or above it), joined when the gap between them is the gap window or less and no event started in between; days inside an event do not count as signal; lead is the time from an episode's first day to the next start of the event series (a 0-to-1 step, e.g. NBER recession months). For each event start, the first day the signal was on from --before months before to --after months after (12 and 3 by default); none means missed.",
-        "recessions" => "Each run of months flagged 1 in the event series (NBER recession months), with its length; with a second series, its value the month before the start and its highest value from the start to the given months after the end (or to the next recession start, if sooner); with --recover, the first month after the end when that series is back at its highest level of the 12 months up to the start (payroll jobs back), counted in months from the end.",
+        "recessions" => "Each run of months flagged 1 in the event series (NBER recession months), with its length; with --claims (weekly initial claims, 4-week average), the peak from the start to a year after the end and the first week after it when the average was back below the midpoint between its low of the year before the start and that peak, and the months from then until jobs were back; with a second series, its value the month before the start and its highest value from the start to the given months after the end (or to the next recession start, if sooner); with --recover, the first month after the end when that series is back at its highest level of the 12 months up to the start (payroll jobs back), counted in months from the end.",
         "together" => "Each signal is on in a month if any of its readings that month crossed its threshold. Episodes are runs of months with at least k signals on, starting outside the event (NBER recession) and outside the settle months after an event ends; for each, the months to the next event start. For each event start, whether at least k were on together in the window months before.",
         "need" => "Each week pairs the 30-year mortgage rate with the 10-year Treasury yield averaged over the days its survey covers; the gap is the difference. For each target rate, the 10-year yield it needs is the target minus the median gap (range: minus the 90th and 10th percentile gaps), with the share of weeks the 10-year was that low. Similar starts are weeks whose rate was within the given distance of this week's, with the full horizon after them in the data, and the lowest rate each reached within it.",
+        "hbars" => "Values given on the command line, one horizontal bar per row, with an optional reference line; bars at or past the line are dark, bars short of it light, the highlighted row blue.",
         "rowdots" => "Values given on the command line, one row per item, drawn on one percentage axis (or, with --unit pt, an axis of percentage points) with a zero line; each row's marks are joined by a light bar from lowest to highest.",
         "intrayear" => "For each calendar year: the deepest fall from that year's highest close to a later close in the same year, and the change from the prior year's last close to the year's last close (the first year starts from its first close; the latest year is year to date).",
         "ladder" => "Every completed decline of at least the first depth from a prior record close (peak to trough, then a new record): how many reached each deeper depth, and the median days from peak to new record for declines whose trough fell between that depth and the next, and the median days from that record to the trough. The decline still under way is reported separately and not counted.",
@@ -1666,8 +1694,17 @@ mod recessions_test {
         };
         let ev = w("ev.csv", &[("2020-01-01", 0.0), ("2020-02-01", 0.0), ("2020-03-01", 1.0), ("2020-04-01", 1.0), ("2020-05-01", 0.0), ("2020-06-01", 0.0), ("2020-07-01", 0.0)]);
         let jobs = w("jobs.csv", &[("2020-01-01", 99.0), ("2020-02-01", 100.0), ("2020-03-01", 97.0), ("2020-04-01", 95.0), ("2020-05-01", 98.0), ("2020-06-01", 99.0), ("2020-07-01", 100.0)]);
-        let o: HashMap<String, String> = [("recover".to_string(), jobs)].into_iter().collect();
+        let o: HashMap<String, String> = [("recover".to_string(), jobs.clone())].into_iter().collect();
         let j = super::recessions_cmd(&ev, &o).unwrap();
         assert!(j.contains("\"back_date\":\"2020-07-01\",\"back_after_end\":3"), "{j}");
+        // 주간 청구: 1월 평균 100, 4월 400까지 올랐다가 6월에 250(절반) 아래로 → 일자리 회복(7월)까지 1달
+        let mut wk = vec![];
+        for (d, v) in [("2019-12-07", 100.0), ("2019-12-14", 100.0), ("2019-12-21", 100.0), ("2019-12-28", 100.0), ("2020-01-04", 100.0),
+                       ("2020-03-07", 400.0), ("2020-03-14", 400.0), ("2020-03-21", 400.0), ("2020-03-28", 400.0),
+                       ("2020-06-06", 100.0), ("2020-06-13", 100.0), ("2020-06-20", 100.0), ("2020-06-27", 100.0)] { wk.push((d, v)); }
+        let cl = w("claims.csv", &wk);
+        let o2: HashMap<String, String> = [("recover".to_string(), jobs.clone()), ("claims".to_string(), cl)].into_iter().collect();
+        let j2 = super::recessions_cmd(&ev, &o2).unwrap();
+        assert!(j2.contains("\"half_to_jobs_back\":1"), "{j2}");
     }
 }

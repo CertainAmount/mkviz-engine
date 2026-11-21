@@ -1997,3 +1997,38 @@ mod aftermath_test {
         assert!(svg.ends_with("</svg>"));
     }
 }
+
+/// 가로 막대: 줄마다 이름과 값 하나(%p), 기준선 하나(예: 첫 인상 폭 0.25). 기준을 넘은 막대는 진한 회색, 못 넘은 막대는 연한 회색,
+/// 강조 줄(--highlight)은 파랑. "모든 사례에서 얼마나 움직였나"를 선 다발 대신 길이로(독자 3명이 선 그림을 복잡하다고 짚음, 2026-11-21)
+pub fn hbars(rows: &[(String, f64)], line: Option<(f64, String)>, highlight: &str, unit: &str, title: &str) -> String {
+    let (row, top) = (30.0, T + 30.0);
+    let h = top + rows.len() as f64 * row + B + 8.0;
+    let max = rows.iter().map(|r| r.1).fold(line.as_ref().map_or(0.0, |l| l.0), f64::max) * 1.15;
+    let l = rows.iter().map(|r| r.0.chars().count()).max().map(|n| n as f64 * 7.6 + 14.0).unwrap_or(52.0).max(52.0);
+    let r = 64.0;
+    let x = |v: f64| l + v.max(0.0) / max.max(1e-9) * (W - l - r);
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    if let Some((lv, lab)) = &line {
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#ea580c\" stroke-width=\"2\" stroke-dasharray=\"4 3\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">{}</text>",
+                       x(*lv), x(*lv), top - 8.0, h - B, x(*lv) + 5.0, top - 12.0, lab.replace('&', "&amp;"));
+    }
+    for (k, (name, v)) in rows.iter().enumerate() {
+        let y = top + k as f64 * row + 8.0;
+        let hl = name == highlight;
+        let c = if hl { BLUE } else if line.as_ref().map_or(true, |l| *v >= l.0) { INK } else { GRAY };
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{}\" font-size=\"14\"{}>{}</text><rect x=\"{l}\" y=\"{y:.1}\" width=\"{:.1}\" height=\"14\" rx=\"2\" fill=\"{c}\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{}\" font-size=\"13\">+{:.2}{unit}</text>",
+                       l - 8.0, y + 12.0, if hl { BLUE } else { INK }, if hl { " font-weight=\"600\"" } else { "" }, name.replace('&', "&amp;"), (x(*v) - l).max(2.0), x(v.max(line.as_ref().map_or(0.0, |l| l.0))) + 6.0, y + 12.0, if hl { BLUE } else { INK }, v);
+    }
+    s.push_str("</svg>");
+    s
+}
+
+#[cfg(test)]
+mod hbars_test {
+    #[test]
+    fn hbars_colors_by_line_and_highlight() {
+        let rows = vec![("1994".to_string(), 0.22), ("2022".to_string(), 1.26), ("2026".to_string(), 0.48)];
+        let svg = super::hbars(&rows, Some((0.25, "The first hike, 0.25".into())), "2026", " pt", "t");
+        assert!(svg.contains("fill=\"#94a3b8\"") && svg.contains("fill=\"#2563eb\"") && svg.contains(">+1.26 pt<") && svg.contains("The first hike"));
+    }
+}

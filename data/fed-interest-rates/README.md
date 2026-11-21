@@ -82,12 +82,12 @@ Data: [fed-vs-10y-mortgage.csv](fed-vs-10y-mortgage.csv) · settings: [fed-vs-10
 ./engine/target/release/mkviz-engine figure rowdots data/series/fred_DGS10.csv --marks 'Fed rate,10-year yield,Mortgage rate' --rows '1994:3.0,1.59,1.83;1997:0.25,-1.11,-0.82;1999:1.75,0.23,0.45;2004:2.25,-0.68,-0.59;2015:0.5,0.3,0.33;2022:4.5,1.37,2.26;2026 (2 months):0.25,0.1,0.33' --unit pt --out fed-vs-10y-mortgage.svg
 ```
 
-## fed-2y-around-hike
+## fed-2y-before-hike
 
-Data: [fed-2y-around-hike.csv](fed-2y-around-hike.csv) · settings: [fed-2y-around-hike.json](fed-2y-around-hike.json)
+Data: [fed-2y-before-hike.csv](fed-2y-before-hike.csv) · settings: [fed-2y-before-hike.json](fed-2y-before-hike.json)
 
-![fed-2y-around-hike](fed-2y-around-hike.svg)
+![fed-2y-before-hike](fed-2y-before-hike.svg)
 
 ```
-./engine/target/release/mkviz-engine figure around data/series/fred_DGS2.csv --after 91 --before 91 --dates 1994-02-04,1997-03-25,1999-06-30,2004-06-30,2015-12-16,2022-03-16,2026-09-17 --event-label 'First hike' --highlight '2026-09-17|2026' --unit ' pt' --out fed-2y-around-hike.svg
+./engine/target/release/mkviz-engine figure hbars data/series/fred_DGS2.csv --highlight 2026 --line '0.25|The first hike itself, 0.25 pt' --rows '1994:0.22;1997:0.48;1999:0.54;2004:1.10;2015:0.20;2022:1.26;2026:0.48' --unit ' pt' --out fed-2y-before-hike.svg
 ```
