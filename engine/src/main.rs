@@ -52,6 +52,8 @@
 //!   payment --loan 300000 --rates 6.66,7.18 [--years 30]
 //!       고정금리 대출의 월 상환액(원리금 균등: P = L·r / (1 - (1+r)^-n), r = 연이율/12).
 //!   recessions <usrec.csv> [--with <unrate.csv> --after 24 --from YYYY-MM-DD --recover <payems.csv>]   침체마다 길이(개월), --with 계열의 시작 직전 값 → 최고값(끝 뒤 after개월까지) 상승폭, --recover 계열이 시작 전 12개월 고점을 되찾은 달(끝 뒤 몇 달).
+//!   dca <csv> --dates d1,d2 [--splice --deflate]   그달부터 매달 같은 돈을 넣은 계좌가 넣은 돈 아래로 내려갔다가 다시 넘은 달(몇 달), 가장 깊은 손실.
+//!   regain <csv> --dates d1,d2 [--lows l1,l2 --splice <old.csv> --deflate <cpi.csv>]   날짜마다 그날 값에서 내려간 뒤 다시 그 값 이상이 된 첫날(같은 출발일로 주가·배당 포함·실질 회복을 견준다).
 //!   fit <y.csv> --x <a.csv>,<b.csv> [--change ,12 --train-from YYYY-MM --train-to YYYY-MM --from YYYY-MM]
 //!       최소제곱 회귀: 학습 기간 달들로 계수를 정하고, 달마다 예상값과 실제와의 차이(잔차). --change: x마다 n달 전 대비 변화율(빈칸은 수준).
 //!   spells <csv> --threshold x [--below]   값이 기준 이상(이하)으로 이어진 구간(시작·끝·길이·극값·진행 중).
@@ -338,6 +340,70 @@ fn spells_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String>
         ));
     }
     Ok(format!("{{\"threshold\":{th},\"below\":{below},\"n\":{},\"spells\":[{}]}}", items.len(), items.join(",")))
+}
+
+/// regain: 날짜마다 그날(이전 마지막 관측) 값에서 한 번 내려간 뒤 처음 그 값 이상으로 돌아온 날. 같은 출발일로 여러 계열(주가, 배당 포함, 물가 뺀 실질)을 견준다
+/// --lows l1,l2(날짜마다 하나): 출발값을 그날~l 사이 이 계열의 최고값으로, 되찾음은 l 뒤에서만 센다(2000년 배당 포함 지수는 3월 기록 뒤 9월에 잠깐 새 기록을 찍고 2002년까지 빠졌다)
+pub fn regain_rows(pts: &[series::Point], dates: &[&str], lows: &[&str]) -> Vec<(String, f64, f64, String, Option<String>, Option<i64>)> {
+    dates.iter().enumerate().filter_map(|(k, d)| {
+        let day = series::day_number(d)?;
+        let i = pts.iter().rposition(|p| p.day <= day)?;
+        let lday = lows.get(k).and_then(|l| series::day_number(l));
+        let i = match lday { Some(ld) => (i..pts.len()).take_while(|&j| pts[j].day <= ld).fold(i, |a, j| if pts[j].value > pts[a].value { j } else { a }), None => i };
+        let start = pts[i].value;
+        let (mut low, mut low_date, mut back) = (start, pts[i].date.clone(), None);
+        for p in &pts[i + 1..] {
+            if p.value < low { low = p.value; low_date = p.date.clone(); }
+            if low < start && p.value >= start && lday.map_or(true, |ld| p.day > ld) { back = Some(p); break; }
+        }
+        Some((d.to_string(), start, low / start - 1.0, low_date, back.map(|p| p.date.clone()), back.map(|p| p.day - day)))
+    }).collect()
+}
+
+/// dca: 날짜마다 그달부터 매달 같은 돈(1)을 넣은 계좌가 넣은 돈 합계 아래로 내려간 뒤 처음 다시 그 이상이 된 달.
+/// 달마다 그달 마지막 관측 값으로 산다(배당 포함 지수를 넣으면 배당 재투자). 반환: (출발일, 되찾은 달, 달 수, 가장 깊은 손실 비율)
+pub fn dca_rows(pts: &[series::Point], dates: &[&str], lows: &[&str]) -> Vec<(String, Option<String>, Option<i64>, f64)> {
+    let mut months: Vec<&series::Point> = Vec::new();
+    for p in pts {
+        match months.last_mut() { Some(l) if l.date[..7] == p.date[..7] => *l = p, _ => months.push(p) }
+    }
+    dates.iter().enumerate().filter_map(|(j, d)| {
+        let i = months.iter().position(|p| p.date[..7] >= d[..7])?;
+        // --lows: 그 바닥이 든 달 뒤에서만 되찾음을 센다(바닥 전 잠깐 원금을 넘은 달은 회복이 아니다)
+        let low = lows.get(j).map(|l| &l[..7]);
+        let (mut units, mut paid, mut worst, mut fell) = (0.0, 0.0, 0.0_f64, false);
+        for (k, p) in months[i..].iter().enumerate() {
+            units += 1.0 / p.value;
+            paid += 1.0;
+            let gap = units * p.value / paid - 1.0;
+            worst = worst.min(gap);
+            if gap < 0.0 { fell = true; }
+            if fell && gap >= 0.0 && low.map_or(true, |l| &p.date[..7] > l) { return Some((d.to_string(), Some(p.date[..7].to_string()), Some(k as i64), worst)); }
+        }
+        Some((d.to_string(), None, None, worst))
+    }).collect()
+}
+
+fn dca_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    let pts = load_with(path, o)?;
+    let dates: Vec<&str> = o.get("dates").ok_or("--dates d1,d2 가 필요")?.split(',').collect();
+    let lows: Vec<&str> = o.get("lows").map(|v| v.split(',').collect()).unwrap_or_default();
+    let items: Vec<String> = dca_rows(&pts, &dates, &lows).iter().map(|(d, m, k, w)| format!(
+        "{{\"date\":\"{d}\",\"back\":{},\"months\":{},\"worst\":{w}}}",
+        m.as_ref().map_or("null".into(), |x| format!("\"{x}\"")), k.map_or("null".into(), |x| x.to_string()))).collect();
+    Ok(format!("{{\"n\":{},\"dca\":[{}]}}", items.len(), items.join(",")))
+}
+
+fn regain_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    let pts = load_with(path, o)?;
+    let dates: Vec<&str> = o.get("dates").ok_or("--dates d1,d2 가 필요")?.split(',').collect();
+    let lows: Vec<&str> = o.get("lows").map(|v| v.split(',').collect()).unwrap_or_default();
+    let rows = regain_rows(&pts, &dates, &lows);
+    let items: Vec<String> = rows.iter().map(|(d, st, lo, ld, bd, days)| format!(
+        "{{\"date\":\"{d}\",\"start\":{st},\"low\":{lo},\"low_date\":\"{ld}\",\"back\":{},\"days\":{},\"years\":{}}}",
+        bd.as_ref().map_or("null".into(), |b| format!("\"{b}\"")), days.map_or("null".into(), |x| x.to_string()),
+        days.map_or("null".into(), |x| format!("{:.2}", x as f64 / 365.25)))).collect();
+    Ok(format!("{{\"n\":{},\"regains\":[{}]}}", items.len(), items.join(",")))
 }
 
 /// lead: 신호 구간(--threshold, --below, --gap 365일 안 재진입은 한 구간) 시작 뒤 --event 계열(0/1) 사건이 시작되기까지(lead.rs)
@@ -946,11 +1012,14 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             viz::lines(&sers, mark, &ticks, &title)
         }
         "rowdots" => {
-            // 줄마다 이름과 값들: --rows "Computers:-0.093,0.097,-0.007;Toys:…" --marks "Usual year,This year,Holiday dip" [--unit pt: 값이 %p] (입력 csv는 쓰지 않는다)
+            // 줄마다 이름과 값들: --rows "Computers:-0.093,0.097,-0.007;Toys:…" --marks "Usual year,This year,Holiday dip" [--unit pt: 값이 %p, --unit yr: 값이 년, --line "2|Median": 기준 점선] (입력 csv는 쓰지 않는다)
             let rows: Vec<(String, Vec<f64>)> = o.get("rows").ok_or("--rows 가 필요")?.split(';').filter_map(|r| r.split_once(':')).map(|(n, v)| (n.to_string(), v.split(',').filter_map(|x| x.trim().parse().ok()).collect())).collect();
             let marks: Vec<String> = o.get("marks").map(|m| m.split(',').map(String::from).collect()).unwrap_or_default();
             csv = format!("row,{}\n{}", marks.join(","), rows.iter().map(|(n, v)| format!("{n},{}\n", v.iter().map(|x| format!("{x}")).collect::<Vec<_>>().join(","))).collect::<String>());
-            viz::rowdots(&rows, &marks, o.get("unit").map_or(false, |u| u.trim() == "pt"), &title)
+            {
+                let line = o.get("line").and_then(|v| v.split_once('|')).and_then(|(a, b)| Some((a.parse::<f64>().ok()?, b)));
+                viz::rowdots(&rows, &marks, o.get("unit").map_or("", |u| u.trim()), line, &title)
+            }
         }
         "intrayear" => {
             // 해마다: 그해 최고 종가에서 그 뒤 최저 종가까지(그해 안), 전해 마지막 종가 대비 그해 등락(첫해는 첫 종가 대비). --line 0.10
@@ -1570,6 +1639,8 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "closer" => "For every month with both forecasts, the absolute gap between each forecast (--a, --b) and the target n months later (--ahead); reported as the mean gap of each and the share of months forecast a was closer. With --change n, all three are n-month percent changes; --min-gap keeps only months where forecast b exceeded forecast a by at least that much. --also adds more forecasts scored on the same months (only months where every forecast exists), each with its mean gap, the share of months it was closer than a and than b, and the share it was the closest of all.",
         "revisions" => "For every month with both estimates, revision = later estimate minus first print. Reported: mean, mean and median absolute revision, 10th-90th percentile, share revised down, months whose sign flipped, the mean of each calendar year with at least ten months, and that range added to a new first print (--now).",
         "fit" => "Ordinary least squares on monthly averages: the coefficients come from the training months only; every month then gets the value those conditions usually went with (expected) and the actual minus expected (gap). With --change, an input is its percent change from n months earlier; with --ahead n, each month's inputs explain the value n months later; --y-change n turns the explained series into its n-month percent change too.",
+        "dca" => "For each start date, an account that buys the same dollar amount every month from that month on, at each month's last value of the series (a total return index reinvests dividends): the first month after it falls below the money paid in when its value is back at or above it, in months from the start, and the deepest shortfall; with --lows (one date per start), the return only counts after the month of that low.",
+        "regain" => "For each start date, the value on that date (or the last observation before it), the lowest value after it, and the first date after that low when the series is back at or above the start value, counted in days from the start date; with --lows (one date per start), the start value is the highest value from the start date to that low and the return only counts after it; with --splice and --deflate, the same for a spliced or inflation-adjusted series.",
         "spells" => "Every stretch of consecutive observations at or above the threshold (or at or below it), with its first and last date, length and most extreme value; the last one may still be under way.",
         "lead" => "Signal episodes: consecutive days at or below the threshold (or at or above it), joined when the gap between them is the gap window or less and no event started in between; days inside an event do not count as signal; lead is the time from an episode's first day to the next start of the event series (a 0-to-1 step, e.g. NBER recession months). For each event start, the first day the signal was on from --before months before to --after months after (12 and 3 by default); none means missed.",
         "recessions" => "Each run of months flagged 1 in the event series (NBER recession months), with its length; with --claims (weekly initial claims, 4-week average), the peak from the start to a year after the end and the first week after it when the average was back below the midpoint between its low of the year before the start and that peak, and the months from then until jobs were back; with a second series, its value the month before the start and its highest value from the start to the given months after the end (or to the next recession start, if sooner); with --recover, the first month after the end when that series is back at its highest level of the 12 months up to the start (payroll jobs back), counted in months from the end.",
@@ -1612,6 +1683,8 @@ fn main() {
         ("closer", Some(p), _) => closer_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("revisions", Some(p), _) => revisions_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("fit", Some(p), _) => fit_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
+        ("dca", Some(p), _) => dca_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
+        ("regain", Some(p), _) => regain_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("spells", Some(p), _) => spells_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("accel", Some(p), _) => accel_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("gapfill", Some(p), _) => gapfill_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
@@ -1706,5 +1779,47 @@ mod recessions_test {
         let o2: HashMap<String, String> = [("recover".to_string(), jobs.clone()), ("claims".to_string(), cl)].into_iter().collect();
         let j2 = super::recessions_cmd(&ev, &o2).unwrap();
         assert!(j2.contains("\"half_to_jobs_back\":1"), "{j2}");
+    }
+}
+
+#[cfg(test)]
+mod regain_test {
+    use crate::series::{day_number, Point};
+    fn p(d: &str, v: f64) -> Point { Point { date: d.into(), day: day_number(d).unwrap(), value: v } }
+    #[test]
+    fn back_only_after_a_fall() {
+        // 1월 100 → 2월 101(아직 안 내려감, 되찾음 아님) → 3월 80 → 4월 99 → 5월 100(되찾음)
+        let s = vec![p("2000-01-01", 100.0), p("2000-02-01", 101.0), p("2000-03-01", 80.0), p("2000-04-01", 99.0), p("2000-05-01", 100.0)];
+        let r = super::regain_rows(&s, &["2000-01-15"], &[]);
+        assert_eq!(r[0].4.as_deref(), Some("2000-05-01"));
+        assert!((r[0].2 + 0.2).abs() < 1e-9);
+        assert_eq!(r[0].3, "2000-03-01");
+        // 아직 못 되찾으면 None
+        let r = super::regain_rows(&s[..4], &["2000-01-15"], &[]);
+        assert!(r[0].4.is_none());
+        // --lows: 출발값은 그날~바닥 사이 최고(2월 101), 되찾음은 바닥(3월) 뒤 101 이상인 6월
+        let mut s2 = s.clone();
+        s2.push(p("2000-06-01", 102.0));
+        let r = super::regain_rows(&s2, &["2000-01-15"], &["2000-03-01"]);
+        assert_eq!(r[0].4.as_deref(), Some("2000-06-01"));
+        assert!((r[0].1 - 101.0).abs() < 1e-9);
+    }
+}
+
+#[cfg(test)]
+mod dca_test {
+    use crate::series::{day_number, Point};
+    fn p(d: &str, v: f64) -> Point { Point { date: d.into(), day: day_number(d).unwrap(), value: v } }
+    #[test]
+    fn back_in_the_green_before_the_index() {
+        // 100 → 50 → 50 → 80: 산 단위 0.01+0.02+0.02+0.0125=0.0625, 4달 낸 돈 4, 80*0.0625=5 >= 4 → 4번째 달(3달 뒤), 지수는 아직 100 아래
+        let s = vec![p("2000-01-03", 90.0), p("2000-01-31", 100.0), p("2000-02-28", 50.0), p("2000-03-31", 50.0), p("2000-04-28", 80.0)];
+        let r = super::dca_rows(&s, &["2000-01-15"], &[]);
+        assert_eq!(r[0].1.as_deref(), Some("2000-04"));
+        assert_eq!(r[0].2, Some(3));
+        assert!((r[0].3 + 0.25).abs() < 1e-9); // 2월: 0.03 단위 * 50 = 1.5 / 2 - 1 = -0.25
+        // 바닥이 4월이면 4월은 세지 않는다 → 자료 안에서 못 되찾음
+        let r = super::dca_rows(&s, &["2000-01-15"], &["2000-04-28"]);
+        assert!(r[0].1.is_none());
     }
 }

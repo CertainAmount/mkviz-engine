@@ -44,6 +44,7 @@
 | [how-long-do-corrections-last](https://mkviz.com/how-long-do-corrections-last/) | [sp-intrayear](how-long-do-corrections-last/sp-intrayear.csv) | intrayear | index_gspc_long.csv |
 | [how-long-do-recessions-last](https://mkviz.com/how-long-do-recessions-last/) | [recession-aftermath](how-long-do-recessions-last/recession-aftermath.csv) | aftermath | fred_PAYEMS.csv, fred_UNRATE.csv, fred_USREC.csv |
 | [jobs-report-revisions](https://mkviz.com/jobs-report-revisions/) | [jobs-revisions-years](jobs-report-revisions/jobs-revisions-years.csv) | years | bls_ces_first.csv, bls_ces_third.csv, fred_USREC.csv |
+| [jobs-report-revisions](https://mkviz.com/jobs-report-revisions/) | [jobs-revisions-lean-timeline](jobs-report-revisions/jobs-revisions-lean-timeline.csv) | lights | bls_ces_first.csv, bls_ces_third.csv, fred_ICSA.csv, fred_USREC.csv |
 | [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [nasdaq-after-midterms](stocks-after-midterm-elections/nasdaq-after-midterms.csv) | fan | fred_NASDAQCOM.csv |
 | [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [midterm-cases](stocks-after-midterm-elections/midterm-cases.csv) | cases |  |
 | [mortgage-rates-treasury-gap](https://mkviz.com/mortgage-rates-treasury-gap/) | [mortgage-rate-stack](mortgage-rates-treasury-gap/mortgage-rate-stack.csv) | stack | fred_DGS10.csv, fred_MORTGAGE30US.csv |
@@ -58,6 +59,7 @@
 | [recession-watch](https://mkviz.com/recession-watch/) | [rw-board](recession-watch/rw-board.csv) | board | fred_UNRATE.csv |
 | [recession-watch](https://mkviz.com/recession-watch/) | [rw-claims](recession-watch/rw-claims.csv) | lead | fred_ICSA.csv, fred_USREC.csv |
 | [recession-watch](https://mkviz.com/recession-watch/) | [rw-lights](recession-watch/rw-lights.csv) | lights | fred_ICSA.csv, fred_SAHMREALTIME.csv, fred_T10Y3M.csv, fred_USREC.csv |
+| [stock-market-recovery-time](https://mkviz.com/stock-market-recovery-time/) | [bear-market-recovery-years](stock-market-recovery-time/bear-market-recovery-years.csv) | rowdots | fred_USREC.csv |
 | [yield-curve-inversion](https://mkviz.com/yield-curve-inversion/) | [yc-measures](yield-curve-inversion/yc-measures.csv) | lights | fred_DGS1.csv, fred_DGS10.csv, fred_T10Y2Y.csv, fred_USREC.csv |
 | [yield-curve-inversion](https://mkviz.com/yield-curve-inversion/) | [yc-lead](yield-curve-inversion/yc-lead.csv) | lead | fred_DGS1.csv, fred_DGS10.csv, fred_USREC.csv |
 | [yield-curve-inversion](https://mkviz.com/yield-curve-inversion/) | [yc-rounds](yield-curve-inversion/yc-rounds.csv) | rounds | fred_DGS1.csv, fred_DGS10.csv, fred_USREC.csv |

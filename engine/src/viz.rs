@@ -1898,7 +1898,10 @@ mod intrayear_test {
 
 /// 줄마다 이름 하나, 같은 축(%)에 표시 여러 개(예: 평소 1년 변화 · 올해 변화 · 연말 할인 폭). 0 세로선.
 /// '할인이 1년 추세보다 작다'를 위치로 보이려고(설계 검토 2026-11-20). 값은 비율(0.097 = 9.7%)
-pub fn rowdots(rows: &[(String, Vec<f64>)], marks: &[String], points: bool, title: &str) -> String {
+/// unit: "pt"(금리 %p), "yr"(년, 0부터 오른쪽으로: 회복까지 걸린 해), 그 밖은 %
+pub fn rowdots(rows: &[(String, Vec<f64>)], marks: &[String], unit: &str, line: Option<(f64, &str)>, title: &str) -> String {
+    let points = unit == "pt";
+    let years = unit == "yr";
     const C: [&str; 4] = ["#94a3b8", "#2563eb", "#eb6834", "#0f172a"];
     let all: Vec<f64> = rows.iter().flat_map(|r| r.1.iter().cloned()).collect();
     let lo = all.iter().cloned().fold(0.0_f64, f64::min) * 1.1;
@@ -1908,14 +1911,19 @@ pub fn rowdots(rows: &[(String, Vec<f64>)], marks: &[String], points: bool, titl
     let rh = (H - t - b) / rows.len().max(1) as f64;
     let mut s = head(title);
     // points: 값이 %p(금리 변화)일 때 눈금을 1 pt 단위로
-    let steps: &[f64] = if points { &[0.5, 1.0, 2.0] } else { &[0.02, 0.05, 0.1] };
+    let steps: &[f64] = if points { &[0.5, 1.0, 2.0] } else if years { &[1.0, 2.0, 5.0] } else { &[0.02, 0.05, 0.1] };
     let step = steps.iter().cloned().find(|st| (hi - lo) / st <= 8.0).unwrap_or(steps[steps.len() - 1]);
     let mut v = (lo / step).ceil() * step;
     while v <= hi + 1e-9 {
         let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{t}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"12\">{}</text>",
             x(v), x(v), H - b, if v.abs() < 1e-9 { INK } else { "#eef2f7" }, x(v), H - b + 14.0,
-            if v.abs() < 1e-9 { "0".to_string() } else if points { format!("{}{} pt", if v > 0.0 { "+" } else { "" }, v) } else { format!("{}{:.0}%", if v > 0.0 { "+" } else { "" }, v * 100.0) });
+            if v.abs() < 1e-9 { "0".to_string() } else if years { format!("{v} yr") } else if points { format!("{}{} pt", if v > 0.0 { "+" } else { "" }, v) } else { format!("{}{:.0}%", if v > 0.0 { "+" } else { "" }, v * 100.0) });
         v += step;
+    }
+    // --line "값|이름": 기준선(예: 중앙값) 점선과 위쪽 이름표. 점 아래에 깔리게 먼저 그린다
+    if let Some((v, name)) = line {
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{INK}\" stroke-dasharray=\"4 3\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"12\">{}</text>",
+            x(v), x(v), t - 4.0, H - b, x(v) + 4.0, t - 8.0, name.replace('&', "&amp;"));
     }
     for (i, (name, vals)) in rows.iter().enumerate() {
         let y = t + rh * (i as f64 + 0.5);
@@ -1923,13 +1931,23 @@ pub fn rowdots(rows: &[(String, Vec<f64>)], marks: &[String], points: bool, titl
         let (mn, mx) = vals.iter().fold((f64::MAX, f64::MIN), |a, &v| (a.0.min(v), a.1.max(v)));
         let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{y:.1}\" y2=\"{y:.1}\" stroke=\"#e2e8f0\" stroke-width=\"2\"/>", x(mn), x(mx));
         for (k, v) in vals.iter().enumerate() {
-            let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{y:.1}\" r=\"5\" fill=\"{}\" stroke=\"#fff\" stroke-width=\"1.5\"/>", x(*v), C[k % C.len()]);
+            // 년 단위: 겹치는 점이 서로 가리지 않게 뒤 표시일수록 작게(첫 표시는 큰 테두리 원). 같은 값이면 겹친 고리로 보인다
+            let (r, fill, stroke) = if years {
+                if k == 0 { (7.5, "#fff".to_string(), "#64748b".to_string()) } else { (6.5 - k as f64, C[k % C.len()].to_string(), "#fff".to_string()) }
+            } else { (5.0, C[k % C.len()].to_string(), "#fff".to_string()) };
+            let sw = if years && k == 0 { 2.5 } else { 1.5 };
+            let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{y:.1}\" r=\"{r}\" fill=\"{fill}\" stroke=\"{stroke}\" stroke-width=\"{sw}\"/>", x(*v));
+        }
+        // 년 단위: 5년 넘는 긴 기다림은 가장 긴 값 오른쪽에 숫자
+        if years && mx >= 5.0 {
+            let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"12\">{:.0} yr</text>", x(mx) + 14.0, y + 4.0, mx);
         }
     }
     let ly = H - 10.0;
     let mut lx = l;
     for (k, m) in marks.iter().enumerate() {
-        let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"5\" fill=\"{}\"/><text x=\"{:.1}\" y=\"{ly:.1}\" fill=\"{INK}\" font-size=\"13\">{}</text>", lx + 5.0, ly - 4.0, C[k % C.len()], lx + 14.0, m.replace('&', "&amp;"));
+        let (lf, ls) = if years && k == 0 { ("#fff", "#64748b") } else { (C[k % C.len()], "none") };
+        let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"5\" fill=\"{lf}\" stroke=\"{ls}\" stroke-width=\"2\"/><text x=\"{:.1}\" y=\"{ly:.1}\" fill=\"{INK}\" font-size=\"13\">{}</text>", lx + 5.0, ly - 4.0, lx + 14.0, m.replace('&', "&amp;"));
         lx += 26.0 + m.len() as f64 * 7.0;
     }
     s.push_str("</svg>");
@@ -1941,10 +1959,14 @@ mod rowdots_test {
     #[test]
     fn dots_draws_rows_and_legend() {
         let rows = vec![("Computers".to_string(), vec![-0.09, 0.097, -0.007])];
-        let svg = super::rowdots(&rows, &["Usual year".into(), "This year".into(), "Holiday dip".into()], false, "t");
+        let svg = super::rowdots(&rows, &["Usual year".into(), "This year".into(), "Holiday dip".into()], "", None, "t");
         assert!(svg.contains(">+5%<"));
-        let pts = super::rowdots(&[("1994".to_string(), vec![3.0, 1.59, 1.83])], &["Fed".into()], true, "t");
+        let pts = super::rowdots(&[("1994".to_string(), vec![3.0, 1.59, 1.83])], &["Fed".into()], "pt", None, "t");
         assert!(pts.contains(">+1 pt<") && !pts.contains("%<"));
+        let yrs = super::rowdots(&[("1973".to_string(), vec![7.5, 3.5, 12.0])], &["Price".into()], "yr", Some((2.0, "Median")), "t");
+        assert!(yrs.contains(">10 yr<") && !yrs.contains("%<") && !yrs.contains("+"));
+        assert!(yrs.contains(">12 yr<")); // 5년 넘는 줄은 가장 긴 값에 숫자
+        assert!(yrs.contains(">Median<") && yrs.contains("stroke-dasharray"));
         assert!(svg.contains(">Computers<") && svg.contains(">Holiday dip<") && svg.ends_with("</svg>"));
     }
 }
