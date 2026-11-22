@@ -1,4 +1,4 @@
-# [Jobs Report Revisions Keep Going Down. That Has Rarely Meant a Recession](https://mkviz.com/jobs-report-revisions/)
+# [Downward Jobs Report Revisions Have Rarely Meant a Recession](https://mkviz.com/jobs-report-revisions/)
 
 ## Research note
 
