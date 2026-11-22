@@ -6,15 +6,15 @@ The calculation engine and chart data behind [MKViz](https://mkviz.com), a blog 
 
 Every number in an MKViz article that comes from our own calculation is produced by this engine, and every chart's data is published here so anyone can check it.
 
-![Stock Market Recovery Usually Takes 2 Years. After Inflation, Up to 13](data/stock-market-recovery-time/bear-market-recovery-years.svg)
+![Bond Funds Lose Money When Yields Rise More Than Their Interest](data/how-bond-funds-lose-money/bond-fund-cushion.svg)
 
 **Latest articles**
 
+- [Bond Funds Lose Money When Yields Rise More Than Their Interest](https://mkviz.com/how-bond-funds-lose-money/) · [data](data/how-bond-funds-lose-money/)
 - [Stock Market Recovery Usually Takes 2 Years. After Inflation, Up to 13](https://mkviz.com/stock-market-recovery-time/) · [data](data/stock-market-recovery-time/)
 - [How Long Do Recessions Last? 10 Months. The Jobs Take Longer](https://mkviz.com/how-long-do-recessions-last/) · [data](data/how-long-do-recessions-last/)
 - [How Often Do Stock Market Corrections Happen? More Years Than Not](https://mkviz.com/how-long-do-corrections-last/) · [data](data/how-long-do-corrections-last/)
 - [How Do Fed Rate Cuts Affect Mortgage Rates? The Drop Comes First](https://mkviz.com/fed-rate-cut-mortgage-rates/) · [data](data/fed-rate-cut-mortgage-rates/)
-- [Will Mortgage Rates Ever Get Back to 3%? What It Would Take](https://mkviz.com/mortgage-rates-back-to-3-percent/) · [data](data/mortgage-rates-back-to-3-percent/)
 
 ## What's here
 

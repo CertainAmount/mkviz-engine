@@ -2,12 +2,12 @@
 
 ## Research note
 
-**Question.** When the S&P 500 is 5% below its record, how often has the decline gone on to a 10% correction or a 20% bear market, and how long did it take to get back to the record at each depth?
+**Question.** When the S&P 500 is 5% or 10% below its record, how often has the decline gone on to a 10% correction or a 20% bear market, how long did it take to get back to the record at each depth, and does the speed of the fall to the 10% line tell the two kinds apart?
 
-**Short answer.** On Nov. 16, 2026 the S&P 500 closed 5.1% below its record close of Oct. 6 (its lowest close so far was 5.9% below, on Nov. 5). Of the 74 completed declines of 5% or more since 1950, 26 reached 10% (35%) and 11 reached 20% (15%). Declines that stopped between 5% and 10% took a median of 2.4 months from record to new record; between 10% and 20%, seven months; 20% or more, 24.5 months.
+**Short answer.** On Nov. 20, 2026 the S&P 500 closed at 6,910.39, 11.6% below its record close of Oct. 6 (7,818.93), 45 days after the record: its first close past the 10% line since 2025. Of the 74 completed declines of 5% or more since 1950, 26 reached 10% (35%) and 11 reached 20% (15%). Declines that stopped between 5% and 10% took a median of 2.4 months from record to new record; between 10% and 20%, seven months; 20% or more, 24.5 months.
 
 ### Data
-- S&P 500 index daily closes, Jan. 3, 1950 to Nov. 16, 2026 (77 years), from Yahoo Finance (^GSPC). This is the price index: it leaves out dividends.
+- S&P 500 index daily closes, Jan. 3, 1950 to Nov. 20, 2026 (77 years), from Yahoo Finance (^GSPC). This is the price index: it leaves out dividends.
 - NBER recession months (USREC) via FRED.
 
 ### Method
@@ -17,6 +17,10 @@ A decline starts on the first close at least 5% below the prior record close and
 ./engine/target/release/mkviz-engine ladder data/series/index_gspc_long.csv --depths 0.05,0.10,0.15,0.20,0.30,0.40,0.50
 ./engine/target/release/mkviz-engine drawdowns data/series/index_gspc_long.csv --threshold 0.10 --deep 0.20 --flag data/series/fred_USREC.csv
 ```
+```
+./engine/target/release/mkviz-engine figure speed data/macro/index_gspc_long.csv --threshold 0.10 --deep 0.20 --marks 1987,2020,2007,1973,2000 --out sp500-correction-speed.svg
+```
+(`figure speed`, added 2026-11-23, writes one row per decline to sp500-correction-speed.csv: the record date, days from the record to the first close 10% or more below it, the final depth, and whether it is still open. The speed bands below count those rows.)
 (`ladder` and `figure ladder` were added to the engine for this page; `figure underwater` now samples each month's deepest close against the daily record.)
 
 ### Results
@@ -36,6 +40,17 @@ A decline starts on the first close at least 5% below the prior record close and
 - Of the 11 declines of 20% or more, seven overlapped an NBER recession.
 - Longest waits for a new record: 1973 (7.5 years), 2000 (7.2 years), 2007 (5.5 years, after a 56.8% fall). The 2025 decline (18.9%) took 4.2 months.
 
+### Speed to the 10% line (added 2026-11-23)
+
+| Days from the record to the first 10% close | Completed corrections | Went on to 20% |
+|---|---|---|
+| 30 or fewer | 8 | 2 (2000, 2020) |
+| 31 to 90 | 6 | 3 (1987, 2007, 2022) |
+| More than 90 | 12 | 6 |
+
+- Median days to the 10% line: 70. The current decline: 45 (middle band).
+- Test of the cut points: splitting at 60 days gives 5 of 12 vs 6 of 14 (no difference); at 30 or 45 days, 2 of 8 or 2 of 9 vs about half of the slower ones. The quickest falls went on to 20% less often, but the two that did (2000, 2020) were among the deepest and the shortest bear markets, and with 26 cases a shift of two or three changes every share. We read it as a weak sorting, not a signal.
+
 ### Limits
 - Price index only. With dividends reinvested, records come back sooner, most of all in the long 1970s and 2000s declines.
 - No adjustment for inflation.
@@ -49,7 +64,7 @@ A decline starts on the first close at least 5% below the prior record close and
 ### Builds on and leads to
 - [Nasdaq correction history](https://mkviz.com/nasdaq-correction-history/): the same count on the Nasdaq since 1971.
 - [Recession indicators](https://mkviz.com/recession-indicators/): most 20% declines came with a recession.
-- Open: the same ladder on total return (with dividends), and on the real (inflation-adjusted) index.
+- Open: the same ladder on total return (with dividends), and on the real (inflation-adjusted) index; the speed test on the Nasdaq.
 
 ### Cite
 MKViz (2026). *Stock market corrections since 1950.* https://mkviz.com/stock-market-corrections-history/ ; code and data: https://github.com/CertainAmount/mkviz-engine/tree/main/data/stock-market-corrections-history
@@ -71,5 +86,13 @@ Drawn from market prices we don't redistribute; the chart data is in the CSV.
 Data: [sp500-underwater.csv](sp500-underwater.csv) · settings: [sp500-underwater.json](sp500-underwater.json)
 
 ![sp500-underwater](sp500-underwater.svg)
+
+Drawn from market prices we don't redistribute; the chart data is in the CSV.
+
+## sp500-correction-speed
+
+Data: [sp500-correction-speed.csv](sp500-correction-speed.csv) · settings: [sp500-correction-speed.json](sp500-correction-speed.json)
+
+![sp500-correction-speed](sp500-correction-speed.svg)
 
 Drawn from market prices we don't redistribute; the chart data is in the CSV.

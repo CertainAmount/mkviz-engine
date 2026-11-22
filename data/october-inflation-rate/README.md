@@ -1,4 +1,4 @@
-# [October Inflation Rate: The Number BLS Couldn't Publish](https://mkviz.com/october-inflation-rate/)
+# [October's Inflation Rate Was About 3.8%. BLS Couldn't Say So](https://mkviz.com/october-inflation-rate/)
 
 ## Research note
 
@@ -6,9 +6,15 @@
 
 **Short answer.** About 3.8% to 3.9% for all items and about 2.4% to 2.7% for core (all items less food and energy). The two usual ways to fill October 2025 give 3.66% and 4.02%; each has a known October bias, and removing it brings them within a few tenths of each other. These are estimates, not BLS figures.
 
+### Definitions
+- **What we measure:** the 12-month change in the Consumer Price Index for All Urban Consumers (CPI-U), all items, not seasonally adjusted, from October 2025 to October 2026, the series behind headline annual rates and the one BLS recommends for escalation clauses.
+- **Other yardsticks for the same thing:** the CPI for Urban Wage Earners and Clerical Workers (CPI-W) covers a narrower group of households and is the index behind Social Security's yearly raise and many blue-collar pay escalators; seasonally adjusted CPI is used for monthly changes; PCE prices (BEA) are what the Fed targets. We measure CPI-U and, separately, CPI-W (below), because contracts can name either. Seasonally adjusted indexes are not used for 12-month rates and are revised each year.
+- Re-scan: every October from 1985 to 2023 with data on both sides was tested for both indexes (39 each, none dropped). October 2024 cannot be tested because its 12-month comparison needs October 2025. The test window starts in 1985 for both so CPI-U and CPI-W results cover the same years.
+
 ### Data
 - CPI-U, all items and all items less food and energy, U.S. city average, not seasonally adjusted (BLS series CUUR0000SA0, CUUR0000SA0L1E), monthly, 1957 to October 2026. This is the series behind published 12-month rates and the one BLS recommends for escalation clauses. October 2025 is missing.
 - October 2026 all-items index: 337.51.
+- CPI-W, all items, U.S. city average, not seasonally adjusted (BLS series CWUR0000SA0), monthly, 1975 to October 2026, October 2025 missing.
 
 ### Methods
 1. **Midpoint (geometric mean).** October 2025 = √(September 2025 × November 2025), the approximation BLS describes for a missing month "if all parties agree."
@@ -81,6 +87,28 @@ September 2026 for comparison: all items 3.74%, core 2.56%.
 | 2022 | +0.26 | -0.26 | +0.10 | -0.25 |
 | 2023 | +0.08 | -0.35 | +0.06 | -0.16 |
 
+### CPI-W (added 2026-11-23)
+The same two fills and the same test on CPI-W, the index many blue-collar pay escalators use. CPI-W ran higher than CPI-U this year (12 months to September 2026: 3.93% against 3.74%), and the October estimates are higher by about the same amount.
+
+| Index | Method | Oct. 2025 stand-in | Oct. 2026 change | Mean error | Median abs. error | Ran high | Corrected | Range after past errors |
+|---|---|---|---|---|---|---|---|---|
+| CPI-W | Midpoint of Sept. and Nov. | 317.776 | 4.21% | 0.08 | 0.11 | 27 of 39 | 4.12% | 3.69% to 4.52% |
+| CPI-W | Prior 12-month trend | 318.909 | 3.84% | -0.14 | 0.14 | 14 of 39 | 3.98% | 3.37% to 5.55% |
+
+```
+./engine/target/release/mkviz-engine gapfill data/macro/bls_CWUR0000SA0.csv --missing 2025-10 --from 1985-01-01
+```
+
+### Figures
+- `october-inflation-shift.svg`: each fill moved by its usual October error, with September's rate as the reference line.
+- `october-inflation-misses.svg` (added 2026-11-23): every past October's miss for each method on one axis, one row per method, with the median miss and how many Octobers ran high. The midpoint's dots sit in a tight cluster just right of zero; the trend rule's spread out on both sides, with 2008 far to the left.
+```
+./engine/target/release/mkviz-engine figure misses data/macro/bls_CUUR0000SA0.csv --missing 2025-10 --since 1985-01-01 --names "Midpoint of Sept. and Nov.,Treasury's TIPS rule" --out data/content/figures/october-inflation-misses.svg
+```
+
+### What happens to the next five annual rates
+With no October 2025 rent survey, BLS held rent and owners' equivalent rent flat from September, which kept their levels low until April 2026 (Monthly Labor Review, May 2026). Annual rates for November 2026 through March 2027 compare against those low months, so they lean a little high; BLS has not published an all-items size for the effect, and we do not estimate one here.
+
 ### Limits
 - With no rent survey in October 2025, BLS held rent and owners' equivalent rent flat from September, which kept their levels low until April 2026 (Monthly Labor Review, May 2026). That leaves the November 2025 index a little low and pushes the midpoint estimate up by an amount BLS has not estimated for all items; the higher end of the range is the less likely one.
 - The trend rule's errors are wider and two-sided (largest miss: October 2008, 1.4 points, when energy prices collapsed).
@@ -90,12 +118,13 @@ September 2026 for comparison: all items 3.74%, core 2.56%.
 ### Sources
 - BLS, Consumer Price Index Summary, October 2026: https://www.bls.gov/news.release/cpi.nr0.htm
 - BLS, Approximating missing data: https://www.bls.gov/cpi/factsheets/approximating-missing-data.htm
+- BLS, Beyond the Numbers, Why does BLS provide both the CPI-W and CPI-U?: https://www.bls.gov/opub/btn/volume-3/why-does-bls-provide-both-the-cpi-w-and-cpi-u.htm
 - BLS, Monthly Labor Review, Counterfactual imputation approaches for the housing component of the October 2025 CPI (May 2026): https://www.bls.gov/opub/mlr/2026/article/counterfactual-imputation-approaches-for-the-housing-component-of-the-october-2025-cpi.htm
 - Tipswatch, Synthetic calculation results in 0.25% inflation for October (Nov. 26, 2025), quoting Treasury's index: https://tipswatch.com/2025/11/26/synthetic-calculation-results-in-0-25-inflation-for-october/
 
 ### Builds on and leads to
 - Used in [Core inflation vs headline](https://mkviz.com/core-inflation/) for core's yearly rate in October 2026.
-- Open: an all-items estimate of the rent-hold effect on November 2025; the same test for CPI-W, which many pay and pension clauses use; repeating the test when November 2026 data arrive.
+- Open: an all-items estimate of the rent-hold effect on November 2025; repeating the test when November 2026 data arrive.
 
 ### Cite
 MKViz (2026). *October 2026 inflation rate: filling the missing October 2025 CPI.* https://mkviz.com/october-inflation-rate/ ; code and data: https://github.com/CertainAmount/mkviz-engine/tree/main/data/october-inflation-rate
@@ -103,6 +132,16 @@ MKViz (2026). *October 2026 inflation rate: filling the missing October 2025 CPI
 ## Charts
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
+
+## october-inflation-misses
+
+Data: [october-inflation-misses.csv](october-inflation-misses.csv) · settings: [october-inflation-misses.json](october-inflation-misses.json)
+
+![october-inflation-misses](october-inflation-misses.svg)
+
+```
+./engine/target/release/mkviz-engine figure misses data/series/bls_CUUR0000SA0.csv --missing 2025-10 --names 'Midpoint of Sept. and Nov.,Treasury'\''s TIPS rule' --since 1985-01-01 --title 'How far each stand-in missed in past Octobers' --out october-inflation-misses.svg
+```
 
 ## october-inflation-shift
 

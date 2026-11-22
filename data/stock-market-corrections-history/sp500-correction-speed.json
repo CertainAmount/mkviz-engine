@@ -1,0 +1,1 @@
+{"frame":"speed","input":"data/series/index_gspc_long.csv","params":{"deep":"0.20","marks":"1987,2020,2007,1973,2000","threshold":"0.10","title":"How fast each S&P 500 correction reached 10%, and how deep it went"}}

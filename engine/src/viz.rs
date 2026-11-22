@@ -1628,6 +1628,11 @@ mod falls_test {
 /// 점 띠 그림: 줄(묶음)마다 사례별 값을 점으로, 기준선(0 또는 '보통') 하나, 줄마다 중앙값 표시와 '몇 개 중 몇 개 위'.
 /// 한 줄에 점 한 종류만 둔다(점 세 종류×11줄은 읽히지 않았다, 2026-11-18 콜드 리드).
 pub fn strips(rows: &[(String, Vec<(String, f64)>)], unit: &str, refline: Option<(f64, &str)>, title: &str) -> String {
+    strips_with(rows, unit, refline, "up in", "no change", title)
+}
+
+/// strips에 '0보다 큰 사례' 이름을 바꿔 단다(예: 메우기 오차는 "too high in"). 값이 작은 띠(폭 2 미만, %p)는 소수 둘째 자리까지
+pub fn strips_with(rows: &[(String, Vec<(String, f64)>)], unit: &str, refline: Option<(f64, &str)>, up_word: &str, zero_word: &str, title: &str) -> String {
     // 줄 이름 아래 점 띠, 0선·기준선은 점 띠 구간에만(이름 글자와 겹쳤다), 범례는 맨 아래 따로(2026-11-18 휴대폰 확인)
     let (top, rh) = (T + 22.0, 76.0);
     let h = top + rh * rows.len() as f64 + 54.0;
@@ -1641,9 +1646,10 @@ pub fn strips(rows: &[(String, Vec<(String, f64)>)], unit: &str, refline: Option
     let x = |v: f64| x0 + (v - lo) / (hi - lo) * (x1 - x0);
     let bottom = top + rh * rows.len() as f64;
     // 반올림해서 0이면 부호 없이 0('-0.0 pt'가 나왔다)
-    let fmt = |v: f64| if unit == "%" { let r = (v * 100.0).round(); if r == 0.0 { "0%".to_string() } else { format!("{}{:.0}%", if r > 0.0 { "+" } else { "" }, r) } } else { let r = (v * 10.0).round() / 10.0; if r == 0.0 { format!("0.0{unit}") } else { format!("{}{:.1}{unit}", if r > 0.0 { "+" } else { "" }, r) } };
+    let dp: usize = if unit != "%" && hi - lo < 2.0 { 2 } else { 1 };
+    let fmt = |v: f64| if unit == "%" { let r = (v * 100.0).round(); if r == 0.0 { "0%".to_string() } else { format!("{}{:.0}%", if r > 0.0 { "+" } else { "" }, r) } } else { let k = 10f64.powi(dp as i32); let r = (v * k).round() / k; if r == 0.0 { format!("{:.dp$}{unit}", 0.0) } else { format!("{}{:.dp$}{unit}", if r > 0.0 { "+" } else { "" }, r) } };
     let z = x(0.0);
-    let _ = write!(s, "<text x=\"{z:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">no change</text>", top - 4.0);
+    let _ = write!(s, "<text x=\"{z:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{zero_word}</text>", top - 4.0);
     // 눈금(두 독자가 점 띠에 눈금이 없어 크기를 못 읽었다, 2026-11-18): 둥근 값 4~6개를 맨 아래에
     let span = hi - lo;
     let raw = span / 5.0;
@@ -1651,7 +1657,8 @@ pub fn strips(rows: &[(String, Vec<(String, f64)>)], unit: &str, refline: Option
     let step = [1.0, 2.0, 2.5, 5.0, 10.0].iter().map(|m| m * mag).find(|st| span / st <= 6.0).unwrap_or(raw);
     let mut t = (lo / step).ceil() * step;
     while t <= hi + 1e-9 {
-        let lab = if unit == "%" { format!("{:.0}%", t * 100.0) } else { format!("{t:.0}{unit}") }; // 단위를 눈금에(독자가 단위를 못 읽었다)
+        let td = if step < 1.0 && unit != "%" { if step < 0.1 { 2 } else { 1 } } else { 0 };
+        let lab = if unit == "%" { format!("{:.0}%", t * 100.0) } else { format!("{:.td$}{unit}", if t.abs() < 1e-9 { 0.0 } else { t }) }; // 단위를 눈금에(독자가 단위를 못 읽었다)
         let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"12\">{lab}</text>", x(t), bottom + 20.0);
         t += step;
     }
@@ -1664,7 +1671,7 @@ pub fn strips(rows: &[(String, Vec<(String, f64)>)], unit: &str, refline: Option
         let mut v: Vec<f64> = pts.iter().map(|p| p.1).collect();
         v.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let med = if v.is_empty() { 0.0 } else if v.len() % 2 == 1 { v[v.len() / 2] } else { (v[v.len() / 2 - 1] + v[v.len() / 2]) / 2.0 };
-        let _ = write!(s, "<text x=\"{x0}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"14\" font-weight=\"600\">{}</text><text x=\"{x1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">up in {up} of {} · middle {}</text>",
+        let _ = write!(s, "<text x=\"{x0}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"14\" font-weight=\"600\">{}</text><text x=\"{x1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{up_word} {up} of {} · middle {}</text>",
             y + 16.0, name.replace('&', "&amp;"), y + 16.0, pts.len(), fmt(med));
         let cy = y + 46.0;
         let _ = write!(s, "<line x1=\"{x0}\" x2=\"{x1}\" y1=\"{cy:.1}\" y2=\"{cy:.1}\" stroke=\"#eef2f7\"/><line x1=\"{z:.1}\" x2=\"{z:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{INK}\"/>", cy - 16.0, cy + 16.0);
@@ -1697,6 +1704,10 @@ mod strips_test {
         let rows = vec![("A".to_string(), vec![("1".to_string(), 1.0), ("2".to_string(), -0.5), ("3".to_string(), 2.0)])];
         let svg = super::strips(&rows, " pt", None, "t");
         assert!(svg.contains("up in 2 of 3") && svg.contains("middle +1.0 pt") && svg.ends_with("</svg>"));
+        // 작은 값(메우기 오차): 둘째 자리, 이름 바꿈
+        let small = vec![("M".to_string(), vec![("1985-10".to_string(), 0.05), ("2008-10".to_string(), -0.2), ("2005-10".to_string(), 0.51)])];
+        let svg = super::strips_with(&small, " pt", None, "too high in", "exact", "t");
+        assert!(svg.contains("too high in 2 of 3") && svg.contains("middle +0.05 pt"), "{svg}");
     }
 }
 
@@ -2052,5 +2063,116 @@ mod hbars_test {
         let rows = vec![("1994".to_string(), 0.22), ("2022".to_string(), 1.26), ("2026".to_string(), 0.48)];
         let svg = super::hbars(&rows, Some((0.25, "The first hike, 0.25".into())), "2026", " pt", "t");
         assert!(svg.contains("fill=\"#94a3b8\"") && svg.contains("fill=\"#2563eb\"") && svg.contains(">+1.26 pt<") && svg.contains("The first hike"));
+    }
+}
+
+/// 쿠션 그림(산점도): 해마다 점 하나, 가로 = 그해 이자 쿠션(시작 금리 ÷ 듀레이션, %p), 세로 = 그해 금리 변화(%p).
+/// 대각선(상승 = 쿠션) 위쪽에 놓인 해는 값 손실이 한 해 이자를 넘은 해다: 손실 해는 진한 점, 나머지는 회색, 아직 안 끝난 해는 파랑.
+/// "채권 펀드는 언제 돈을 잃나"를 규칙 하나(선)와 실제 해들(점)로 한 번에 보인다(Cleveland & McGill: 같은 축 위치 비교)
+pub fn cushion(rows: &[(i32, f64, f64, bool, bool)], marks: &[String], title: &str) -> String {
+    let (l, r, top) = (52.0, 18.0, T + 26.0);
+    let h = H + 40.0;
+    let bottom = h - B - 18.0;
+    let xmax = (rows.iter().map(|x| x.1).fold(0.5, f64::max) * 2.0).ceil() / 2.0;
+    let ymax = rows.iter().map(|x| x.2).fold(0.5, f64::max).ceil().max(xmax.ceil());
+    let ymin = rows.iter().map(|x| x.2).fold(-0.5, f64::min).floor();
+    let x = |v: f64| l + v / xmax * (W - l - r);
+    let y = |v: f64| top + (ymax - v) / (ymax - ymin) * (bottom - top);
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    // 범례
+    let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"5\" fill=\"{INK}\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Fund lost money that year</text><circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"5\" fill=\"{GRAY}\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Made money</text>",
+                   l, T + 6.0, l + 10.0, T + 10.0, l + 214.0, T + 6.0, l + 224.0, T + 10.0);
+    // 눈금
+    let mut v = ymin;
+    while v <= ymax + 1e-9 {
+        let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{}</text>",
+                       W - r, y(v), y(v), if v == 0.0 { "#cbd5e1" } else { "#eef2f7" }, l - 6.0, y(v) + 4.0, if v > 0.0 { format!("+{v}") } else { format!("{v}") });
+        v += 1.0;
+    }
+    let mut v = 0.0;
+    while v <= xmax + 1e-9 {
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{}</text>", x(v), bottom + 16.0, v);
+        v += if xmax > 2.0 { 1.0 } else { 0.5 };
+    }
+    let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">Cushion: starting yield ÷ duration (points)</text>", (l + W - r) / 2.0, bottom + 34.0);
+    let _ = write!(s, "<text transform=\"translate(14 {:.1}) rotate(-90)\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">Change in yield that year (points)</text>", (top + bottom) / 2.0);
+    // 대각선: 상승 = 쿠션
+    let xe = xmax.min(ymax);
+    let _ = write!(s, "<line x1=\"{:.1}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"#ea580c\" stroke-width=\"2\" stroke-dasharray=\"5 4\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"#c2410c\" font-size=\"13\">Rise = cushion</text>",
+                   x(0.0), y(0.0), x(xe), y(xe), x(xe) - 4.0, y(xe) - 6.0);
+    for (yr, c, ch, loss, full) in rows {
+        let (fill, rad) = if !full { (BLUE, 6.0) } else if *loss { (INK, 5.0) } else { (GRAY, 4.0) };
+        let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"{rad}\" fill=\"{fill}\" stroke=\"#fff\" stroke-width=\"1.5\"/>", x(*c), y(*ch));
+        if !full || marks.iter().any(|m| m == &yr.to_string()) {
+            let lab = if *full { yr.to_string() } else { format!("{yr} so far") };
+            let right = x(*c) < W - r - 90.0;
+            let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"{}\" fill=\"{}\" font-size=\"13\" font-weight=\"600\" stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\">{lab}</text>",
+                           if right { x(*c) + 9.0 } else { x(*c) - 9.0 }, y(*ch) + 4.0, if right { "start" } else { "end" }, if *full { INK } else { BLUE });
+        }
+    }
+    s.push_str("</svg>");
+    s
+}
+
+#[cfg(test)]
+mod cushion_test {
+    #[test]
+    fn cushion_colors_losses_and_labels_marks() {
+        let rows = vec![(2021, 0.1, 0.8, true, true), (2020, 0.3, -1.2, false, true), (2026, 0.65, -0.3, false, false)];
+        let svg = super::cushion(&rows, &["2021".to_string()], "t");
+        assert!(svg.contains(">2021<") && svg.contains("2026 so far") && svg.contains("Rise = cushion") && !svg.contains(">2020<"));
+    }
+}
+
+/// 속도 그림(산점도): 하락마다 점 하나, 가로 = 기록에서 처음 threshold 아래로 닫힌 날까지 걸린 날(빨리 빠졌나), 세로 = 끝난 깊이.
+/// deep 선 아래(약세장까지 간 것)는 진한 점, 그 위에서 멈춘 것은 회색, 아직 진행 중인 하락은 파랑(지금까지 깊이).
+/// "빨리 빠지면 더 깊이 가나"를 사례 전부로(Cleveland & McGill: 같은 축 위치 비교). marks: 이름표 달 고점 해
+pub fn speed(rows: &[(String, f64, f64, bool)], deep: f64, marks: &[String], title: &str) -> String {
+    let (l, r, top) = (52.0, 18.0, T + 26.0);
+    let h = H + 40.0;
+    let bottom = h - B - 18.0;
+    let xmax = (rows.iter().map(|x| x.1).fold(30.0, f64::max) / 60.0).ceil() * 60.0;
+    let ymin = (rows.iter().map(|x| x.2).fold(-deep, f64::min) * 10.0).floor() / 10.0;
+    let x = |v: f64| l + v / xmax * (W - l - r);
+    let y = |v: f64| top + v / ymin * (bottom - top);
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"5\" fill=\"{INK}\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Became a bear market</text><circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"5\" fill=\"{GRAY}\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\">Stopped short</text>",
+                   l, T + 6.0, l + 10.0, T + 10.0, l + 190.0, T + 6.0, l + 200.0, T + 10.0);
+    let mut v = 0.0;
+    while v >= ymin - 1e-9 {
+        let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#eef2f7\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{}</text>",
+                       W - r, y(v), y(v), l - 6.0, y(v) + 4.0, pct(v));
+        v -= 0.1;
+    }
+    let mut v = 0.0;
+    while v <= xmax + 1e-9 {
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{}</text>", x(v), bottom + 16.0, v);
+        v += 60.0;
+    }
+    let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">Days from the record to the first 10% close</text>", (l + W - r) / 2.0, bottom + 34.0);
+    let _ = write!(s, "<text transform=\"translate(14 {:.1}) rotate(-90)\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">How far it fell in the end</text>", (top + bottom) / 2.0);
+    let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#ea580c\" stroke-width=\"2\" stroke-dasharray=\"5 4\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"#c2410c\" font-size=\"13\">Bear market line</text>",
+                   W - r, y(-deep), y(-deep), W - r, y(-deep) - 5.0);
+    for (name, d, low, open) in rows {
+        let (fill, rad) = if *open { (BLUE, 6.0) } else if *low <= -deep { (INK, 5.0) } else { (GRAY, 4.0) };
+        let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"{rad}\" fill=\"{fill}\" stroke=\"#fff\" stroke-width=\"1.5\"/>", x(*d), y(*low));
+        if *open || marks.iter().any(|m| name.starts_with(m.as_str())) {
+            let lab = if *open { format!("{} so far", &name[..4.min(name.len())]) } else { name[..4.min(name.len())].to_string() };
+            let right = x(*d) < W - r - 90.0;
+            let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"{}\" fill=\"{}\" font-size=\"13\" font-weight=\"600\">{lab}</text>",
+                           if right { x(*d) + 9.0 } else { x(*d) - 9.0 }, y(*low) + 4.0, if right { "start" } else { "end" }, if *open { BLUE } else { INK });
+        }
+    }
+    s.push_str("</svg>");
+    s
+}
+
+#[cfg(test)]
+mod speed_test {
+    #[test]
+    fn speed_marks_open_and_deep() {
+        let rows = vec![("2020-02-19".to_string(), 8.0, -0.339, false), ("2015-05-21".to_string(), 95.0, -0.142, false), ("2026-10-06".to_string(), 45.0, -0.116, true)];
+        let svg = super::speed(&rows, 0.20, &["2020".to_string()], "t");
+        assert!(svg.contains(">2020<") && svg.contains("2026 so far") && !svg.contains(">2015<") && svg.contains("Bear market line"));
     }
 }

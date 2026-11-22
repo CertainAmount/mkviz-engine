@@ -18,6 +18,7 @@
 | [recession-indicators](https://mkviz.com/recession-indicators/) | [recession-breadth](recession-indicators/recession-breadth.csv) | breadth | fred_CE16OV.csv, fred_CMRMTSPL.csv, fred_DPCERA3M086SBEA.csv, fred_INDPRO.csv, fred_PAYEMS.csv, fred_USREC.csv, fred_W875RX1.csv |
 | [stock-market-corrections-history](https://mkviz.com/stock-market-corrections-history/) | [sp500-dip-ladder](stock-market-corrections-history/sp500-dip-ladder.csv) | ladder | index_gspc_long.csv |
 | [stock-market-corrections-history](https://mkviz.com/stock-market-corrections-history/) | [sp500-underwater](stock-market-corrections-history/sp500-underwater.csv) | underwater | fred_USREC.csv, index_gspc_long.csv |
+| [stock-market-corrections-history](https://mkviz.com/stock-market-corrections-history/) | [sp500-correction-speed](stock-market-corrections-history/sp500-correction-speed.csv) | speed | index_gspc_long.csv |
 | [ai-stocks](https://mkviz.com/ai-stocks/) | [ai-vs-dotcom](ai-stocks/ai-vs-dotcom.csv) | paths | fred_NASDAQ100.csv |
 | [ai-stocks](https://mkviz.com/ai-stocks/) | [ai-dotcom-aftermath](ai-stocks/ai-dotcom-aftermath.csv) | paths | fred_NASDAQ100.csv |
 | [ai-stocks](https://mkviz.com/ai-stocks/) | [ai-crash-pictogram](ai-stocks/ai-crash-pictogram.csv) | pictogram |  |
@@ -41,6 +42,7 @@
 | [oil-prices-falling](https://mkviz.com/oil-prices-falling/) | [gas-after-oil-moves](oil-prices-falling/gas-after-oil-moves.csv) |  |  |
 | [gold-price](https://mkviz.com/gold-price/) | [gold-underwater](gold-price/gold-underwater.csv) | underwater | wb_gold.csv |
 | [gold-price](https://mkviz.com/gold-price/) | [gold-during-crashes](gold-price/gold-during-crashes.csv) | during | fred_NASDAQCOM.csv, wb_gold.csv |
+| [how-bond-funds-lose-money](https://mkviz.com/how-bond-funds-lose-money/) | [bond-fund-cushion](how-bond-funds-lose-money/bond-fund-cushion.csv) | cushion | fred_DGS7.csv |
 | [how-long-do-corrections-last](https://mkviz.com/how-long-do-corrections-last/) | [sp-intrayear](how-long-do-corrections-last/sp-intrayear.csv) | intrayear | index_gspc_long.csv |
 | [how-long-do-recessions-last](https://mkviz.com/how-long-do-recessions-last/) | [recession-aftermath](how-long-do-recessions-last/recession-aftermath.csv) | aftermath | fred_PAYEMS.csv, fred_UNRATE.csv, fred_USREC.csv |
 | [jobs-report-revisions](https://mkviz.com/jobs-report-revisions/) | [jobs-revisions-years](jobs-report-revisions/jobs-revisions-years.csv) | years | bls_ces_first.csv, bls_ces_third.csv, fred_USREC.csv |
@@ -54,6 +56,7 @@
 | [mortgage-rates-back-to-3-percent](https://mkviz.com/mortgage-rates-back-to-3-percent/) | [m3-falls](mortgage-rates-back-to-3-percent/m3-falls.csv) | falls | fred_DGS10.csv, fred_MORTGAGE30US.csv |
 | [mortgage-rates-back-to-3-percent](https://mkviz.com/mortgage-rates-back-to-3-percent/) | [m3-savings](mortgage-rates-back-to-3-percent/m3-savings.csv) | savings | fred_MORTGAGE30US.csv |
 | [nasdaq-correction-history](https://mkviz.com/nasdaq-correction-history/) | [nasdaq-drops-dots](nasdaq-correction-history/nasdaq-drops-dots.csv) | dots | index_ixic_long.csv |
+| [october-inflation-rate](https://mkviz.com/october-inflation-rate/) | [october-inflation-misses](october-inflation-rate/october-inflation-misses.csv) | misses | bls_CUUR0000SA0.csv |
 | [october-inflation-rate](https://mkviz.com/october-inflation-rate/) | [october-inflation-shift](october-inflation-rate/october-inflation-shift.csv) | shift | bls_CUUR0000SA0.csv |
 | [recession-watch](https://mkviz.com/recession-watch/) | [rw-board](recession-watch/rw-board.csv) | board | fred_UNRATE.csv |
 | [recession-watch](https://mkviz.com/recession-watch/) | [rw-claims](recession-watch/rw-claims.csv) | lead | fred_ICSA.csv, fred_USREC.csv |

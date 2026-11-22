@@ -56,6 +56,30 @@ pub fn total_return(pts: &[crate::series::Point], m: f64) -> Vec<crate::series::
     out
 }
 
+/// 한 해의 이자 쿠션: 해 첫 금리 y0(%)로 액면 채권의 듀레이션 D를 구하면, 금리가 y0/D(%p)만큼 오를 때 값의 손실(≈D×상승)이
+/// 한 해 이자(≈y0)를 다 지운다. 해마다 (해, 시작 금리, 듀레이션, 쿠션 %p, 실제 금리 변화 %p, 펀드 총수익, 해가 다 찼나).
+/// 금리는 해 직전 달(전해 12월) 마지막 값부터 그해 마지막 달까지, 총수익은 total_return 지수의 같은 두 달 비율.
+pub struct CushionYear { pub year: i32, pub start: f64, pub duration: f64, pub cushion: f64, pub change: f64, pub ret: f64, pub full: bool }
+
+pub fn cushion(pts: &[crate::series::Point], m: f64) -> Vec<CushionYear> {
+    let idx = total_return(pts, m);
+    let mut last_in: std::collections::BTreeMap<i32, (f64, f64, String)> = std::collections::BTreeMap::new();
+    let mut by_month: std::collections::BTreeMap<String, f64> = std::collections::BTreeMap::new();
+    for p in pts { by_month.insert(p.date[..7].to_string(), p.value); }
+    for (p, i) in by_month.iter().zip(idx.iter()) {
+        let y: i32 = p.0[..4].parse().unwrap_or(0);
+        last_in.insert(y, (*p.1, i.value, p.0.clone()));
+    }
+    let mut out = Vec::new();
+    for (y, (r1, i1, mon)) in &last_in {
+        let Some((r0, i0, mon0)) = last_in.get(&(y - 1)) else { continue };
+        if !mon0.ends_with("-12") { continue; }
+        let d = par_duration(r0 / 100.0, m);
+        out.push(CushionYear { year: *y, start: *r0, duration: d, cushion: r0 / d, change: r1 - r0, ret: i1 / i0 - 1.0, full: mon.ends_with("-12") });
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -94,5 +118,21 @@ mod tests {
         assert_eq!(up.len(), 2);
         let r = up[1].value / up[0].value - 1.0;
         assert!(r < -0.05 && r > -0.065, "{r}");
+    }
+
+    #[test]
+    fn cushion_flags_years_where_rise_beats_interest() {
+        use crate::series::Point;
+        let p = |d: &str, v: f64| Point { date: d.into(), day: crate::series::day_number(d).unwrap(), value: v };
+        // 2020년 말 2%, 2021년 말 3%(쿠션 약 0.3%p보다 크게 오름 → 손실), 2022년 말 3%(그대로 → 이자만큼 이익)
+        let mut v = vec![p("2020-12-31", 2.0)];
+        for m in 1..=12 { v.push(p(&format!("2021-{m:02}-28"), 2.0 + m as f64 / 12.0)); }
+        for m in 1..=6 { v.push(p(&format!("2022-{m:02}-28"), 3.0)); }
+        let c = cushion(&v, 7.0);
+        assert_eq!(c.len(), 2);
+        assert_eq!(c[0].year, 2021);
+        assert!((c[0].cushion - 2.0 / par_duration(0.02, 7.0)).abs() < 1e-9 && (c[0].change - 1.0).abs() < 1e-9);
+        assert!(c[0].ret < 0.0 && c[0].full);
+        assert!(c[1].ret > 0.0 && !c[1].full && c[1].change.abs() < 1e-9);
     }
 }

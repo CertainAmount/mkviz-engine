@@ -668,6 +668,21 @@ fn catchup_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String
     Ok(format!("{{\"caught_up\":{},\"faster_than_duration\":{faster},\"median_years_to_catch_up\":{},\"rows\":[{}]}}", done.len(), num(stats::median(&done)), rows.join(",")))
 }
 
+/// cushion: 해마다 채권 펀드의 이자 쿠션(시작 금리 ÷ 듀레이션)과 실제 금리 변화·총수익. --maturity 7 (금리 csv, %)
+fn cushion_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
+    let m = opt_f(o, "maturity", 7.0);
+    let ys = bond::cushion(&series::load(path)?, m);
+    if ys.is_empty() { return Err("해 없음".into()); }
+    let full: Vec<&bond::CushionYear> = ys.iter().filter(|y| y.full).collect();
+    let losses: Vec<&&bond::CushionYear> = full.iter().filter(|y| y.ret < 0.0).collect();
+    let right = full.iter().filter(|y| (y.change > y.cushion) == (y.ret < 0.0)).count();
+    let worst = full.iter().min_by(|a, b| a.ret.partial_cmp(&b.ret).unwrap()).unwrap();
+    let rows: Vec<String> = ys.iter().map(|y| format!("{{\"year\":{},\"start_yield\":{},\"duration\":{},\"cushion_pt\":{},\"yield_change_pt\":{},\"total_return\":{},\"full_year\":{}}}",
+        y.year, num(Some(y.start)), num(Some(y.duration)), num(Some(y.cushion)), num(Some(y.change)), num(Some(y.ret)), y.full)).collect();
+    Ok(format!("{{\"maturity\":{m},\"full_years\":{},\"losing_years\":{},\"losing\":[{}],\"rule_right\":{right},\"worst_year\":{},\"worst_return\":{},\"rows\":[{}]}}",
+        full.len(), losses.len(), losses.iter().map(|y| y.year.to_string()).collect::<Vec<_>>().join(","), worst.year, num(Some(worst.ret)), rows.join(",")))
+}
+
 /// bond: 채권 펀드 손익분기. --duration 6 --yield 4.86 --jump 0.24 [--convexity 0 --years 10] (금리 단위 %)
 fn bond_cmd(o: &HashMap<String, String>) -> Result<String, String> {
     let d = opt_f(o, "duration", 0.0);
@@ -1272,6 +1287,25 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             csv = format!("method,as_filled,corrected,range_low,range_high\n{}", rows.iter().map(|r| format!("{},{:.4},{:.4},{:.4},{:.4}\n", r.0, r.1, r.2, r.3, r.4)).collect::<String>());
             viz::shift(&rows, refv, o.get("ref-label").map(String::as_str).unwrap_or("Month before"), o.contains_key("range"), &title)
         }
+        "misses" => {
+            // 빠진 달 메우기 두 방법의 과거 오차 띠: 같은 달(예: 10월)을 해마다 빠졌다고 치고 메운 n달 변화 - 실제(%p), 방법마다 한 줄.
+            // --missing YYYY-MM [--change 12 --since 1985-01-01 (--from는 그림 전체 자료를 자르니 쓰지 않는다) --names "이름,이름"] "방법마다 버릇이 있나"(한쪽으로 쏠림, 폭)
+            let m: gapfill::Months = pts.iter().filter_map(|p| Some((gapfill::key(&p.date)?, p.value))).collect();
+            let miss = gapfill::key(o.get("missing").ok_or("--missing YYYY-MM")?).ok_or("--missing YYYY-MM")?;
+            let lag: i64 = o.get("change").and_then(|v| v.parse().ok()).unwrap_or(12);
+            let from = o.get("since").and_then(|d| gapfill::key(d)).unwrap_or(0);
+            let names: Vec<String> = o.get("names").map(|n| n.split(',').map(str::to_string).collect()).unwrap_or_else(|| vec!["Average of the months around it".into(), "Prior 12-month trend".into()]);
+            let mut rows: Vec<(String, Vec<(String, f64)>)> = vec![];
+            csv = String::from("method,month,error_pt\n");
+            for (i, f) in [gapfill::fill as fn(&gapfill::Months, i64) -> Option<f64>, gapfill::trend].into_iter().enumerate() {
+                let errs: Vec<(String, f64)> = gapfill::backtest(&m, lag, from, miss - 1, f).into_iter().filter(|(k, _)| k.rem_euclid(12) == miss.rem_euclid(12)).map(|(k, e)| (gapfill::label(k), 100.0 * e)).collect();
+                if errs.is_empty() { return Err("시험할 달이 없음".into()); }
+                let name = names.get(i).cloned().unwrap_or_default();
+                for (k, e) in &errs { csv.push_str(&format!("{name},{k},{e:.4}\n")); }
+                rows.push((name, errs));
+            }
+            viz::strips_with(&rows, " pt", None, o.get("up-word").map_or("too high in", String::as_str), o.get("zero-word").map_or("exact", String::as_str), &title)
+        }
         "savings" => {
             // 같은 대출에서 금리가 내릴 때 월 절약액: --loan 314640 [--years 30 --drop 1.5] --marks "이름:하락폭,..." 지금 금리는 이 계열의 마지막 값
             let now = pts.last().ok_or("자료 없음")?.value;
@@ -1402,6 +1436,26 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
                 out.push((r.start[..4].to_string(), r.months, back, peak));
             }
             viz::aftermath(&out, &title)
+        }
+        "cushion" => {
+            // 해마다 점 하나: 가로 = 이자 쿠션(시작 금리 ÷ 듀레이션, %p), 세로 = 그해 금리 변화(%p). 대각선 위 = 그해 손실. --maturity 7 --marks 1994,2022
+            let ys = bond::cushion(&pts, opt_f(o, "maturity", 7.0));
+            let marks: Vec<String> = o.get("marks").map(|v| v.split(',').map(String::from).collect()).unwrap_or_default();
+            csv = format!("year,cushion_pt,yield_change_pt,total_return,full_year\n{}", ys.iter().map(|y| format!("{},{:.3},{:.3},{:.4},{}\n", y.year, y.cushion, y.change, y.ret, y.full)).collect::<String>());
+            let rows: Vec<(i32, f64, f64, bool, bool)> = ys.iter().map(|y| (y.year, y.cushion, y.change, y.ret < 0.0, y.full)).collect();
+            viz::cushion(&rows, &marks, &title)
+        }
+        "speed" => {
+            // 하락마다 점: 가로 = 기록에서 처음 threshold 아래 종가까지 날, 세로 = 끝난 깊이(진행 중이면 지금까지). --threshold 0.10 --deep 0.20 --marks 1987,2020
+            let th = opt_f(o, "threshold", 0.10);
+            let deep = opt_f(o, "deep", 0.20);
+            let marks: Vec<String> = o.get("marks").map(|v| v.split(',').map(String::from).collect()).unwrap_or_default();
+            let rows: Vec<(String, f64, f64, bool)> = episodes::drawdowns(&pts, th).iter().filter_map(|e| {
+                let (p, c) = (series::day_number(&e.peak)?, series::day_number(&e.cross)?);
+                Some((e.peak.clone(), (c - p) as f64, e.low, e.recovered.is_none()))
+            }).collect();
+            csv = format!("peak,days_record_to_first_close_past_threshold,depth,open\n{}", rows.iter().map(|r| format!("{},{},{:.4},{}\n", r.0, r.1, r.2, r.3)).collect::<String>());
+            viz::speed(&rows, deep, &marks, &title)
         }
         "hbars" => {
             // 가로 막대: --rows "1994:0.22;…" --line "0.25|The first hike" --highlight 2026 --unit " pt" (입력 csv는 쓰지 않는다)
@@ -1646,7 +1700,9 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "recessions" => "Each run of months flagged 1 in the event series (NBER recession months), with its length; with --claims (weekly initial claims, 4-week average), the peak from the start to a year after the end and the first week after it when the average was back below the midpoint between its low of the year before the start and that peak, and the months from then until jobs were back; with a second series, its value the month before the start and its highest value from the start to the given months after the end (or to the next recession start, if sooner); with --recover, the first month after the end when that series is back at its highest level of the 12 months up to the start (payroll jobs back), counted in months from the end.",
         "together" => "Each signal is on in a month if any of its readings that month crossed its threshold. Episodes are runs of months with at least k signals on, starting outside the event (NBER recession) and outside the settle months after an event ends; for each, the months to the next event start. For each event start, whether at least k were on together in the window months before.",
         "need" => "Each week pairs the 30-year mortgage rate with the 10-year Treasury yield averaged over the days its survey covers; the gap is the difference. For each target rate, the 10-year yield it needs is the target minus the median gap (range: minus the 90th and 10th percentile gaps), with the share of weeks the 10-year was that low. Similar starts are weeks whose rate was within the given distance of this week's, with the full horizon after them in the data, and the lowest rate each reached within it.",
+        "cushion" => "A constant-maturity Treasury fund (par bond bought each month at that month's last yield, repriced a month later, interest added). For each calendar year: the cushion is the yield at the end of the prior December divided by the modified duration of a par bond at that yield, roughly how far yields can rise over the year before the price loss uses up the year's interest; compared with the actual change in the yield from December to December and the fund's total return over the same months. The latest year is year to date.",
         "hbars" => "Values given on the command line, one horizontal bar per row, with an optional reference line; bars at or past the line are dark, bars short of it light, the highlighted row blue.",
+        "misses" => "Every earlier month of the same calendar month (from the start date) was treated as missing and filled two ways, with the geometric mean of the months before and after it and with the month before raised by one-twelfth of the prior 12-month change; each dot is the filled n-month change minus the actual one, in percentage points. Dots to the right of zero mean the fill made that year's rate too high.",
         "rowdots" => "Values given on the command line, one row per item, drawn on one percentage axis (or, with --unit pt, an axis of percentage points) with a zero line; each row's marks are joined by a light bar from lowest to highest.",
         "intrayear" => "For each calendar year: the deepest fall from that year's highest close to a later close in the same year, and the change from the prior year's last close to the year's last close (the first year starts from its first close; the latest year is year to date).",
         "ladder" => "Every completed decline of at least the first depth from a prior record close (peak to trough, then a new record): how many reached each deeper depth, and the median days from peak to new record for declines whose trough fell between that depth and the next, and the median days from that record to the trough. The decline still under way is reported separately and not counted.",
@@ -1702,6 +1758,7 @@ fn main() {
         ("together", Some(p), _) => together_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("need", Some(p), _) => need_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("ladder", Some(p), _) => ladder_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
+        ("cushion", Some(p), _) => cushion_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("bond", _, _) => bond_cmd(&opt).map(|j| { let mut j = j; j.pop(); format!("{j},\"method\":{}}}", s("A bond fund's value drops at once by about its duration times the rise in yields (duration times the rise; no convexity), then compounds at the higher yield; the no-change path compounds at the old yield. Simplified: the fund's yield moves with the market at once and yields then stay put. Break-even is when the two paths meet.")) }),
         ("export", Some(p), _) => export_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("figure", Some(f), Some(p)) => figure_cmd(f, p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
