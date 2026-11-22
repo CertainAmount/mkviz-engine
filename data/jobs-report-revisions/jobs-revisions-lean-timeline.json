@@ -1,1 +1,0 @@
-{"frame":"lights","input":"data/series/fred_USREC.csv","params":{"from":"1980-01-01","labels":"Job revisions leaning down,Jobless claims 20% above their low","signals":"data/series/bls_ces_third.csv minus=data/series/bls_ces_first.csv avg=12 threshold=0 below;data/series/fred_ICSA.csv threshold=0.2 avg=4 from-low=52","title":"Two job signals and the recessions that followed"}}

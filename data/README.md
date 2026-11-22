@@ -44,7 +44,6 @@
 | [how-long-do-corrections-last](https://mkviz.com/how-long-do-corrections-last/) | [sp-intrayear](how-long-do-corrections-last/sp-intrayear.csv) | intrayear | index_gspc_long.csv |
 | [how-long-do-recessions-last](https://mkviz.com/how-long-do-recessions-last/) | [recession-aftermath](how-long-do-recessions-last/recession-aftermath.csv) | aftermath | fred_PAYEMS.csv, fred_UNRATE.csv, fred_USREC.csv |
 | [jobs-report-revisions](https://mkviz.com/jobs-report-revisions/) | [jobs-revisions-years](jobs-report-revisions/jobs-revisions-years.csv) | years | bls_ces_first.csv, bls_ces_third.csv, fred_USREC.csv |
-| [jobs-report-revisions](https://mkviz.com/jobs-report-revisions/) | [jobs-revisions-lean-timeline](jobs-report-revisions/jobs-revisions-lean-timeline.csv) | lights | bls_ces_first.csv, bls_ces_third.csv, fred_ICSA.csv, fred_USREC.csv |
 | [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [nasdaq-after-midterms](stocks-after-midterm-elections/nasdaq-after-midterms.csv) | fan | fred_NASDAQCOM.csv |
 | [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [midterm-cases](stocks-after-midterm-elections/midterm-cases.csv) | cases |  |
 | [mortgage-rates-treasury-gap](https://mkviz.com/mortgage-rates-treasury-gap/) | [mortgage-rate-stack](mortgage-rates-treasury-gap/mortgage-rate-stack.csv) | stack | fred_DGS10.csv, fred_MORTGAGE30US.csv |

@@ -16,6 +16,7 @@
 ### Data
 - BLS, Current Employment Statistics, revisions between over-the-month estimates (first, second, third), January 1979 to October 2026 (first estimate), August 2026 (third).
 - NBER recession months via FRED (USREC).
+- DOL initial jobless claims via FRED (ICSA), weekly, through Nov. 14, 2026.
 
 ### Method
 
@@ -23,7 +24,7 @@
 python -m msci.cli bls --revisions
 ./engine/target/release/mkviz-engine revisions data/macro/bls_ces_first.csv --final data/macro/bls_ces_third.csv --flag data/macro/fred_USREC.csv --now 165
 ./engine/target/release/mkviz-engine lead data/macro/bls_ces_third.csv --minus data/macro/bls_ces_first.csv --avg 12 --threshold 0 --below --event data/macro/fred_USREC.csv --gap 365
-./engine/target/release/mkviz-engine figure lead (same options) --mark 12 --out jobs-revisions-lean-lead.svg
+./engine/target/release/mkviz-engine lead data/macro/fred_ICSA.csv --avg 4 --from-low 52 --threshold 0.2 --event data/macro/fred_USREC.csv --gap 365
 ./engine/target/release/mkviz-engine figure years data/macro/bls_ces_first.csv --final data/macro/bls_ces_third.csv --flag data/macro/fred_USREC.csv --out jobs-revisions-years.svg
 ```
 
@@ -50,6 +51,17 @@ Downward-lean stretches (12-month average revision below zero):
 | Dec. 2022 | Aug. 2026 (latest) | none yet | 44 so far |
 
 Recessions and the stretch before them: 1981 (a stretch began 12 months before), 1990 (none in the year before), 2001 (none), 2008 (a stretch began the month the recession began), 2020 (one began 10 months before; the recession came from the pandemic).
+
+Jobless claims for comparison (initial claims, 4-week average, 20% or more above the lowest 4-week average of the past 52 weeks, DOL via FRED ICSA): the signal came in the 12 months before four of the six recessions since 1979 (1980, 1981, 1990, 2001, 9 to 12 months before except 2001 at 4) and 3 months after the start of 2008 and at the start of 2020. It also fired without a recession following within a year in 1984, 2005, 2017 and 2023 (1984 and 2017 for a week or a few weeks), and after recessions ended (1991, 2001-02, 2009, 2020-21).
+
+| Recession began | Revisions ran down in the year before | Claims up 20% in the year before |
+|---|---|---|
+| Feb. 1980 | yes (Dec. 1979) | yes (April 1979) |
+| Aug. 1981 | yes (Aug. 1980, 12 months before) | yes (Aug. 1980) |
+| Aug. 1990 | no | yes (Oct. 1989) |
+| April 2001 | no | yes (Nov. 2000) |
+| Jan. 2008 | only as it began | no (April 2008) |
+| March 2020 | yes (May 2019) | only as it began |
 
 ### Limits
 - Few recessions (five checked) and overlapping causes; a lean in revisions mostly says the first estimates ran high, not why.
@@ -83,14 +95,4 @@ Data: [jobs-revisions-years.csv](jobs-revisions-years.csv) · settings: [jobs-re
 
 ```
 ./engine/target/release/mkviz-engine figure years data/series/bls_ces_first.csv --final data/series/bls_ces_third.csv --flag data/series/fred_USREC.csv --title 'Average revision to the first jobs estimate, by year' --out jobs-revisions-years.svg
-```
-
-## jobs-revisions-lean-timeline
-
-Data: [jobs-revisions-lean-timeline.csv](jobs-revisions-lean-timeline.csv) · settings: [jobs-revisions-lean-timeline.json](jobs-revisions-lean-timeline.json)
-
-![jobs-revisions-lean-timeline](jobs-revisions-lean-timeline.svg)
-
-```
-./engine/target/release/mkviz-engine figure lights data/series/fred_USREC.csv --from 1980-01-01 --labels 'Job revisions leaning down,Jobless claims 20% above their low' --signals 'data/series/bls_ces_third.csv minus=data/series/bls_ces_first.csv avg=12 threshold=0 below;data/series/fred_ICSA.csv threshold=0.2 avg=4 from-low=52' --title 'Two job signals and the recessions that followed' --out jobs-revisions-lean-timeline.svg
 ```
