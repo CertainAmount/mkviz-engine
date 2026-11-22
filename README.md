@@ -6,11 +6,11 @@ The calculation engine and chart data behind [MKViz](https://mkviz.com), a blog 
 
 Every number in an MKViz article that comes from our own calculation is produced by this engine, and every chart's data is published here so anyone can check it.
 
-![Stock Market Recovery Time: Usually 2 Years, Up to 13 After Inflation](data/stock-market-recovery-time/bear-market-recovery-years.svg)
+![Stock Market Recovery Usually Takes 2 Years. After Inflation, Up to 13](data/stock-market-recovery-time/bear-market-recovery-years.svg)
 
 **Latest articles**
 
-- [Stock Market Recovery Time: Usually 2 Years, Up to 13 After Inflation](https://mkviz.com/stock-market-recovery-time/) · [data](data/stock-market-recovery-time/)
+- [Stock Market Recovery Usually Takes 2 Years. After Inflation, Up to 13](https://mkviz.com/stock-market-recovery-time/) · [data](data/stock-market-recovery-time/)
 - [How Long Do Recessions Last? 10 Months. The Jobs Take Longer](https://mkviz.com/how-long-do-recessions-last/) · [data](data/how-long-do-recessions-last/)
 - [How Often Do Stock Market Corrections Happen? More Years Than Not](https://mkviz.com/how-long-do-corrections-last/) · [data](data/how-long-do-corrections-last/)
 - [How Do Fed Rate Cuts Affect Mortgage Rates? The Drop Comes First](https://mkviz.com/fed-rate-cut-mortgage-rates/) · [data](data/fed-rate-cut-mortgage-rates/)

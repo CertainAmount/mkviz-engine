@@ -1,4 +1,4 @@
-# [Stock Market Recovery Time: Usually 2 Years, Up to 13 After Inflation](https://mkviz.com/stock-market-recovery-time/)
+# [Stock Market Recovery Usually Takes 2 Years. After Inflation, Up to 13](https://mkviz.com/stock-market-recovery-time/)
 
 ## Research note
 

@@ -1,4 +1,4 @@
-# [Jobs Report Revisions: Down 4 Years. Is That a Recession Sign?](https://mkviz.com/jobs-report-revisions/)
+# [Jobs Report Revisions Keep Going Down. That Has Rarely Meant a Recession](https://mkviz.com/jobs-report-revisions/)
 
 ## Research note
 
