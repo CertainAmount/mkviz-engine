@@ -2176,3 +2176,71 @@ mod speed_test {
         assert!(svg.contains(">2020<") && svg.contains("2026 so far") && !svg.contains(">2015<") && svg.contains("Bear market line"));
     }
 }
+
+/// 이자 대 가격(해마다 막대 둘): 파랑 = 그해 번 이자(0에서 위로), 주황 = 가격 하락(0에서 아래로), 회색 = 가격 상승(이자 위에 쌓음),
+/// 검은 눈금 = 그해 총수익(둘의 합), 0선 아래 눈금이 손실 난 해. 독자는 눈금을 읽는다(2026-11-23 콜드 리드). 폭포(이자 꼭대기에서 깎기)는 주황이 파랑을 가려 버렸다: "이자와 가격 중 무엇이 이겼나"를 해마다 길이로(Cleveland & McGill).
+/// rows: (해, 이자 몫, 가격 몫, 총수익, 해가 다 찼나). marks: 총수익을 이름표로 달 해. 다 차지 않은 해는 'so far'.
+pub fn split(rows: &[(i32, f64, f64, f64, bool)], marks: &[String], title: &str) -> String {
+    const ORANGE: &str = "#eb6834";
+    let (l, r, top) = (40.0, 12.0, T + 30.0);
+    let h = H + 30.0;
+    let bottom = h - B;
+    let hi = rows.iter().map(|x| x.1 + x.2.max(0.0)).fold(0.05, f64::max) * 100.0;
+    let lo = rows.iter().map(|x| x.2.min(0.0)).fold(-0.05, f64::min) * 100.0;
+    let step = if hi - lo > 40.0 { 10.0 } else { 5.0 };
+    let (lo, hi) = ((lo / step).floor() * step, (hi / step).ceil() * step);
+    let n = rows.len() as f64;
+    let bw = (W - l - r) / n;
+    let x = |i: usize| l + i as f64 * bw;
+    let y = |v: f64| top + (hi - v * 100.0) / (hi - lo) * (bottom - top);
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    // 범례(색만으로 뜻을 말하지 않게 글자로)
+    let items = [(BLUE, "Interest earned"), (ORANGE, "Price drop"), (GRAY, "Price gain")];
+    let mut lx = l;
+    for (c, name) in items {
+        let _ = write!(s, "<rect x=\"{lx:.1}\" y=\"6\" width=\"11\" height=\"11\" rx=\"2\" fill=\"{c}\"/><text x=\"{:.1}\" y=\"16\" fill=\"{INK}\" font-size=\"13\">{name}</text>", lx + 15.0);
+        lx += 22.0 + name.len() as f64 * 7.0;
+    }
+    let _ = write!(s, "<line x1=\"{lx:.1}\" x2=\"{:.1}\" y1=\"11.5\" y2=\"11.5\" stroke=\"#0f172a\" stroke-width=\"2.5\"/><text x=\"{:.1}\" y=\"16\" fill=\"{INK}\" font-size=\"13\">Year's return</text>", lx + 12.0, lx + 16.0);
+    let mut v = lo;
+    while v <= hi + 1e-9 {
+        let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{}{v}%</text>",
+                       W - r, y(v / 100.0), y(v / 100.0), if v == 0.0 { INK } else { "#eef2f7" }, l - 5.0, y(v / 100.0) + 4.0, if v > 0.0 { "+" } else { "" });
+        v += step;
+    }
+    for (i, (_, inc, pr, ret, _)) in rows.iter().enumerate() {
+        let (bx, w) = (x(i) + 0.6, (bw - 1.2).max(1.0));
+        let _ = write!(s, "<rect x=\"{bx:.1}\" y=\"{:.1}\" width=\"{w:.1}\" height=\"{:.1}\" fill=\"{BLUE}\"/>", y(*inc), y(0.0) - y(*inc));
+        if *pr < 0.0 {
+            let _ = write!(s, "<rect x=\"{bx:.1}\" y=\"{:.1}\" width=\"{w:.1}\" height=\"{:.1}\" fill=\"{ORANGE}\"/>", y(0.0), y(*pr) - y(0.0));
+        } else {
+            let _ = write!(s, "<rect x=\"{bx:.1}\" y=\"{:.1}\" width=\"{w:.1}\" height=\"{:.1}\" fill=\"{GRAY}\"/>", y(inc + pr), y(*inc) - y(inc + pr));
+        }
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#0f172a\" stroke-width=\"2.5\"/>", x(i) - 0.5, x(i) + bw + 0.5, y(*ret), y(*ret));
+    }
+    for (i, (yr, inc, pr, ret, full)) in rows.iter().enumerate() {
+        if !(!full || marks.iter().any(|m| m == &yr.to_string())) { continue; }
+        let lab = format!("{yr}{} {}{}", if *full { "" } else { " so far" }, if *ret > 0.0 { "+" } else { "" }, pct(*ret));
+        // 다 차지 않은 해(오른쪽 끝)는 이름표가 왼쪽 막대들 위로 뻗으니, 가까운 16해 막대 꼭대기보다 위에 둔다
+        let near = rows[i.saturating_sub(16)..=i].iter().map(|x| x.1 + x.2.max(0.0)).fold(0.0, f64::max);
+        let ly = if !full { y(near + 0.03) } else if *ret < 0.0 { y(pr.min(0.0)) + 15.0 } else { y(inc + pr.max(0.0)) - 6.0 }; // 이익 난 해는 막대 위, 손실 난 해는 주황 아래(2026-11-23: 주황 아래 '+7%'가 손실로 읽혔다)
+        let anchor = if x(i) > W - 90.0 { "end" } else if x(i) < l + 40.0 { "start" } else { "middle" };
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{ly:.1}\" text-anchor=\"{anchor}\" fill=\"{}\" font-size=\"13\" font-weight=\"600\" stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\">{lab}</text>",
+                       x(i) + bw / 2.0, if *full { "#0f172a" } else { BLUE });
+    }
+    let (first, last) = (rows[0].0, rows.last().unwrap().0);
+    let _ = write!(s, "<text x=\"{l}\" y=\"{}\" fill=\"{INK}\" font-size=\"13\">{first}</text><text x=\"{:.1}\" y=\"{}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{last}</text></svg>", h - 6.0, W - r, h - 6.0);
+    s
+}
+
+#[cfg(test)]
+mod split_test {
+    #[test]
+    fn split_draws_parts_and_labels() {
+        let rows = vec![(2021, 0.01, -0.05, -0.04, true), (2020, 0.015, 0.05, 0.065, true), (2026, 0.035, -0.054, -0.019, false)];
+        let svg = super::split(&rows, &["2021".to_string()], "t");
+        assert!(svg.contains("2021 -4%") && svg.contains("2026 so far -2%") && !svg.contains(">2020 "));
+        assert!(super::split(&rows, &["2020".to_string()], "t").contains("2020 +7%"));
+        assert_eq!(svg.matches("#eb6834").count(), 3); // 범례 1 + 하락 막대 2
+    }
+}

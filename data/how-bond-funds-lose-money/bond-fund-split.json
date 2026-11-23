@@ -1,0 +1,1 @@
+{"frame":"split","input":"data/series/fred_DGS7.csv","params":{"from":"1970","marks":"1981,1994,2022","maturity":"7","title":"Interest earned vs price change, 7-year Treasury fund, each year since 1970"}}

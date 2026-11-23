@@ -1445,6 +1445,15 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             let rows: Vec<(i32, f64, f64, bool, bool)> = ys.iter().map(|y| (y.year, y.cushion, y.change, y.ret < 0.0, y.full)).collect();
             viz::cushion(&rows, &marks, &title)
         }
+        "split" => {
+            // 해마다 막대: 이자 몫(위) 대 가격 몫(아래·위), 눈금 = 총수익. --maturity 7 --from 1970 --marks 1994,2022
+            let from: i32 = o.get("from").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let ys: Vec<bond::SplitYear> = bond::split(&pts, opt_f(o, "maturity", 7.0)).into_iter().filter(|y| y.year >= from).collect();
+            let marks: Vec<String> = o.get("marks").map(|v| v.split(',').map(String::from).collect()).unwrap_or_default();
+            csv = format!("year,income,price,total_return,full_year\n{}", ys.iter().map(|y| format!("{},{:.4},{:.4},{:.4},{}\n", y.year, y.income, y.price, y.ret, y.full)).collect::<String>());
+            let rows: Vec<(i32, f64, f64, f64, bool)> = ys.iter().map(|y| (y.year, y.income, y.price, y.ret, y.full)).collect();
+            viz::split(&rows, &marks, &title)
+        }
         "speed" => {
             // 하락마다 점: 가로 = 기록에서 처음 threshold 아래 종가까지 날, 세로 = 끝난 깊이(진행 중이면 지금까지). --threshold 0.10 --deep 0.20 --marks 1987,2020
             let th = opt_f(o, "threshold", 0.10);
@@ -1700,6 +1709,7 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "recessions" => "Each run of months flagged 1 in the event series (NBER recession months), with its length; with --claims (weekly initial claims, 4-week average), the peak from the start to a year after the end and the first week after it when the average was back below the midpoint between its low of the year before the start and that peak, and the months from then until jobs were back; with a second series, its value the month before the start and its highest value from the start to the given months after the end (or to the next recession start, if sooner); with --recover, the first month after the end when that series is back at its highest level of the 12 months up to the start (payroll jobs back), counted in months from the end.",
         "together" => "Each signal is on in a month if any of its readings that month crossed its threshold. Episodes are runs of months with at least k signals on, starting outside the event (NBER recession) and outside the settle months after an event ends; for each, the months to the next event start. For each event start, whether at least k were on together in the window months before.",
         "need" => "Each week pairs the 30-year mortgage rate with the 10-year Treasury yield averaged over the days its survey covers; the gap is the difference. For each target rate, the 10-year yield it needs is the target minus the median gap (range: minus the 90th and 10th percentile gaps), with the share of weeks the 10-year was that low. Similar starts are weeks whose rate was within the given distance of this week's, with the full horizon after them in the data, and the lowest rate each reached within it.",
+        "split" => "The same constant-maturity Treasury fund as cushion. Each month's return is split into interest (the index times the prior month's yield divided by 12) and price (the rest); a year's interest and price parts are the sums over its months divided by the index at the end of the prior December, so interest plus price equals the year's total return. The latest year is year to date.",
         "cushion" => "A constant-maturity Treasury fund (par bond bought each month at that month's last yield, repriced a month later, interest added). For each calendar year: the cushion is the yield at the end of the prior December divided by the modified duration of a par bond at that yield, roughly how far yields can rise over the year before the price loss uses up the year's interest; compared with the actual change in the yield from December to December and the fund's total return over the same months. The latest year is year to date.",
         "hbars" => "Values given on the command line, one horizontal bar per row, with an optional reference line; bars at or past the line are dark, bars short of it light, the highlighted row blue.",
         "misses" => "Every earlier month of the same calendar month (from the start date) was treated as missing and filled two ways, with the geometric mean of the months before and after it and with the month before raised by one-twelfth of the prior 12-month change; each dot is the filled n-month change minus the actual one, in percentage points. Dots to the right of zero mean the fill made that year's rate too high.",

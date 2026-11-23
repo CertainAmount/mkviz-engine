@@ -42,7 +42,7 @@
 | [oil-prices-falling](https://mkviz.com/oil-prices-falling/) | [gas-after-oil-moves](oil-prices-falling/gas-after-oil-moves.csv) |  |  |
 | [gold-price](https://mkviz.com/gold-price/) | [gold-underwater](gold-price/gold-underwater.csv) | underwater | wb_gold.csv |
 | [gold-price](https://mkviz.com/gold-price/) | [gold-during-crashes](gold-price/gold-during-crashes.csv) | during | fred_NASDAQCOM.csv, wb_gold.csv |
-| [how-bond-funds-lose-money](https://mkviz.com/how-bond-funds-lose-money/) | [bond-fund-cushion](how-bond-funds-lose-money/bond-fund-cushion.csv) | cushion | fred_DGS7.csv |
+| [how-bond-funds-lose-money](https://mkviz.com/how-bond-funds-lose-money/) | [bond-fund-split](how-bond-funds-lose-money/bond-fund-split.csv) | split | fred_DGS7.csv |
 | [how-long-do-corrections-last](https://mkviz.com/how-long-do-corrections-last/) | [sp-intrayear](how-long-do-corrections-last/sp-intrayear.csv) | intrayear | index_gspc_long.csv |
 | [how-long-do-recessions-last](https://mkviz.com/how-long-do-recessions-last/) | [recession-aftermath](how-long-do-recessions-last/recession-aftermath.csv) | aftermath | fred_PAYEMS.csv, fred_UNRATE.csv, fred_USREC.csv |
 | [jobs-report-revisions](https://mkviz.com/jobs-report-revisions/) | [jobs-revisions-years](jobs-report-revisions/jobs-revisions-years.csv) | years | bls_ces_first.csv, bls_ces_third.csv, fred_USREC.csv |

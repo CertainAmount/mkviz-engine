@@ -1,4 +1,4 @@
-# [Bond Funds Lose Money When Yields Rise More Than Their Interest](https://mkviz.com/how-bond-funds-lose-money/)
+# [Why Bond Funds Lose Money in a Year Like 2026](https://mkviz.com/how-bond-funds-lose-money/)
 
 ## Research note
 
@@ -10,6 +10,7 @@
 - Bond fund: a constant-maturity Treasury fund rebuilt from the Federal Reserve's daily yields (FRED DGS2, DGS7, DGS10). Each month it buys a par note at that month's last yield, reprices it a month later at the new yield with one month less to maturity (semiannual compounding) and adds a month of interest (Swinkels 2019). No fees, taxes or credit risk.
 - Losing year: a calendar year whose total return, end of December to end of December, is below zero.
 - Cushion: the yield at the end of the prior December divided by the modified duration of a par note at that yield, in percentage points. Price loss ≈ duration × rise, a year's interest ≈ yield, so the two are equal when the rise equals yield ÷ duration. It ignores roll-down (the note gets shorter during the year) and the higher interest earned after the rise.
+- Interest part and price part: each month's return is split into interest (the fund's value times the prior month's yield divided by 12) and price (the rest). A year's parts are the sums over its months divided by the value at the end of the prior December, so interest plus price equals the year's total return.
 - Yield change: the month-end yield in December (or the latest month) minus the yield at the end of the prior December.
 - Other definitions: fund fact sheets report 1-year returns on a rolling basis and net of fees; a fund with corporate bonds also loses when credit spreads widen or issuers default, which this Treasury-only measure does not capture. A fund's own yield and duration are on its fact sheet.
 - Re-scan: every full calendar year in the data was kept (2-year 1977-2025: 49, 7-year 1970-2025: 56, 10-year 1963-2025: 63). The first partial year of each series is dropped because it has no prior December. 2026 is shown separately as year to date and not counted.
@@ -26,9 +27,10 @@ python -m msci.cli fred DGS2 DGS7 DGS10
 ./engine/target/release/mkviz-engine cushion data/macro/fred_DGS2.csv --maturity 2
 ./engine/target/release/mkviz-engine cushion data/macro/fred_DGS10.csv --maturity 10
 ./engine/target/release/mkviz-engine figure cushion data/macro/fred_DGS7.csv --maturity 7 --marks 1994,2022,2021,2013,1981 --out bond-fund-cushion.svg
+./engine/target/release/mkviz-engine figure split data/macro/fred_DGS7.csv --maturity 7 --from 1970 --marks 1981,1994,2022 --out bond-fund-split.svg
 ./engine/target/release/mkviz-engine figure intrayear data/macro/index_gspc_long.csv --out sp500-years.svg
 ```
-(`cushion` and the `figure cushion` scatter were added to the engine for this note.)
+(`cushion`, the `figure cushion` scatter and the `figure split` bars were added to the engine for this note.)
 
 ### Results
 
@@ -41,6 +43,16 @@ By maturity:
 | 10-year Treasury | 63 | 12 | -16.4% (2022) | 0.52 | +0.86 | -2.7% | 0.65 |
 
 Losing years: 2-year 1994, 2014, 2015, 2021, 2022; 7-year 1987, 1994, 1999, 2009, 2013, 2021, 2022; 10-year 1967, 1969, 1978, 1980, 1987, 1994, 1999, 2009, 2013, 2021, 2022, 2024.
+
+Interest against price, 7-year fund (the post's chart; full table in bond-fund-split.csv):
+
+| Year | Interest part | Price part | Total return |
+|---|---|---|---|
+| 1981 | +13.9% | -6.5% | +7.4% |
+| 2021 | +1.1% | -5.2% | -4.0% |
+| 2022 | +2.6% | -14.9% | -12.3% |
+
+The interest part never fell below 11.2% from 1980 through 1985 and stayed under 3% every year from 2009 through 2022. On $10,000 at the start of 2026, through Nov. 19: interest $395, price drop $590, net down $195. At the Nov. 19 yield of 4.94%, a month's interest is about 0.41% of the fund, so the 2026 drop would take about 4.7 months of interest to earn back if yields did not move (a condition, not a forecast).
 
 7-year fund, the losing years and the cushion:
 
@@ -83,12 +95,12 @@ MKViz (2026). *How do bond funds lose money?* https://mkviz.com/how-bond-funds-l
 
 Run from the repository root after `cd engine && cargo build --release && cd ..`.
 
-## bond-fund-cushion
+## bond-fund-split
 
-Data: [bond-fund-cushion.csv](bond-fund-cushion.csv) · settings: [bond-fund-cushion.json](bond-fund-cushion.json)
+Data: [bond-fund-split.csv](bond-fund-split.csv) · settings: [bond-fund-split.json](bond-fund-split.json)
 
-![bond-fund-cushion](bond-fund-cushion.svg)
+![bond-fund-split](bond-fund-split.svg)
 
 ```
-./engine/target/release/mkviz-engine figure cushion data/series/fred_DGS7.csv --marks 1994,2022,2021,2013,1981 --maturity 7 --title 'Each dot is one year of a 7-year Treasury fund since 1970' --out bond-fund-cushion.svg
+./engine/target/release/mkviz-engine figure split data/series/fred_DGS7.csv --from 1970 --marks 1981,1994,2022 --maturity 7 --title 'Interest earned vs price change, 7-year Treasury fund, each year since 1970' --out bond-fund-split.svg
 ```

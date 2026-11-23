@@ -80,6 +80,33 @@ pub fn cushion(pts: &[crate::series::Point], m: f64) -> Vec<CushionYear> {
     out
 }
 
+/// 한 해 총수익을 이자 몫과 가격 몫으로 나눈다(total_return과 같은 펀드). 달마다 이자 = 지수 × y0/12, 가격 = 나머지.
+/// 해마다 (해, 이자 몫, 가격 몫, 총수익, 해가 다 찼나). 셋 다 전해 12월 말 지수 대비 비율이라 이자 + 가격 = 총수익.
+pub struct SplitYear { pub year: i32, pub income: f64, pub price: f64, pub ret: f64, pub full: bool }
+
+pub fn split(pts: &[crate::series::Point], m: f64) -> Vec<SplitYear> {
+    let idx = total_return(pts, m);
+    let mut by_month: std::collections::BTreeMap<String, f64> = std::collections::BTreeMap::new();
+    for p in pts { by_month.insert(p.date[..7].to_string(), p.value); }
+    let months: Vec<(&String, &f64)> = by_month.iter().collect();
+    // 해마다 (시작 지수, 이자 합, 끝 지수, 끝 달)
+    let mut acc: std::collections::BTreeMap<i32, (f64, f64, f64, String)> = std::collections::BTreeMap::new();
+    for k in 1..months.len().min(idx.len()) {
+        let y: i32 = months[k].0[..4].parse().unwrap_or(0);
+        let prev = idx[k - 1].value;
+        let inc = prev * months[k - 1].1 / 100.0 / 12.0;
+        let e = acc.entry(y).or_insert((prev, 0.0, prev, String::new()));
+        if months[k - 1].0[..4] != months[k].0[..4] && !months[k - 1].0.ends_with("-12") { e.0 = f64::NAN; }
+        e.1 += inc;
+        e.2 = idx[k].value;
+        e.3 = months[k].0.clone();
+    }
+    acc.into_iter().filter(|(_, (s, ..))| s.is_finite()).map(|(y, (s, inc, end, mon))| {
+        let ret = end / s - 1.0;
+        SplitYear { year: y, income: inc / s, price: ret - inc / s, ret, full: mon.ends_with("-12") }
+    }).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -93,6 +120,19 @@ mod tests {
         let idx = [100.0, 95.0, 97.0, 100.0, 103.0, 104.5, 106.5, 107.0];
         assert_eq!(catchup(&idx, 0, 0.12), Some(6));
         assert_eq!(catchup(&idx[..6], 0, 0.12), None);
+    }
+
+    #[test]
+    fn split_adds_up_and_flat_year_is_all_interest() {
+        use crate::series::Point;
+        let p = |d: &str, v: f64| Point { date: d.into(), day: crate::series::day_number(d).unwrap(), value: v };
+        let mut pts = vec![p("2020-12-31", 5.0)];
+        for mth in 1..=12 { pts.push(p(&format!("2021-{mth:02}-28"), 5.0)); }
+        for mth in 1..=6 { pts.push(p(&format!("2022-{mth:02}-28"), 6.0)); }
+        let s = split(&pts, 7.0);
+        assert_eq!(s.len(), 2);
+        assert!(s[0].full && (s[0].price).abs() < 1e-9 && (s[0].income - 0.0512).abs() < 0.001, "{}", s[0].income);
+        assert!(!s[1].full && s[1].price < -0.05 && (s[1].income + s[1].price - s[1].ret).abs() < 1e-12);
     }
 
     #[test]
