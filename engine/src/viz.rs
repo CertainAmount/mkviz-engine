@@ -2228,8 +2228,13 @@ pub fn split(rows: &[(i32, f64, f64, f64, bool)], marks: &[String], title: &str)
         let _ = write!(s, "<text x=\"{:.1}\" y=\"{ly:.1}\" text-anchor=\"{anchor}\" fill=\"{}\" font-size=\"13\" font-weight=\"600\" stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\">{lab}</text>",
                        x(i) + bw / 2.0, if *full { "#0f172a" } else { BLUE });
     }
-    let (first, last) = (rows[0].0, rows.last().unwrap().0);
-    let _ = write!(s, "<text x=\"{l}\" y=\"{}\" fill=\"{INK}\" font-size=\"13\">{first}</text><text x=\"{:.1}\" y=\"{}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{last}</text></svg>", h - 6.0, W - r, h - 6.0);
+    // 해마다 막대가 좁아 휴대폰에서 연도를 찾기 어렵다(2026-11-23 콜드 리드): 처음·끝 대신 10년마다 눈금과 연도
+    for (i, (yr, ..)) in rows.iter().enumerate() {
+        if yr % 10 != 0 { continue; }
+        let cx = x(i) + bw / 2.0;
+        let _ = write!(s, "<line x1=\"{cx:.1}\" x2=\"{cx:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{INK}\"/><text x=\"{cx:.1}\" y=\"{}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{yr}</text>", bottom, bottom + 4.0, h - 6.0);
+    }
+    s.push_str("</svg>");
     s
 }
 

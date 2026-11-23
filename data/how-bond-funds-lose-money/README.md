@@ -86,7 +86,7 @@ Stocks and bonds, calendar years since 1970: the S&P 500 price index fell in 14 
 
 ### Builds on and leads to
 - Builds on [Bond fund calculator](https://mkviz.com/bond-fund-calculator/) (every 5% loss since 1969 and its recovery, same rebuilt fund) and [Bond funds and rising yields](https://mkviz.com/bond-funds/) (break-even after a jump).
-- Open: the same cushion for a corporate bond index; rolling twelve-month windows instead of calendar years.
+- Open: the same cushion for a corporate bond index; rolling twelve-month windows instead of calendar years; the stocks-and-bonds years above as their own question (do bonds go up when stocks go down?).
 
 ### Cite
 MKViz (2026). *How do bond funds lose money?* https://mkviz.com/how-bond-funds-lose-money/ ; code and data: https://github.com/CertainAmount/mkviz-engine/tree/main/data/how-bond-funds-lose-money
