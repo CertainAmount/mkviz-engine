@@ -153,6 +153,15 @@ pub fn paths_with(pts: &[Point], starts: &[String], days: i64, title: &str, diff
         let _ = write!(s, "<line x1=\"{lm}\" x2=\"{}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\">{}</text>", W - right, y(v), y(v), if v.abs() < 1e-9 { INK } else { "#e5e7eb" }, lm - 6.0, y(v) + 4.0, fmt(v));
         v += step;
     }
+    // 끝 이름표(이름 + 값, 두 줄) 자리: 끝이 가까운 선끼리 세로로 34px 이상 벌린다(1980·2011이 한 자리에 겹쳤다, 2026-11-24 금 그림)
+    let mut spots: Vec<(usize, f64, f64)> = lines.iter().enumerate().filter_map(|(k, ln)| ln.last().map(|e| (k, x(e.0), y(e.1)))).collect();
+    spots.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap());
+    for i in 1..spots.len() {
+        for j in 0..i {
+            if (spots[i].1 - spots[j].1).abs() < 60.0 && spots[i].2 - spots[j].2 < 34.0 { spots[i].2 = spots[j].2 + 34.0; }
+        }
+    }
+    let spot = |k: usize| spots.iter().find(|s| s.0 == k).map(|s| s.2);
     for (k, ln) in lines.iter().enumerate() {
         let last = k + 1 == lines.len();
         let d: Vec<String> = ln.iter().map(|(a, b)| format!("{:.1},{:.1}", x(*a), y(*b))).collect();
@@ -160,7 +169,7 @@ pub fn paths_with(pts: &[Point], starts: &[String], days: i64, title: &str, diff
         if let (Some(l), Some(end)) = (labels.get(k), ln.last()) {
             // 끝 이름표에 값까지(그림만 봐도 '얼마나'가 읽히게)
             let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"{}\" font-size=\"15\" font-weight=\"600\">{}</text><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"14\">{}</text>",
-                           x(end.0) + 6.0, y(end.1) - 2.0, if last { BLUE } else { INK }, l, x(end.0) + 6.0, y(end.1) + 15.0, if end.1 > 0.0 { format!("+{}", fmt(end.1)) } else { fmt(end.1) });
+                           x(end.0) + 6.0, spot(k).unwrap_or(y(end.1)) - 2.0, if last { BLUE } else { INK }, l, x(end.0) + 6.0, spot(k).unwrap_or(y(end.1)) + 15.0, if end.1 > 0.0 { format!("+{}", fmt(end.1)) } else { fmt(end.1) });
         }
     }
     // 선이 하나면 꼭대기와 바닥에 값을 단다(그림만 봐도 '얼마나 올랐다 얼마나 빠졌나'가 읽히게)
@@ -1813,7 +1822,17 @@ mod around_test {
 /// 여러 계열 선 그림(수준): 같은 단위(%)의 계열 2~4개를 한 축에, 끝에 이름, 날짜 하나에 세로 표시(예: 연준 첫 인하일).
 /// 기준금리가 내려도 10년 국채·대출 금리가 오른 구간처럼 '따로 움직인다'를 위치로 보이려고(2026-11-19)
 pub fn lines(series: &[(String, Vec<(i64, f64)>)], mark: Option<(i64, &str)>, ticks: &[(i64, String)], title: &str) -> String {
-    const COLORS: [&str; 4] = ["#2563eb", "#eb6834", "#0f172a", "#16a34a"];
+    lines_with(series, mark, ticks, &["#2563eb", "#eb6834", "#0f172a", "#16a34a"], title)
+}
+
+/// 색을 정해 그리는 선 그림(같은 글의 다른 그림에서 주황이 '금리 오름'처럼 뜻을 맡았으면 겹치지 않게 고른다)
+pub fn lines_with(series: &[(String, Vec<(i64, f64)>)], mark: Option<(i64, &str)>, ticks: &[(i64, String)], colors: &[&str], title: &str) -> String {
+    lines_band(series, mark, ticks, colors, None, title)
+}
+
+/// band: (시작일, 끝일, 이름) 구간을 옅게 칠하고 위에 이름을 적는다
+pub fn lines_band(series: &[(String, Vec<(i64, f64)>)], mark: Option<(i64, &str)>, ticks: &[(i64, String)], colors: &[&str], band: Option<(i64, i64, &str)>, title: &str) -> String {
+    let colors = if colors.is_empty() { &["#2563eb", "#eb6834", "#0f172a", "#16a34a"][..] } else { colors };
     let all: Vec<f64> = series.iter().flat_map(|s| s.1.iter().map(|p| p.1)).collect();
     let (mut lo, mut hi) = (all.iter().cloned().fold(f64::MAX, f64::min), all.iter().cloned().fold(f64::MIN, f64::max));
     let pad = (hi - lo).max(0.1) * 0.08;
@@ -1825,10 +1844,16 @@ pub fn lines(series: &[(String, Vec<(i64, f64)>)], mark: Option<(i64, &str)>, ti
     let x = |d: i64| l + (d - d0) as f64 / (d1 - d0).max(1) as f64 * (W - l - r);
     let y = |v: f64| t + (hi - v) / (hi - lo) * (H - t - b);
     let mut s = head(title);
-    let mut v = lo.ceil();
+    // 눈금 간격: 폭이 8%p를 넘으면 2%p마다(1%p마다면 글자가 빽빽했다)
+    let step = if hi - lo > 8.0 { 2.0 } else { 1.0 };
+    let mut v = (lo / step).ceil() * step;
     while v <= hi + 1e-9 {
-        let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#eef2f7\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{v:.0}%</text>", W - r, y(v), y(v), l - 4.0, y(v) + 4.0);
-        v += 1.0;
+        let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{v:.0}%</text>", W - r, y(v), y(v), if v.abs() < 1e-9 && lo < 0.0 { INK } else { "#eef2f7" }, l - 4.0, y(v) + 4.0);
+        v += step;
+    }
+    if let Some((b0, b1, name)) = band {
+        let _ = write!(s, "<rect x=\"{:.1}\" y=\"{t:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"{SHADE}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{}</text>",
+                       x(b0), (x(b1) - x(b0)).max(2.0), H - t - b, (x(b0) + x(b1)) / 2.0, t - 6.0, name.replace('&', "&amp;"));
     }
     if let Some((md, name)) = mark {
         let xm = x(md);
@@ -1839,12 +1864,14 @@ pub fn lines(series: &[(String, Vec<(i64, f64)>)], mark: Option<(i64, &str)>, ti
     ends.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
     for k in 1..ends.len() { if ends[k].1 - ends[k - 1].1 < 18.0 { ends[k].1 = ends[k - 1].1 + 18.0; } }
     for (k, (name, pts)) in series.iter().enumerate() {
-        let c = COLORS[k % COLORS.len()];
+        let c = colors[k % colors.len()];
         let d: Vec<String> = pts.iter().map(|p| format!("{:.1},{:.1}", x(p.0), y(p.1))).collect();
         let _ = write!(s, "<polyline points=\"{}\" fill=\"none\" stroke=\"{c}\" stroke-width=\"2.5\"/>", d.join(" "));
         let ly = ends.iter().find(|e| e.0 == k).map(|e| e.1).unwrap_or(0.0);
         let lastv = pts.last().map(|p| p.1).unwrap_or(0.0);
-        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"{c}\" font-size=\"13\" font-weight=\"600\">{} {lastv:.2}%</text>", W - r + 6.0, ly + 4.0, name.replace('&', "&amp;"));
+        // 수준(금리 %)은 소수 둘째 자리, 변화(--rebase, 0선이 있는 그림)는 첫째 자리와 부호(설계 검토: -11.62%는 본문 11.6%보다 정밀해 보였다)
+        let lab = if lo < 0.0 && hi > 0.0 { format!("{}{lastv:.1}%", if lastv > 0.0 { "+" } else { "" }) } else { format!("{lastv:.2}%") };
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"{c}\" font-size=\"13\" font-weight=\"600\">{} {lab}</text>", W - r + 6.0, ly + 4.0, name.replace('&', "&amp;"));
     }
     for (d, lab) in ticks {
         let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{lab}</text>", x(*d), H - 8.0);
@@ -2258,5 +2285,56 @@ mod split_test {
         assert!(svg.contains("2021 -4%") && svg.contains("2026 so far -2%") && !svg.contains(">2020 "));
         assert!(super::split(&rows, &["2020".to_string()], "t").contains("2020 +7%"));
         assert_eq!(svg.matches("#eb6834").count(), 3); // 범례 1 + 하락 막대 2
+    }
+}
+
+/// 받쳐 주기 그림: 주식이 기록에서 크게 빠진 하락마다 한 줄(왼쪽 이름 = 해 · 주식 하락폭), 같은 날짜 사이 채권 펀드 총수익을 0에서 뻗는 막대로.
+/// 막대 색은 그 사이 금리 방향(내림 파랑, 오름 주황, 범례 글자로도). "주식이 빠질 때 채권은 오르나"와 "언제 아닌가"를 한 장에(2026-11-24 글)
+pub fn catch(rows: &[(String, f64, f64, bool)], title: &str) -> String {
+    const ORANGE: &str = "#eb6834";
+    let (row, top) = (26.0, T + 44.0);
+    let h = top + rows.len() as f64 * row + B + 6.0;
+    let l = rows.iter().map(|r| r.0.chars().count()).max().map(|n| n as f64 * 7.4 + 12.0).unwrap_or(90.0).max(90.0);
+    let r = 50.0;
+    let lo = (rows.iter().map(|x| x.1).fold(0.0, f64::min) * 20.0).floor() / 20.0;  // 손실 쪽은 5% 단위로(10% 단위면 왼쪽이 비었다)
+    let hi = (rows.iter().map(|x| x.1).fold(0.0, f64::max) * 10.0).ceil() / 10.0;
+    let lo = if lo < 0.0 { lo.min(-0.05) } else { 0.0 };
+    let x = |v: f64| l + (v - lo) / (hi - lo).max(1e-9) * (W - l - r);
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    // 범례: 색만으로 뜻을 말하지 않게 글자로
+    let mut lx = 4.0;
+    for (c, name) in [(BLUE, "Yields fell"), (ORANGE, "Yields rose")] {
+        let _ = write!(s, "<rect x=\"{lx:.1}\" y=\"6\" width=\"11\" height=\"11\" rx=\"2\" fill=\"{c}\"/><text x=\"{:.1}\" y=\"16\" fill=\"{INK}\" font-size=\"13\">{name}</text>", lx + 15.0);
+        lx += 30.0 + name.len() as f64 * 7.0;
+    }
+    let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"12\">Stock fall</text><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"12\">Bond fund, same days</text>", l - 8.0, top - 10.0, x(0.0) + 4.0, top - 10.0);
+    let mut v = (lo * 10.0).ceil() / 10.0;
+    while v <= hi + 1e-9 {
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"12\">{}{}</text>",
+                       x(v), x(v), top - 4.0, h - B, if v.abs() < 1e-9 { INK } else { "#eef2f7" }, x(v), h - 8.0, if v > 1e-9 { "+" } else { "" }, pct(v));
+        v += 0.1;
+    }
+    for (k, (name, b, dy, open)) in rows.iter().enumerate() {
+        let y = top + k as f64 * row + 5.0;
+        let c = if *dy < 0.0 { BLUE } else { ORANGE };
+        let (x0, x1) = (x(b.min(0.0)), x(b.max(0.0)));
+        let val = format!("{}{:.1}%", if *b > 0.0 { "+" } else if *b < 0.0 { "-" } else { "" }, (b * 100.0).abs());
+        // 손실 값이 왼쪽 이름과 부딪히면 0선 오른쪽에 적는다(2022 · -25% 옆 -12.8%가 붙어 읽혔다)
+        let (tx, anchor) = if *b >= 0.0 || x0 - 5.0 - val.len() as f64 * 7.0 < l { (x1.max(x(0.0)) + 5.0, "start") } else { (x0 - 5.0, "end") };
+        let w = if *open { " font-weight=\"600\"" } else { "" };
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\"{w}>{}</text><rect x=\"{x0:.1}\" y=\"{y:.1}\" width=\"{:.1}\" height=\"14\" rx=\"2\" fill=\"{c}\"/><text x=\"{tx:.1}\" y=\"{:.1}\" text-anchor=\"{anchor}\" fill=\"{INK}\" font-size=\"12\"{w}>{val}</text>",
+                       l - 8.0, y + 12.0, name.replace('&', "&amp;"), (x1 - x0).max(1.5), y + 11.0);
+    }
+    s.push_str("</svg>");
+    s
+}
+
+#[cfg(test)]
+mod catch_test {
+    #[test]
+    fn catch_colors_by_yield_direction() {
+        let rows = vec![("2008–09 · -57%".to_string(), 0.177, -1.96, false), ("2022 · -25%".to_string(), -0.128, 2.48, false), ("2026 · -12% so far".to_string(), 0.018, -0.21, true)];
+        let svg = super::catch(&rows, "t");
+        assert!(svg.contains(">+17.7%<") && svg.contains(">-12.8%<") && svg.contains("fill=\"#eb6834\"") && svg.contains("Yields rose") && svg.contains("so far"));
     }
 }

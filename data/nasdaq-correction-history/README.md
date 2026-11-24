@@ -33,6 +33,12 @@ A drop starts on the first close at least 10% below the prior record close and e
 - The first close back above the line came a median of two days after the first 10% close.
 - The eight that got back above the line and still fell 20% or more started in 1983, 1989, 1998, 2000, 2018, 2020, 2021 (bottom 2022) and 2024 (bottom 2025).
 
+By depth reached (finished drops, `figure ladder --depths 0.10,0.12,0.14,0.16,0.18,0.20`, nasdaq-depth-ladder.csv): 10% or more 31, 12% 24, 14% 18, 16% 16, 18% 14, 20% 13. Of the 14 that reached 18%, 13 went on to 20%; the exception bottomed at 18.2% in February 2016. Of the 18 that stopped short of 20%, 17 turned before 18%. Because 18% is close to 20%, this mostly says that stops came early, not that 18% predicts a bear market on its own.
+
+The drop under way (2026-11-24 update): record close Oct. 6, 2026 (27,599.79); lowest close Nov. 20 (22,617.73, -18.1%); Nov. 23 close up +6.5% on the day, -12.7% from the record. S&P 500 on Nov. 23: -7.4% from its Oct. 6 record.
+
+Moved here from the post (2026-11-24, scope check): $10,000 at the Oct. 6 record was worth about $8,880 on Nov. 16; at the median correction bottom $8,690, the median bear-market bottom $6,990, the 2000-02 bottom $2,210, and the 2000 record took 15.1 years to regain. Of the 13 bear markets, seven came without a US recession (including 1987, 2022 and 2025). The Nov. 5 fall followed the midterm results, led by chip and AI stocks (Quartz, CNN).
+
 ### Limits
 - Price index, no dividends; closes only, not intraday.
 - The 10% and 20% lines are conventions, not turning points the market knows about.
@@ -62,4 +68,16 @@ Data: [nasdaq-drops-dots.csv](nasdaq-drops-dots.csv) · settings: [nasdaq-drops-
 
 ![nasdaq-drops-dots](nasdaq-drops-dots.svg)
 
-Drawn from market prices we don't redistribute; the chart data is in the CSV.
+```
+./engine/target/release/mkviz-engine figure dots ../../macro/index_ixic_long.csv --deep 0.20 --threshold 0.10 --title 'Nasdaq drops of 10% or more since 1971' --out nasdaq-drops-dots.svg
+```
+
+## nasdaq-depth-ladder
+
+Data: [nasdaq-depth-ladder.csv](nasdaq-depth-ladder.csv) · settings: [nasdaq-depth-ladder.json](nasdaq-depth-ladder.json)
+
+![nasdaq-depth-ladder](nasdaq-depth-ladder.svg)
+
+```
+./engine/target/release/mkviz-engine figure ladder ../../macro/index_ixic_long.csv --depths 0.10,0.12,0.14,0.16,0.18,0.20 --labels 'Fell 10% or more,12% or more,14% or more,16% or more,18% or more,20%: bear market' --title 'Nasdaq corrections since 1971 by how deep they went' --out nasdaq-depth-ladder.svg
+```

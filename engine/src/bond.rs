@@ -56,6 +56,41 @@ pub fn total_return(pts: &[crate::series::Point], m: f64) -> Vec<crate::series::
     out
 }
 
+/// 날마다 다시 값을 매기는 만기 고정 채권 펀드(시작 100): total_return과 같은 방식을 관측일 간격(년 = 날 수 / 365.25)으로.
+/// 주식 하락처럼 몇 주짜리 구간에서도 같은 날짜로 채권 쪽 수익을 잴 수 있게 한다(월말 지수는 구간 끝을 놓친다)
+pub fn daily_index(pts: &[crate::series::Point], m: f64) -> Vec<crate::series::Point> {
+    let mut out: Vec<crate::series::Point> = Vec::with_capacity(pts.len());
+    let mut idx = 100.0;
+    for (k, p) in pts.iter().enumerate() {
+        if k > 0 {
+            let (y0, y1) = (pts[k - 1].value / 100.0, p.value / 100.0);
+            let t = (p.day - pts[k - 1].day) as f64 / 365.25;
+            let n = 2.0 * (m - t);
+            let v = (1.0 + y1 / 2.0).powf(-n);
+            let price = if y1.abs() < 1e-12 { y0 / 2.0 * n + 1.0 } else { y0 / y1 * (1.0 - v) + v };
+            idx *= price + y0 * t;
+        }
+        out.push(crate::series::Point { date: p.date.clone(), day: p.day, value: idx });
+    }
+    out
+}
+
+/// 주식이 기록에서 threshold 이상 빠진 하락마다(기록일 → 바닥일, 진행 중이면 지금까지 바닥), 같은 날짜 사이 채권 펀드 총수익과 금리 변화(%p)
+#[derive(Debug, Clone)]
+pub struct Catch { pub peak: String, pub low_date: String, pub fall: f64, pub bond: f64, pub dy: f64, pub y0: f64, pub open: bool }
+
+pub fn catch(stock: &[crate::series::Point], rates: &[crate::series::Point], m: f64, th: f64) -> Vec<Catch> {
+    let idx = daily_index(rates, m);
+    // 그날이나 그 전 마지막 관측(주식 거래일과 국채 휴장일이 다를 수 있다)
+    let at = |d: &str| rates.iter().rposition(|p| p.date.as_str() <= d);
+    let first = rates.first().map(|p| p.date.clone()).unwrap_or_default();
+    crate::episodes::drawdowns(stock, th).into_iter().filter(|e| e.peak >= first).filter_map(|e| {
+        let (a, b) = (at(&e.peak)?, at(&e.low_date)?);
+        Some(Catch { peak: e.peak.clone(), low_date: e.low_date.clone(), fall: e.low, bond: idx[b].value / idx[a].value - 1.0,
+                     dy: rates[b].value - rates[a].value, y0: rates[a].value, open: e.recovered.is_none() })
+    }).collect()
+}
+
 /// 한 해의 이자 쿠션: 해 첫 금리 y0(%)로 액면 채권의 듀레이션 D를 구하면, 금리가 y0/D(%p)만큼 오를 때 값의 손실(≈D×상승)이
 /// 한 해 이자(≈y0)를 다 지운다. 해마다 (해, 시작 금리, 듀레이션, 쿠션 %p, 실제 금리 변화 %p, 펀드 총수익, 해가 다 찼나).
 /// 금리는 해 직전 달(전해 12월) 마지막 값부터 그해 마지막 달까지, 총수익은 total_return 지수의 같은 두 달 비율.
@@ -174,5 +209,21 @@ mod tests {
         assert!((c[0].cushion - 2.0 / par_duration(0.02, 7.0)).abs() < 1e-9 && (c[0].change - 1.0).abs() < 1e-9);
         assert!(c[0].ret < 0.0 && c[0].full);
         assert!(c[1].ret > 0.0 && !c[1].full && c[1].change.abs() < 1e-9);
+    }
+
+    #[test]
+    fn daily_index_matches_carry_and_catch_pairs_dates() {
+        use crate::series::Point;
+        let mk = |d: &str, v: f64| Point { date: d.into(), day: crate::series::day_number(d).unwrap(), value: v };
+        // 금리가 그대로면 1년 뒤 약 금리만큼 불어난다
+        let r: Vec<Point> = (0..=12).map(|k| mk(&format!("{}-{:02}-01", 2020 + (k / 12), k % 12 + 1), 5.0)).collect();
+        let i = daily_index(&r, 7.0);
+        assert!((i.last().unwrap().value / 100.0 - 1.05).abs() < 0.003, "{}", i.last().unwrap().value);
+        // 주식이 20% 빠지는 동안 금리가 1%p 내리면 채권은 오른다
+        let st = vec![mk("2020-01-01", 100.0), mk("2020-02-01", 80.0), mk("2020-03-01", 101.0)];
+        let rt = vec![mk("2020-01-01", 3.0), mk("2020-02-01", 2.0), mk("2020-03-01", 2.0)];
+        let c = catch(&st, &rt, 7.0, 0.10);
+        assert_eq!(c.len(), 1);
+        assert!(c[0].bond > 0.05 && (c[0].dy + 1.0).abs() < 1e-9 && (c[0].fall + 0.2).abs() < 1e-9 && !c[0].open);
     }
 }

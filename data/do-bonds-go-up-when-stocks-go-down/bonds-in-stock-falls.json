@@ -1,0 +1,1 @@
+{"frame":"catch","input":"../../macro/index_gspc_long.csv","params":{"maturity":"7","rates":"../../macro/fred_DGS7.csv","threshold":"0.10","title":"A 7-year Treasury fund's return during each S&P 500 fall of 10% or more since 1969"}}

@@ -29,6 +29,8 @@
 | [bond-funds](https://mkviz.com/bond-funds/) | [bond-fund-catchup](bond-funds/bond-fund-catchup.csv) | catchup | fred_DGS7.csv |
 | [consumer-sentiment](https://mkviz.com/consumer-sentiment/) | [sentiment-gap](consumer-sentiment/sentiment-gap.csv) | fit | fred_CPIAUCSL.csv, fred_UMCSENT.csv, fred_UNRATE.csv |
 | [core-inflation](https://mkviz.com/core-inflation/) | [core-gauge-race](core-inflation/core-gauge-race.csv) | closer | fred_CPIAUCSL.csv, fred_CPILFESL.csv, fred_MEDCPIM094SFRBCLE.csv, fred_TRMMEANCPIM094SFRBCLE.csv |
+| [do-bonds-go-up-when-stocks-go-down](https://mkviz.com/do-bonds-go-up-when-stocks-go-down/) | [bonds-in-stock-falls](do-bonds-go-up-when-stocks-go-down/bonds-in-stock-falls.csv) | catch |  |
+| [do-bonds-go-up-when-stocks-go-down](https://mkviz.com/do-bonds-go-up-when-stocks-go-down/) | [bonds-stocks-this-fall](do-bonds-go-up-when-stocks-go-down/bonds-stocks-this-fall.csv) | lines |  |
 | [dollar-weaker-2026](https://mkviz.com/dollar-weaker-2026/) | [dollar-underwater](dollar-weaker-2026/dollar-underwater.csv) | underwater | fred_DTWEXBGS.csv, fred_TWEXBMTH.csv |
 | [fed-rate-cut-mortgage-rates](https://mkviz.com/fed-rate-cut-mortgage-rates/) | [cut-around](fed-rate-cut-mortgage-rates/cut-around.csv) | around | fred_MORTGAGE30US.csv |
 | [fed-rate-cut-mortgage-rates](https://mkviz.com/fed-rate-cut-mortgage-rates/) | [cut-lines](fed-rate-cut-mortgage-rates/cut-lines.csv) | lines | fred_DFEDTARU.csv, fred_DGS10.csv, fred_MORTGAGE30US.csv |
@@ -40,8 +42,8 @@
 | [fuel-prices](https://mkviz.com/fuel-prices/) | [gas-calendar](fuel-prices/gas-calendar.csv) | calendar | fred_GASREGW.csv |
 | [fuel-prices](https://mkviz.com/fuel-prices/) | [gas-year-rules](fuel-prices/gas-year-rules.csv) | timeline |  |
 | [oil-prices-falling](https://mkviz.com/oil-prices-falling/) | [gas-after-oil-moves](oil-prices-falling/gas-after-oil-moves.csv) |  |  |
-| [gold-price](https://mkviz.com/gold-price/) | [gold-underwater](gold-price/gold-underwater.csv) | underwater | wb_gold.csv |
-| [gold-price](https://mkviz.com/gold-price/) | [gold-during-crashes](gold-price/gold-during-crashes.csv) | during | fred_NASDAQCOM.csv, wb_gold.csv |
+| [gold-price](https://mkviz.com/gold-price/) | [gold-underwater](gold-price/gold-underwater.csv) | underwater |  |
+| [gold-price](https://mkviz.com/gold-price/) | [gold-after-peaks](gold-price/gold-after-peaks.csv) | paths |  |
 | [how-bond-funds-lose-money](https://mkviz.com/how-bond-funds-lose-money/) | [bond-fund-split](how-bond-funds-lose-money/bond-fund-split.csv) | split | fred_DGS7.csv |
 | [how-long-do-corrections-last](https://mkviz.com/how-long-do-corrections-last/) | [sp-intrayear](how-long-do-corrections-last/sp-intrayear.csv) | intrayear | index_gspc_long.csv |
 | [how-long-do-recessions-last](https://mkviz.com/how-long-do-recessions-last/) | [recession-aftermath](how-long-do-recessions-last/recession-aftermath.csv) | aftermath | fred_PAYEMS.csv, fred_UNRATE.csv, fred_USREC.csv |
@@ -55,7 +57,8 @@
 | [mortgage-rates-back-to-3-percent](https://mkviz.com/mortgage-rates-back-to-3-percent/) | [m3-need](mortgage-rates-back-to-3-percent/m3-need.csv) | need | fred_DGS10.csv, fred_MORTGAGE30US.csv |
 | [mortgage-rates-back-to-3-percent](https://mkviz.com/mortgage-rates-back-to-3-percent/) | [m3-falls](mortgage-rates-back-to-3-percent/m3-falls.csv) | falls | fred_DGS10.csv, fred_MORTGAGE30US.csv |
 | [mortgage-rates-back-to-3-percent](https://mkviz.com/mortgage-rates-back-to-3-percent/) | [m3-savings](mortgage-rates-back-to-3-percent/m3-savings.csv) | savings | fred_MORTGAGE30US.csv |
-| [nasdaq-correction-history](https://mkviz.com/nasdaq-correction-history/) | [nasdaq-drops-dots](nasdaq-correction-history/nasdaq-drops-dots.csv) | dots | index_ixic_long.csv |
+| [nasdaq-correction-history](https://mkviz.com/nasdaq-correction-history/) | [nasdaq-drops-dots](nasdaq-correction-history/nasdaq-drops-dots.csv) | dots |  |
+| [nasdaq-correction-history](https://mkviz.com/nasdaq-correction-history/) | [nasdaq-depth-ladder](nasdaq-correction-history/nasdaq-depth-ladder.csv) | ladder |  |
 | [october-inflation-rate](https://mkviz.com/october-inflation-rate/) | [october-inflation-misses](october-inflation-rate/october-inflation-misses.csv) | misses | bls_CUUR0000SA0.csv |
 | [october-inflation-rate](https://mkviz.com/october-inflation-rate/) | [october-inflation-shift](october-inflation-rate/october-inflation-shift.csv) | shift | bls_CUUR0000SA0.csv |
 | [recession-watch](https://mkviz.com/recession-watch/) | [rw-board](recession-watch/rw-board.csv) | board | fred_UNRATE.csv |

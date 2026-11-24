@@ -1007,9 +1007,19 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             let first_name = o.get("name").cloned().unwrap_or("Series".into());
             sers.push((first_name, pts.iter().filter(|p| p.day >= from && p.day <= to).map(|p| (p.day, p.value)).collect()));
             for spec in o.get("series").map(String::as_str).unwrap_or("").split(';').filter(|x| !x.is_empty()) {
-                let (path, name) = spec.split_once('|').unwrap_or((spec, spec));
-                let sp = series::load(path)?;
+                // 경로|이름[|bond=7]: 금리 계열을 만기 m년 채권 펀드 지수로(날마다 다시 값을 매김) 바꿔 그린다
+                let mut parts = spec.splitn(3, '|');
+                let path = parts.next().unwrap_or(spec);
+                let name = parts.next().unwrap_or(path);
+                let mut sp = series::load(path)?;
+                if let Some(m) = parts.next().and_then(|x| x.strip_prefix("bond=")).and_then(|m| m.parse::<f64>().ok()) { sp = bond::daily_index(&sp, m); }
                 sers.push((name.to_string(), sp.iter().filter(|p| p.day >= from && p.day <= to).map(|p| (p.day, p.value)).collect()));
+            }
+            // --rebase: 계열마다 첫 값 대비 변화(%)로, 같은 날에서 출발한 주식과 채권을 한 축에 놓는다
+            if o.contains_key("rebase") {
+                for (_, ps) in sers.iter_mut() {
+                    if let Some(&(_, v0)) = ps.first() { for p in ps.iter_mut() { p.1 = (p.1 / v0 - 1.0) * 100.0; } }
+                }
             }
             csv = format!("series,date_day,value\n{}", sers.iter().flat_map(|(n, ps)| ps.iter().map(move |(d, v)| format!("{n},{d},{v}\n"))).collect::<String>());
             let mark = o.get("mark").and_then(|m| m.split_once('|')).and_then(|(d, n)| Some((series::day_number(d)?, n)));
@@ -1020,11 +1030,16 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             let mut last_m = String::new();
             for p in &firsts {
                 let m = &p.date[..7];
-                if m != last_m && (m[5..7].parse::<usize>().unwrap_or(1) - 1) % 3 == 0 { ticks.push((p.day, format!("{} {}", MON[m[5..7].parse::<usize>().unwrap_or(1) - 1], &m[2..4]))); }
+                // 반년이 안 되는 구간은 달마다 눈금(3달마다면 눈금이 하나뿐이었다)
+                let every = if to != i64::MAX && from != i64::MIN && to - from < 183 { 1 } else if firsts.last().map_or(false, |l| l.day - firsts[0].day < 183) { 1 } else { 3 };
+                if m != last_m && (m[5..7].parse::<usize>().unwrap_or(1) - 1) % every == 0 { ticks.push((p.day, format!("{} {}", MON[m[5..7].parse::<usize>().unwrap_or(1) - 1], &m[2..4]))); }
                 last_m = m.to_string();
             }
             let ticks: Vec<(i64, String)> = ticks.into_iter().map(|(d, l)| (d, l.replacen(' ', " '", 1))).collect();
-            viz::lines(&sers, mark, &ticks, &title)
+            let colors: Vec<&str> = o.get("colors").map(|c| c.split(',').collect()).unwrap_or_default();
+            // --band "YYYY-MM-DD,YYYY-MM-DD|이름": 글이 짚는 구간을 옅게 칠한다
+            let band = o.get("band").and_then(|b| b.split_once('|')).and_then(|(ds, n)| { let (a, b) = ds.split_once(',')?; Some((series::day_number(a)?, series::day_number(b)?, n)) });
+            if colors.is_empty() && band.is_none() { viz::lines(&sers, mark, &ticks, &title) } else { viz::lines_band(&sers, mark, &ticks, &colors, band, &title) }
         }
         "rowdots" => {
             // 줄마다 이름과 값들: --rows "Computers:-0.093,0.097,-0.007;Toys:…" --marks "Usual year,This year,Holiday dip" [--unit pt: 값이 %p, --unit yr: 값이 년, --line "2|Median": 기준 점선] (입력 csv는 쓰지 않는다)
@@ -1454,6 +1469,20 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             let rows: Vec<(i32, f64, f64, f64, bool)> = ys.iter().map(|y| (y.year, y.income, y.price, y.ret, y.full)).collect();
             viz::split(&rows, &marks, &title)
         }
+        "catch" => {
+            // 주식 하락마다 한 줄: 같은 날짜 사이 채권 펀드 총수익 막대, 색 = 금리 방향. <stock.csv> --rates <dgs7.csv> --maturity 7 --threshold 0.10
+            let rates = series::load(o.get("rates").ok_or("--rates <금리 csv> 가 필요")?)?;
+            let cs = bond::catch(&pts, &rates, opt_f(o, "maturity", 7.0), opt_f(o, "threshold", 0.10));
+            csv = format!("peak,low_date,stock_fall,bond_return,yield_change_pt,start_yield,open\n{}", cs.iter().map(|c| format!("{},{},{:.4},{:.4},{:.3},{:.2},{}\n", c.peak, c.low_date, c.fall, c.bond, c.dy, c.y0, c.open)).collect::<String>());
+            let rows: Vec<(String, f64, f64, bool)> = cs.iter().map(|c| {
+                let (a, b) = (&c.peak[..4], &c.low_date[..4]);
+                // 한 해 안에 끝난 하락은 시작 달을 붙인다(같은 해에 두 줄이면 둘이 같은 하락으로 읽혔다, 2026-11-24 설계 검토)
+                const MON: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                let yrs = if a == b { format!("{} {a}", MON[c.peak[5..7].parse::<usize>().unwrap_or(1) - 1]) } else { format!("{a}–{}", &b[2..]) };
+                (format!("{yrs} · {}{}", format!("{}%", (c.fall * 100.0).round()), if c.open { " so far" } else { "" }), c.bond, c.dy, c.open)
+            }).collect();
+            viz::catch(&rows, &title)
+        }
         "speed" => {
             // 하락마다 점: 가로 = 기록에서 처음 threshold 아래 종가까지 날, 세로 = 끝난 깊이(진행 중이면 지금까지). --threshold 0.10 --deep 0.20 --marks 1987,2020
             let th = opt_f(o, "threshold", 0.10);
@@ -1709,6 +1738,7 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "recessions" => "Each run of months flagged 1 in the event series (NBER recession months), with its length; with --claims (weekly initial claims, 4-week average), the peak from the start to a year after the end and the first week after it when the average was back below the midpoint between its low of the year before the start and that peak, and the months from then until jobs were back; with a second series, its value the month before the start and its highest value from the start to the given months after the end (or to the next recession start, if sooner); with --recover, the first month after the end when that series is back at its highest level of the 12 months up to the start (payroll jobs back), counted in months from the end.",
         "together" => "Each signal is on in a month if any of its readings that month crossed its threshold. Episodes are runs of months with at least k signals on, starting outside the event (NBER recession) and outside the settle months after an event ends; for each, the months to the next event start. For each event start, whether at least k were on together in the window months before.",
         "need" => "Each week pairs the 30-year mortgage rate with the 10-year Treasury yield averaged over the days its survey covers; the gap is the difference. For each target rate, the 10-year yield it needs is the target minus the median gap (range: minus the 90th and 10th percentile gaps), with the share of weeks the 10-year was that low. Similar starts are weeks whose rate was within the given distance of this week's, with the full horizon after them in the data, and the lowest rate each reached within it.",
+        "catch" => "Every decline of the stock index at least the threshold below its prior record close (record-based, so a later fall that stays below the old record belongs to the same decline), from the record to the lowest close (for the decline under way, the lowest close so far). Over the same dates, the total return of a constant-maturity Treasury fund repriced every observation day: it holds a par note bought at the prior day's yield, prices it at the new yield with that much less time to maturity (semiannual compounding) and adds interest for the days between; yield change is the end yield minus the start yield, in points.",
         "split" => "The same constant-maturity Treasury fund as cushion. Each month's return is split into interest (the index times the prior month's yield divided by 12) and price (the rest); a year's interest and price parts are the sums over its months divided by the index at the end of the prior December, so interest plus price equals the year's total return. The latest year is year to date.",
         "cushion" => "A constant-maturity Treasury fund (par bond bought each month at that month's last yield, repriced a month later, interest added). For each calendar year: the cushion is the yield at the end of the prior December divided by the modified duration of a par bond at that yield, roughly how far yields can rise over the year before the price loss uses up the year's interest; compared with the actual change in the yield from December to December and the fund's total return over the same months. The latest year is year to date.",
         "hbars" => "Values given on the command line, one horizontal bar per row, with an optional reference line; bars at or past the line are dark, bars short of it light, the highlighted row blue.",

@@ -1,0 +1,1 @@
+{"frame":"paths","input":"gold-monthly-input.csv","params":{"dates":"1973-07-01,1974-12-01,1980-01-01,2008-03-01,2011-09-01,2026-02-01","days":"1100","labels":"1973,1974,1980,2008,2011,2026","title":"Gold in the three years after each record that led to a 20% fall, % from the record"}}

@@ -1,1 +1,1 @@
-{"frame":"dots","input":"data/series/index_ixic_long.csv","params":{"deep":"0.20","threshold":"0.10","title":"Nasdaq drops of 10% or more since 1971"}}
+{"frame":"dots","input":"../../macro/index_ixic_long.csv","params":{"deep":"0.20","threshold":"0.10","title":"Nasdaq drops of 10% or more since 1971"}}
