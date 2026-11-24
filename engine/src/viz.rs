@@ -90,9 +90,20 @@ pub fn underwater(pts: &[Point], lines: &[f64], flag: &[Point], marks_in: &[(i64
     // 지금 위치: 마지막 점에 점과 'Now'(독자가 '지금은 어디냐'를 바로 찾게)
     if let Some(&(d, v)) = dd.last() {
         if v < 0.0 {
-            let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"5\" fill=\"{BLUE}\" stroke=\"#fff\" stroke-width=\"2\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-weight=\"600\" font-size=\"14\" stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\">Now {}</text>", x(d as f64), y(v), x(d as f64) - 8.0,
-                // 0% 선 가까이면 점 아래에(위에 두면 기준선·선과 겹쳤다, 2026-11-17 콜드 리드), 흰 테두리로 선 위에서도 읽히게
-                if y(v) - T < 30.0 { y(v) + 22.0 } else { y(v) - 10.0 }, pct(v));
+            // 깊은 하락의 오른쪽 끝은 촘촘한 선 위라 흰 테두리를 둘러도 글자가 깨져 보였다(2026-11-24 콜드 리드 두 독자).
+            // 점 바로 왼쪽, 0% 아래 빈 띠에 선이 올라오지 않으면 'Now'와 깊이를 두 줄로 그 띠에 두고 점까지 선을 긋는다
+            let wide = 6.0 + 8.0 * pct(v).chars().count().max(3) as f64;  // 굵은 14px 글자 너비 어림
+            let free = y(v) - T >= 50.0 && dd.iter().filter(|p| x(p.0 as f64) >= x(d as f64) - wide).all(|p| y(p.1) - T > 38.0);
+            let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"5\" fill=\"{BLUE}\" stroke=\"#fff\" stroke-width=\"2\"/>", x(d as f64), y(v));
+            if free {
+                let xe = x(d as f64) - 6.0;
+                let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{INK}\"/><text text-anchor=\"end\" fill=\"{INK}\" font-weight=\"600\" font-size=\"14\"><tspan x=\"{xe:.1}\" y=\"{:.1}\">Now</tspan><tspan x=\"{xe:.1}\" y=\"{:.1}\">{}</tspan></text>",
+                    x(d as f64), x(d as f64), T + 4.0, y(v) - 6.0, T + 16.0, T + 32.0, pct(v));
+            } else {
+                let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-weight=\"600\" font-size=\"14\" stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\">Now {}</text>", x(d as f64) - 8.0,
+                    // 0% 선 가까이면 점 아래에(위에 두면 기준선·선과 겹쳤다, 2026-11-17 콜드 리드), 흰 테두리로 선 위에서도 읽히게
+                    if y(v) - T < 30.0 { y(v) + 22.0 } else { y(v) - 10.0 }, pct(v));
+            }
         }
     }
     let (ya, yb) = (&pts[0].date[..4], &pts.last().unwrap().date[..4]);
