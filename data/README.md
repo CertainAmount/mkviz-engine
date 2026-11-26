@@ -46,7 +46,7 @@
 | [fuel-prices](https://mkviz.com/fuel-prices/) | [gas-calendar](fuel-prices/gas-calendar.csv) | calendar | fred_GASREGW.csv |
 | [fuel-prices](https://mkviz.com/fuel-prices/) | [gas-year-rules](fuel-prices/gas-year-rules.csv) | timeline |  |
 | [fuel-prices](https://mkviz.com/fuel-prices/) | [gas-after-drops](fuel-prices/gas-after-drops.csv) | fan |  |
-| [oil-prices-falling](https://mkviz.com/oil-prices-falling/) | [gas-after-oil-moves](oil-prices-falling/gas-after-oil-moves.csv) |  |  |
+| [oil-prices-falling](https://mkviz.com/oil-prices-falling/) | [gas-margin](oil-prices-falling/gas-margin.csv) | recent | fred_DCOILWTICO.csv, fred_GASREGW.csv |
 | [gold-price](https://mkviz.com/gold-price/) | [gold-underwater](gold-price/gold-underwater.csv) | underwater |  |
 | [gold-price](https://mkviz.com/gold-price/) | [gold-after-peaks](gold-price/gold-after-peaks.csv) | paths |  |
 | [how-bond-funds-lose-money](https://mkviz.com/how-bond-funds-lose-money/) | [bond-fund-split](how-bond-funds-lose-money/bond-fund-split.csv) | split | fred_DGS7.csv |

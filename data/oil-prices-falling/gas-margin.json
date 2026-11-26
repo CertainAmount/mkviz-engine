@@ -1,0 +1,1 @@
+{"frame":"recent","input":"data/series/fred_GASREGW.csv","params":{"decimals":"2","line":"1.55|Usual since 2021","minus":"data/series/fred_DCOILWTICO.csv","minus-scale":"0.0238095","minus-window":"7","now":"Nov. 23","title":"Gas price minus the crude oil in it, dollars a gallon","weeks":"100"}}
