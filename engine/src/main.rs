@@ -2136,8 +2136,8 @@ mod minus_scale_test {
     fn subtracts_scaled_series() {
         let dir = std::env::temp_dir();
         let (a, b) = (dir.join("ms_a.csv"), dir.join("ms_b.csv"));
-        std::fs::write(&a, "date,v\n2020-01-08,3.0\n").unwrap();
-        std::fs::write(&b, "date,v\n2020-01-06,84\n2020-01-07,84\n").unwrap();
+        std::fs::write(&a, "date,v\n2020-01-08,3.0\n2020-01-15,3.0\n").unwrap();
+        std::fs::write(&b, "date,v\n2020-01-06,84\n2020-01-07,84\n2020-01-13,84\n").unwrap();
         let mut o = std::collections::HashMap::new();
         o.insert("minus".to_string(), b.to_string_lossy().to_string());
         o.insert("minus-scale".to_string(), (1.0 / 42.0).to_string());

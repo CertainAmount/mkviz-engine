@@ -94,5 +94,5 @@ Data: [inflation-tracker.csv](inflation-tracker.csv) · settings: [inflation-tra
 ![inflation-tracker](inflation-tracker.svg)
 
 ```
-./engine/target/release/mkviz-engine figure tracker data/series/fred_CPIAUCSL.csv --fill-gaps --note 'Shaded: where the middle 80% of months fell. Dashed: the median.' --pct-change 12 --suffix '%' --years 1980,2022 --out inflation-tracker.svg
+./engine/target/release/mkviz-engine figure tracker data/series/fred_CPIAUCSL.csv --fill-gaps --pct-change 12 --suffix '%' --years 1980,2022 --out inflation-tracker.svg
 ```

@@ -333,6 +333,11 @@ pub fn tracker(all: &[Point], drawn: &[Point], title: &str, suffix: &str, peaks:
     let (top_y, bot_y) = (span.iter().cloned().fold(ny, f64::min), span.iter().cloned().fold(ny, f64::max));
     let ty = [ny - 9.0, ny + 22.0, bot_y + 18.0, top_y - 6.0].into_iter().filter(|t| *t > T + 14.0 && *t < H - B - 2.0)
         .min_by_key(|t| cover(*t)).unwrap_or(ny - 9.0);
+    // 이름표가 점에서 멀리 떨어지면(빈자리가 아래·위에만 있을 때) 점까지 가는 가는 선(독자: 'Now 3.9%'가 선 아래 엉뚱한 자리, 2026-11-26)
+    if (ty - ny).abs() > 30.0 {
+        let ly = if ty > ny { ty - 15.0 } else { ty + 4.0 };
+        let _ = write!(s, "<line x1=\"{:.1}\" y1=\"{ly:.1}\" x2=\"{nx:.1}\" y2=\"{ny:.1}\" stroke=\"#0f172a\" stroke-width=\"1\"/>", nx - 12.0);
+    }
     let _ = write!(s, "<circle cx=\"{nx:.1}\" cy=\"{ny:.1}\" r=\"5\" fill=\"{BLUE}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" font-size=\"14\" font-weight=\"600\" fill=\"#0f172a\" {HALO}>{now_label} {}</text>", nx - 9.0, ty, lab(now.value));
     // 가로축: 10년마다 눈금 글자, 양 끝 연도와 겹치면 뺀다
     let (y0, y1): (i32, i32) = (drawn[0].date[..4].parse().unwrap_or(0), now.date[..4].parse().unwrap_or(0));
@@ -386,7 +391,20 @@ pub fn recent(pts: &[Point], title: &str, suffix: &str, decimals: usize, now_lab
         let (lx, lyy, anchor) = spots.iter().cloned().min_by_key(|&(sx, sy, a)| { let (xa, xb) = if a == "end" { (sx - w, sx) } else { (sx, sx + w) }; hits(xa, xb, sy) }).unwrap_or(spots[0]);
         let _ = write!(s, "<line x1=\"{left}\" x2=\"{:.1}\" y1=\"{ly:.1}\" y2=\"{ly:.1}\" stroke=\"#eb6834\" stroke-width=\"1.5\" stroke-dasharray=\"4 3\"/><text x=\"{lx:.1}\" y=\"{lyy:.1}\" text-anchor=\"{anchor}\" font-size=\"13\" fill=\"#eb6834\" {HALO}>{}</text>", xr, name.replace('&', "&amp;"));
     }
-    let long = now.day - pts[0].day > 400;
+    // 흐린 가로 눈금과 값(독자가 세로축이 없다고 짚었다, 2026-11-26 물가 추적기): 왼쪽 안쪽에 작게
+    {
+        let span = vmax - vmin + 2.0 * pad;
+        let raw = span / 4.0;
+        let mag = 10f64.powf(raw.log10().floor());
+        let step = [1.0, 2.0, 2.5, 5.0, 10.0].iter().map(|m| m * mag).find(|st| *st >= raw).unwrap_or(10.0 * mag);
+        let mut v = ((vmin - pad) / step).ceil() * step;
+        while v <= vmax + pad + 1e-9 {
+            let gy = y(v);
+            let _ = write!(s, "<line x1=\"{left}\" x2=\"{:.1}\" y1=\"{gy:.1}\" y2=\"{gy:.1}\" stroke=\"#eef2f7\"/><text x=\"{left}\" y=\"{:.1}\" font-size=\"11\" fill=\"#94a3b8\" {HALO}>{}</text>", W - right - 70.0, gy - 3.0, val_label(v + 0.0, suffix, decimals.min(2)));
+            v += step;
+        }
+    }
+    let long = true; // 이름표에 늘 연도(독자: 'Low 2.3% (Apr)'가 어느 해인지 모름, 2026-11-26)
     let d: Vec<String> = pts.iter().map(|p| format!("{:.1},{:.1}", x(p.day as f64), y(p.value))).collect();
     let _ = write!(s, "<polyline points=\"{}\" fill=\"none\" stroke=\"{GRAY}\" stroke-width=\"2\"/>", d.join(" "));
     for (p, name, below) in [(lo, "Low", true), (hi, "High", false)] {
