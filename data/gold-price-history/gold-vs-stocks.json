@@ -1,0 +1,1 @@
+{"frame":"tracker","input":"gold-monthly-input.csv","params":{"mid":"0.8","now":"Nov.","per":"../../macro/index_gspc_long.csv","title":"Gold price divided by the S&P 500, monthly since 1971","years":"1980,2011"}}

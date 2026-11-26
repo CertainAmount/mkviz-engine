@@ -192,6 +192,16 @@ pub fn paths_with(pts: &[Point], starts: &[String], days: i64, title: &str, diff
 }
 
 #[cfg(test)]
+mod val_label_test {
+    #[test]
+    fn dollars_and_suffix() {
+        assert_eq!(super::val_label(3901.4, "$", 1), "$3,901");
+        assert_eq!(super::val_label(5318.4, "$", 2), "$5,318");
+        assert_eq!(super::val_label(7.28, "%", 2), "7.28%");
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::series::parse;
@@ -247,14 +257,24 @@ pub fn band(pts: &[Point], title: &str, as_pct: bool, suffix: &str) -> String {
 
 /// 추적기 그림(데이터 페이지, 2026-11-13): 긴 역사 위의 지금. 선(월말 값), 모든 관측의 가운데 80% 띠와 중앙값 점선, 이름 붙은 고점 몇 개,
 /// 지금 점과 값. 띠(--mid, 기본 가운데 80%)·중앙값은 그리는 월말 값이 아니라 모든 관측(rank와 같은 기준)으로 잰다. 범례는 그림 안 한 줄(note).
-pub fn tracker(all: &[Point], drawn: &[Point], title: &str, suffix: &str, peaks: usize, years: &[String], note: &str, mid: f64) -> String {
+/// 값 표기: suffix가 "$"면 달러 앞 기호·천 단위 쉼표·정수(금값 그림), 아니면 소수 d자리 + suffix
+pub fn val_label(v: f64, suffix: &str, d: usize) -> String {
+    if suffix != "$" { return format!("{:.*}{suffix}", d, v); }
+    let n = format!("{:.0}", v.abs());
+    let mut out = String::new();
+    for (i, c) in n.chars().enumerate() { if i > 0 && (n.len() - i) % 3 == 0 { out.push(','); } out.push(c); }
+    format!("{}${out}", if v < 0.0 { "-" } else { "" })
+}
+
+pub fn tracker(all: &[Point], drawn: &[Point], title: &str, suffix: &str, peaks: usize, years: &[String], note: &str, mid: f64, now_label: &str) -> String {
     let (qa, qb) = ((1.0 - mid) / 2.0, 1.0 - (1.0 - mid) / 2.0); // 음영: 가운데 mid 몫(0.5면 사분위 범위)
     const HALO: &str = "stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\"";
     let mut vals: Vec<f64> = all.iter().map(|p| p.value).collect();
     vals.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    let q = |f: f64| vals[((vals.len() - 1) as f64 * f) as usize];
+    // 분위수는 두 이웃 값 사이를 잇는다(짝수 개 자료의 중앙값이 아래쪽 값으로 기울지 않게, 본문 중앙값 팩트와 같은 값)
+    let q = |f: f64| { let x = (vals.len() - 1) as f64 * f; let (i, w) = (x.floor() as usize, x - x.floor()); vals[i] + (vals[(i + 1).min(vals.len() - 1)] - vals[i]) * w };
     let now = all.last().unwrap();
-    let lab = |v: f64| format!("{:.1}{suffix}", v);
+    let lab = |v: f64| val_label(v, suffix, 1);
     let left = ([q(qb), q(0.5), q(qa)].iter().map(|v| lab(*v).chars().count()).max().unwrap_or(4) as f64 * 8.4 + 12.0).max(L);
     let top = if note.is_empty() { T } else { T + 22.0 };
     let (lo, hi) = (vals[0].min(now.value), vals[vals.len() - 1].max(now.value));
@@ -313,7 +333,7 @@ pub fn tracker(all: &[Point], drawn: &[Point], title: &str, suffix: &str, peaks:
     let (top_y, bot_y) = (span.iter().cloned().fold(ny, f64::min), span.iter().cloned().fold(ny, f64::max));
     let ty = [ny - 9.0, ny + 22.0, bot_y + 18.0, top_y - 6.0].into_iter().filter(|t| *t > T + 14.0 && *t < H - B - 2.0)
         .min_by_key(|t| cover(*t)).unwrap_or(ny - 9.0);
-    let _ = write!(s, "<circle cx=\"{nx:.1}\" cy=\"{ny:.1}\" r=\"5\" fill=\"{BLUE}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" font-size=\"14\" font-weight=\"600\" fill=\"#0f172a\" {HALO}>Now {}</text>", nx - 9.0, ty, lab(now.value));
+    let _ = write!(s, "<circle cx=\"{nx:.1}\" cy=\"{ny:.1}\" r=\"5\" fill=\"{BLUE}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" font-size=\"14\" font-weight=\"600\" fill=\"#0f172a\" {HALO}>{now_label} {}</text>", nx - 9.0, ty, lab(now.value));
     // 가로축: 10년마다 눈금 글자, 양 끝 연도와 겹치면 뺀다
     let (y0, y1): (i32, i32) = (drawn[0].date[..4].parse().unwrap_or(0), now.date[..4].parse().unwrap_or(0));
     let _ = write!(s, "<text x=\"{left}\" y=\"{}\" font-size=\"14\" fill=\"{INK}\">{y0}</text><text x=\"{}\" y=\"{}\" text-anchor=\"end\" font-size=\"14\" fill=\"{INK}\">{y1}</text>", H - 6.0, W - R, H - 6.0);
@@ -335,7 +355,7 @@ pub fn tracker(all: &[Point], drawn: &[Point], title: &str, suffix: &str, peaks:
 pub fn recent(pts: &[Point], title: &str, suffix: &str, decimals: usize, now_label: &str, line: Option<(f64, &str)>) -> String {
     const HALO: &str = "stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\"";
     const MON: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    let lab = |v: f64| format!("{:.*}{suffix}", decimals, v);
+    let lab = |v: f64| val_label(v, suffix, decimals);
     let mo = |d: &str| format!("{} {}", MON[d[5..7].parse::<usize>().unwrap_or(1) - 1], &d[..4]);
     let lo = pts.iter().min_by(|a, b| a.value.partial_cmp(&b.value).unwrap()).unwrap();
     let hi = pts.iter().max_by(|a, b| a.value.partial_cmp(&b.value).unwrap()).unwrap();
@@ -349,7 +369,22 @@ pub fn recent(pts: &[Point], title: &str, suffix: &str, decimals: usize, now_lab
     let mut s = head(title);
     if let Some((v, name)) = line {
         let ly = y(v);
-        let _ = write!(s, "<line x1=\"{left}\" x2=\"{:.1}\" y1=\"{ly:.1}\" y2=\"{ly:.1}\" stroke=\"#eb6834\" stroke-width=\"1.5\" stroke-dasharray=\"4 3\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" font-size=\"13\" fill=\"#eb6834\" {HALO}>{}</text>", W - right - 70.0, W - right - 70.0, ly - 6.0, name.replace('&', "&amp;"));
+        // 이름 자리: 오른쪽 위 → 오른쪽 아래 → 왼쪽 위 → 왼쪽 아래 중 선(자료)과 겹치지 않는 첫 자리(근원 물가 선이 이름을 지나갔다, 2026-11-26)
+        let w = name.chars().count() as f64 * 7.0;
+        let xr = W - right - 70.0;
+        // 점 사이 선분도 잰다(점만 보면 선분이 이름을 지나갔다)
+        let hits = |xa: f64, xb: f64, yb: f64| pts.windows(2).map(|w2| (0..=12).filter(|&k| {
+            let f = k as f64 / 12.0;
+            let (px, py) = (x(w2[0].day as f64 + (w2[1].day - w2[0].day) as f64 * f), y(w2[0].value + (w2[1].value - w2[0].value) * f));
+            px >= xa - 6.0 && px <= xb + 6.0 && py >= yb - 16.0 && py <= yb + 5.0
+        }).count()).sum::<usize>();
+        // 네 자리가 모두 막히면 선을 따라 30씩 옮겨 가며 위·아래 빈자리를 찾는다
+        let mut spots = vec![(xr, ly - 6.0, "end"), (xr, ly + 16.0, "end"), (left, ly - 6.0, "start"), (left, ly + 16.0, "start")];
+        let mut sx = left + 30.0;
+        while sx + w < xr { spots.push((sx, ly - 6.0, "start")); spots.push((sx, ly + 16.0, "start")); sx += 30.0; }
+        // 빈자리가 없으면 겹침이 가장 적은 자리(앞쪽 후보 우선)
+        let (lx, lyy, anchor) = spots.iter().cloned().min_by_key(|&(sx, sy, a)| { let (xa, xb) = if a == "end" { (sx - w, sx) } else { (sx, sx + w) }; hits(xa, xb, sy) }).unwrap_or(spots[0]);
+        let _ = write!(s, "<line x1=\"{left}\" x2=\"{:.1}\" y1=\"{ly:.1}\" y2=\"{ly:.1}\" stroke=\"#eb6834\" stroke-width=\"1.5\" stroke-dasharray=\"4 3\"/><text x=\"{lx:.1}\" y=\"{lyy:.1}\" text-anchor=\"{anchor}\" font-size=\"13\" fill=\"#eb6834\" {HALO}>{}</text>", xr, name.replace('&', "&amp;"));
     }
     let long = now.day - pts[0].day > 400;
     let d: Vec<String> = pts.iter().map(|p| format!("{:.1},{:.1}", x(p.day as f64), y(p.value))).collect();
@@ -400,6 +435,45 @@ pub fn dots(items: &[(i64, f64, bool)], line: f64, first_year: &str, last_year: 
         let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\" {halo}>{yr} {}</text>", (x(*d as f64) + 8.0).min(W - R - 70.0), y(*v) + 4.0, pct(*v));
     }
     let _ = write!(s, "<text x=\"{L}\" y=\"{}\" fill=\"{INK}\">{first_year}</text><text x=\"{}\" y=\"{}\" text-anchor=\"end\" fill=\"{INK}\">{last_year}</text></svg>", H - 6.0, W - R, H - 6.0);
+    s
+}
+
+/// 사분면 점 그림(quad): 달마다 (x의 n개월 변화, y의 n개월 변화율) 한 점, 0 선 두 개, x의 ±at 점선,
+/// 네 칸마다 점 수, 마지막 점(지금)은 파란 점과 이름표. xlab/ylab은 축 이름(축 끝에 짧게).
+pub fn quad(pts: &[(String, f64, f64)], at: f64, xlab: &str, ylab: &str, xunit: &str, title: &str) -> String {
+    let (xs, ys): (Vec<f64>, Vec<f64>) = pts.iter().map(|p| (p.1, p.2)).unzip();
+    let ext = |v: &[f64]| v.iter().fold(0.0f64, |a, b| a.max(b.abs()));
+    let (xm, ym) = ((ext(&xs) * 10.0).ceil() / 10.0, (ext(&ys) * 10.0).ceil() / 10.0);
+    let (left, top, bot) = (L + 8.0, T + 18.0, B + 10.0);
+    let x = |v: f64| left + (v + xm) / (2.0 * xm) * (W - left - R);
+    let y = |v: f64| top + (ym - v) / (2.0 * ym) * (H - top - bot);
+    let halo = "stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\"";
+    let mut s = head(title);
+    for v in [-ym, -ym / 2.0, 0.0, ym / 2.0, ym] {
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{}</text>", left - 6.0, y(v) + 4.0, if v > 0.0 { format!("+{}", pct(v)) } else { pct(v) });
+    }
+    let _ = write!(s, "<line x1=\"{left}\" x2=\"{}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{INK}\"/><line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{top}\" y2=\"{:.1}\" stroke=\"{INK}\"/>", W - R, y(0.0), y(0.0), x(0.0), x(0.0), H - bot);
+    for a in [-at, at] {
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{top}\" y2=\"{:.1}\" stroke=\"{INK}\" stroke-dasharray=\"4 3\"/>", x(a), x(a), H - bot);
+    }
+    let n = pts.len().saturating_sub(1);
+    for p in &pts[..n] {
+        let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"2.6\" fill=\"{GRAY}\" fill-opacity=\"0.7\"/>", x(p.1), y(p.2));
+    }
+    // 점선 바깥 두 칸의 점 수와 오른 몫(왼쪽: x가 at 넘게 내린 달, 오른쪽: at 넘게 오른 달)
+    let side = |f: &dyn Fn(f64) -> bool| { let v: Vec<f64> = pts[..n].iter().filter(|p| f(p.1)).map(|p| p.2).collect(); (v.len(), v.iter().filter(|&&g| g > 0.0).count()) };
+    let (ln, lu) = side(&|v| v <= -at);
+    let (rn, ru) = side(&|v| v >= at);
+    let _ = write!(s, "<text x=\"{:.1}\" y=\"{}\" fill=\"{INK}\" font-size=\"13\" {halo}>{lu} of {ln} up</text>", left + 4.0, top - 4.0);
+    let _ = write!(s, "<text x=\"{:.1}\" y=\"{}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\" {halo}>{ru} of {rn} up</text>", W - R - 2.0, top - 4.0);
+    if let Some(p) = pts.last() {
+        let (cx, cy) = (x(p.1), y(p.2));
+        let anchor = if cx > W / 2.0 { "end" } else { "start" };
+        let dx = if cx > W / 2.0 { -10.0 } else { 10.0 };
+        let _ = write!(s, "<circle cx=\"{cx:.1}\" cy=\"{cy:.1}\" r=\"6\" fill=\"{BLUE}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"{anchor}\" fill=\"#0f172a\" font-weight=\"600\" font-size=\"14\" {halo}>Now</text>", cx + dx, cy + 5.0);
+    }
+    let _ = write!(s, "<text x=\"{left}\" y=\"{}\" fill=\"{INK}\" font-size=\"13\">{xlab} \u{2190} fell</text><text x=\"{}\" y=\"{}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">rose \u{2192} {}{xunit}</text>", H - 6.0, W - R, H - 6.0, if at > 0.0 { format!("dashed \u{b1}{at} ") } else { String::new() });
+    let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"12\" {halo}>{ylab}</text></svg>", left + 4.0, y(0.0) - 6.0);
     s
 }
 
@@ -1966,7 +2040,7 @@ pub fn rowdots(rows: &[(String, Vec<f64>)], marks: &[String], unit: &str, line: 
     while v <= hi + 1e-9 {
         let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{t}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"12\">{}</text>",
             x(v), x(v), H - b, if v.abs() < 1e-9 { INK } else { "#eef2f7" }, x(v), H - b + 14.0,
-            if v.abs() < 1e-9 { "0".to_string() } else if years { format!("{v} yr") } else if points { format!("{}{} pt", if v > 0.0 { "+" } else { "" }, v) } else { format!("{}{:.0}%", if v > 0.0 { "+" } else { "" }, v * 100.0) });
+            if v.abs() < 1e-9 { "0".to_string() } else if years { format!("{v} yr") } else if points { format!("{}{} pt", if v > 0.0 { "+" } else { "" }, v) } else { format!("{}{:.0}%", if v > 0.0 && unit != "level" { "+" } else { "" }, v * 100.0) });
         v += step;
     }
     // --line "값|이름": 기준선(예: 중앙값) 점선과 위쪽 이름표. 점 아래에 깔리게 먼저 그린다
@@ -2336,5 +2410,111 @@ mod catch_test {
         let rows = vec![("2008–09 · -57%".to_string(), 0.177, -1.96, false), ("2022 · -25%".to_string(), -0.128, 2.48, false), ("2026 · -12% so far".to_string(), 0.018, -0.21, true)];
         let svg = super::catch(&rows, "t");
         assert!(svg.contains(">+17.7%<") && svg.contains(">-12.8%<") && svg.contains("fill=\"#eb6834\"") && svg.contains("Yields rose") && svg.contains("so far"));
+    }
+}
+
+/// 반등 작은 그림들: 사례마다 한 칸(두 줄씩), 반등 달 앞뒤 months달의 주 계열(파랑)과 also 계열(주황 점선), 반등 달 세로선.
+/// 칸 제목은 해와 'also가 반등 뒤 6달 동안 바뀐 폭'(없으면 'core n/a'). 모든 칸이 같은 세로 눈금이라 크기를 견줄 수 있다.
+/// cases: (이름, [(반등 대비 달, 주 값)], [(달, also 값)], 제목 꼬리)
+pub fn rebound_grid(cases: &[(String, Vec<(f64, f64)>, Vec<(f64, f64)>, String)], months: f64, names: (&str, &str), unit: &str, title: &str) -> String {
+    let cols = 2usize;
+    let rows = (cases.len() + cols - 1) / cols;
+    let (pw, ph, gap_y, top) = (W / cols as f64, 118.0, 10.0, 30.0);
+    let hh = top + rows as f64 * (ph + gap_y) + 4.0;
+    let all: Vec<f64> = cases.iter().flat_map(|c| c.1.iter().chain(c.2.iter()).map(|q| q.1)).collect();
+    let lo = all.iter().cloned().fold(0.0_f64, f64::min).floor();
+    let hi = all.iter().cloned().fold(0.0_f64, f64::max).ceil();
+    let mut s = format!("<svg viewBox=\"0 0 {W} {hh}\" width=\"{W}\" height=\"{hh}\" style=\"width:100%;max-width:560px;height:auto\" role=\"img\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"system-ui,sans-serif\" font-size=\"16\"><title>{}</title>", title.replace('&', "&amp;").replace('<', "&lt;"));
+    // 범례(맨 위)
+    let _ = write!(s, "<line x1=\"8\" x2=\"30\" y1=\"14\" y2=\"14\" stroke=\"{BLUE}\" stroke-width=\"2.5\"/><text x=\"35\" y=\"18\" fill=\"{INK}\" font-size=\"13\">{}</text><line x1=\"190\" x2=\"212\" y1=\"14\" y2=\"14\" stroke=\"#eb6834\" stroke-width=\"2\" stroke-dasharray=\"4 3\"/><text x=\"217\" y=\"18\" fill=\"{INK}\" font-size=\"13\">{}</text>",
+        names.0.replace('&', "&amp;"), names.1.replace('&', "&amp;"));
+    let step = if hi - lo > 8.0 { 4.0 } else { 2.0 };
+    for (k, (name, a, b, tail)) in cases.iter().enumerate() {
+        let (cx, cy) = ((k % cols) as f64 * pw, top + (k / cols) as f64 * (ph + gap_y));
+        let (l, r, t, bt) = (cx + 34.0, cx + pw - 8.0, cy + 20.0, cy + ph - 16.0);
+        let x = |m: f64| l + (m + months) / (2.0 * months) * (r - l);
+        let y = |v: f64| t + (hi - v) / (hi - lo) * (bt - t);
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"13\"><tspan font-weight=\"700\">{}</tspan> {}</text>", cx + 6.0, cy + 12.0, name, tail.replace('&', "&amp;"));
+        let mut v = (lo / step).ceil() * step + 0.0;
+        while v <= hi + 1e-9 {
+            let _ = write!(s, "<line x1=\"{l:.1}\" x2=\"{r:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"11\">{v:.0}{unit}</text>",
+                y(v), y(v), if v.abs() < 1e-9 { "#cbd5e1" } else { "#eef2f7" }, l - 3.0, y(v) + 4.0);
+            v += step;
+            if v.abs() < 1e-9 { v = 0.0; } // -0% 대신 0%
+        }
+        let x0 = x(0.0);
+        let _ = write!(s, "<line x1=\"{x0:.1}\" x2=\"{x0:.1}\" y1=\"{t:.1}\" y2=\"{bt:.1}\" stroke=\"{INK}\" stroke-dasharray=\"3 3\"/>");
+        for (m, lab) in [(-months, format!("-{}y", months / 12.0)), (0.0, "0".to_string()), (months, format!("+{}y", months / 12.0))] {
+            let anchor = if m < 0.0 { "start" } else if m > 0.0 { "end" } else { "middle" };
+            let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"{anchor}\" fill=\"{INK}\" font-size=\"11\">{lab}</text>", x(m), bt + 13.0);
+        }
+        let line = |p: &[(f64, f64)]| p.iter().map(|q| format!("{:.1},{:.1}", x(q.0), y(q.1))).collect::<Vec<_>>().join(" ");
+        if !b.is_empty() { let _ = write!(s, "<polyline points=\"{}\" fill=\"none\" stroke=\"#eb6834\" stroke-width=\"1.8\" stroke-dasharray=\"4 3\"/>", line(b)); }
+        let _ = write!(s, "<polyline points=\"{}\" fill=\"none\" stroke=\"{BLUE}\" stroke-width=\"2.2\"/>", line(a));
+        if let Some(last) = a.last() { let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"2.8\" fill=\"{BLUE}\"/>", x(last.0), y(last.1)); }
+    }
+    s.push_str("</svg>");
+    s
+}
+
+#[cfg(test)]
+mod rebound_grid_tests {
+    #[test]
+    fn grid_has_one_panel_per_case() {
+        let c = vec![("1973".to_string(), vec![(-1.0, 3.0), (0.0, 4.0), (1.0, 6.0)], vec![(0.0, 3.0)], "core +0.6 pt in 6 mo".to_string()),
+                     ("2026".to_string(), vec![(0.0, 3.8)], vec![], "no core data".to_string())];
+        let s = super::rebound_grid(&c, 24.0, ("Headline", "Core"), "%", "t");
+        assert!(s.starts_with("<svg") && s.ends_with("</svg>"));
+        assert_eq!(s.matches("font-weight=\"700\"").count(), 2);
+        assert!(s.contains("core +0.6 pt in 6 mo") && s.contains("stroke-dasharray=\"4 3\""));
+    }
+}
+
+/// 화살표 줄: 줄마다 시작 값 → 끝 값 화살표. 내려가면 파랑, 오르면 주황, 열린 줄(--open, 아직 끝나지 않은 사례)은 회색 점선.
+/// 끝에 값 글자. 눈금은 수준값 %(부호 없음). 한 줄에 점 셋을 겹치던 그림을 대신한다(물가 반등, 2026-11-26 독자: 색 셋을 읽어야 결론이 보였다)
+pub fn arrows(rows: &[(String, f64, f64)], open: &[String], names: (&str, &str), title: &str) -> String {
+    let all: Vec<f64> = rows.iter().flat_map(|r| [r.1, r.2]).collect();
+    let lo = all.iter().cloned().fold(0.0_f64, f64::min) - 0.01;
+    let hi = all.iter().cloned().fold(0.0_f64, f64::max) + 0.015;
+    let (l, r, t, b) = (118.0, 30.0, T + 8.0, 52.0);
+    let x = |v: f64| l + (v - lo) / (hi - lo).max(1e-9) * (W - l - r);
+    let rh = (H - t - b) / rows.len().max(1) as f64;
+    let mut s = head(title);
+    s.push_str("<defs><marker id=\"ah-b\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" markerWidth=\"5\" markerHeight=\"5\" orient=\"auto\"><path d=\"M0,0L10,5L0,10z\" fill=\"#2563eb\"/></marker><marker id=\"ah-o\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" markerWidth=\"5\" markerHeight=\"5\" orient=\"auto\"><path d=\"M0,0L10,5L0,10z\" fill=\"#eb6834\"/></marker><marker id=\"ah-g\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" markerWidth=\"5\" markerHeight=\"5\" orient=\"auto\"><path d=\"M0,0L10,5L0,10z\" fill=\"#94a3b8\"/></marker></defs>");
+    let step = [0.02, 0.05].iter().cloned().find(|st| (hi - lo) / st <= 8.0).unwrap_or(0.05);
+    let mut v = (lo / step).ceil() * step;
+    while v <= hi + 1e-9 {
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{t}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"12\">{:.0}%</text>",
+            x(v), x(v), H - b, if v.abs() < 1e-9 { INK } else { "#eef2f7" }, x(v), H - b + 14.0, (v * 100.0).round() + 0.0);
+        v += step;
+    }
+    for (i, (name, a, z)) in rows.iter().enumerate() {
+        let y = t + rh * (i as f64 + 0.5);
+        let is_open = open.iter().any(|o| o == name);
+        let (col, mk) = if is_open { ("#94a3b8", "ah-g") } else if z < a { ("#2563eb", "ah-b") } else { ("#eb6834", "ah-o") };
+        let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{}</text>", l - 8.0, y + 4.0, name.replace('&', "&amp;"));
+        let _ = write!(s, "<circle cx=\"{:.1}\" cy=\"{y:.1}\" r=\"3.5\" fill=\"{col}\"/>", x(*a));
+        // 아주 짧은 화살표(거의 그대로)는 화살촉만 보이게 최소 길이를 둔다
+        let dir = if z >= a { 1.0 } else { -1.0 };
+        let x2 = if (x(*z) - x(*a)).abs() < 8.0 { x(*a) + dir * 8.0 } else { x(*z) };
+        let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{y:.1}\" y2=\"{y:.1}\" stroke=\"{col}\" stroke-width=\"2.5\"{} marker-end=\"url(#{mk})\"/>", x(*a), x2, if is_open { " stroke-dasharray=\"4 3\"" } else { "" });
+        let (tx, anchor) = if dir > 0.0 { (x2 + 8.0, "start") } else { (x2 - 8.0, "end") };
+        let _ = write!(s, "<text x=\"{tx:.1}\" y=\"{:.1}\" text-anchor=\"{anchor}\" fill=\"{INK}\" font-size=\"12\">{:.1}%</text>", y + 4.0, z * 100.0);
+    }
+    let ly = H - 10.0;
+    let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#2563eb\" stroke-width=\"2.5\" marker-end=\"url(#ah-b)\"/><text x=\"{:.1}\" y=\"{ly:.1}\" fill=\"{INK}\" font-size=\"13\">{}</text><line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#eb6834\" stroke-width=\"2.5\" marker-end=\"url(#ah-o)\"/><text x=\"{:.1}\" y=\"{ly:.1}\" fill=\"{INK}\" font-size=\"13\">{}</text>",
+        l + 18.0, ly - 4.0, ly - 4.0, l + 24.0, names.0.replace('&', "&amp;"), l + 150.0, l + 168.0, ly - 4.0, ly - 4.0, l + 174.0, names.1.replace('&', "&amp;"));
+    s.push_str("</svg>");
+    s
+}
+
+#[cfg(test)]
+mod arrows_tests {
+    #[test]
+    fn color_by_direction() {
+        let r = vec![("a".to_string(), 0.03, 0.01), ("b".to_string(), 0.04, 0.10), ("c".to_string(), 0.038, 0.039)];
+        let s = super::arrows(&r, &["c".to_string()], ("Lower", "Higher"), "t");
+        assert!(s.contains("url(#ah-b)") && s.contains("url(#ah-o)") && s.contains("url(#ah-g)"));
+        assert!(s.contains("10.0%") && s.contains("stroke-dasharray=\"4 3\""));
     }
 }

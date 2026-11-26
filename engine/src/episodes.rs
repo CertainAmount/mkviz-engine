@@ -239,3 +239,45 @@ mod back_test {
         assert!((e.low + 0.25).abs() < 1e-12); // 되찾은 뒤 더 깊어짐
     }
 }
+
+/// 반등: 값이 peak 이상이던 구간의 정점 뒤, 그 뒤 최저(누적 최저)에서 rise 이상 다시 오른 첫 점.
+/// (정점 i, 최저 i, 반등 i). 반등이 없으면 반등 자리는 None(진행 중). 다음 정점은 반등 뒤에서 찾는다.
+/// 예: 연간 물가 상승률이 5% 넘는 정점을 찍고 내려온 뒤 바닥에서 1%p 다시 오른 달(두 번째 물결의 시작).
+/// cool: 바닥이 이 값 이하로 내려온 뒤의 반등만 센다(식기 전에는 더 높은 값이 오면 정점을 옮긴다).
+pub fn rebounds(pts: &[Point], peak: f64, rise: f64, cool: f64) -> Vec<(usize, usize, Option<usize>)> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < pts.len() {
+        if pts[i].value < peak { i += 1; continue; }
+        let s = i;
+        while i < pts.len() && pts[i].value >= peak { i += 1; }
+        let pk = (s..i).fold(s, |a, j| if pts[j].value > pts[a].value { j } else { a });
+        let (mut pk, mut lo) = (pk, pk);
+        let mut hit = None;
+        for j in pk + 1..pts.len() {
+            if pts[lo].value > cool && pts[j].value > pts[pk].value { pk = j; lo = j; continue; }
+            if pts[j].value < pts[lo].value { lo = j; }
+            if pts[lo].value <= cool && pts[j].value >= pts[lo].value + rise - 1e-9 { hit = Some(j); break; }
+        }
+        out.push((pk, lo, hit));
+        match hit { Some(h) => i = h + 1, None => break }
+    }
+    out
+}
+
+#[cfg(test)]
+mod rebound_tests {
+    use super::*;
+    use crate::series::parse;
+
+    #[test]
+    fn rebound_after_peak() {
+        // 6 -> 7(정점) -> 4 -> 2(바닥) -> 2.5 -> 3.1(반등 1pt) -> 6(새 정점) -> 5 -> 4.5(진행 중)
+        let p = parse("d,v\n2020-01-01,6\n2020-02-01,7\n2020-03-01,4\n2020-04-01,2\n2020-05-01,2.5\n2020-06-01,3.1\n2020-07-01,6\n2020-08-01,5\n2020-09-01,4.5\n");
+        let r = rebounds(&p, 5.0, 1.0, 3.0);
+        assert_eq!(r, vec![(1, 3, Some(5)), (6, 8, None)]);
+        // 식지 않은 반등(4 -> 5.5)은 세지 않고, 더 높은 7.5로 정점을 옮긴다
+        let q = parse("d,v\n2020-01-01,6\n2020-02-01,4\n2020-03-01,5.5\n2020-04-01,7.5\n2020-05-01,2\n2020-06-01,3.2\n");
+        assert_eq!(rebounds(&q, 5.0, 1.0, 3.0), vec![(3, 4, Some(5))]);
+    }
+}

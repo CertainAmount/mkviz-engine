@@ -1,0 +1,1 @@
+{"frame":"tracker","input":"gold-monthly-input.csv","params":{"deflate":"../../macro/fred_CPIAUCSL.csv","mid":"0.8","now":"Nov. avg","suffix":"$","title":"Gold, monthly average in October 2026 dollars","years":"1980,2011"}}

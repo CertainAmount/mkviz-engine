@@ -1,0 +1,1 @@
+{"frame":"quad","input":"gold-monthly-input.csv","params":{"at":"1.0","months":"12","title":"Gold's 12-month change against the change in the 10-year real yield, monthly since 2004","x":"../../macro/fred_DFII10.csv","xlabel":"Real yield","xunit":"pt","ylabel":"Gold, 12-month change"}}

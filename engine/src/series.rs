@@ -165,9 +165,33 @@ pub fn fill_months(pts: &[Point]) -> Vec<Point> {
     out
 }
 
+/// 해마다 묶음: (해, 관측 수, 평균, 최저, 최고). 달력 해 기준, 마지막 해는 진행 중일 수 있다(yearly).
+pub fn by_year(pts: &[Point]) -> Vec<(i32, usize, f64, f64, f64)> {
+    let mut out: Vec<(i32, usize, f64, f64, f64)> = Vec::new();
+    for p in pts {
+        let Some(y) = p.date.get(..4).and_then(|v| v.parse::<i32>().ok()) else { continue };
+        match out.last_mut() {
+            Some(r) if r.0 == y => { r.1 += 1; r.2 += p.value; r.3 = r.3.min(p.value); r.4 = r.4.max(p.value); }
+            _ => out.push((y, 1, p.value, p.value, p.value)),
+        }
+    }
+    for r in out.iter_mut() { r.2 /= r.1 as f64; }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn by_year_mean_min_max() {
+        let p = parse("date,v\n2024-01-04,6\n2024-06-06,8\n2025-01-02,7\n");
+        let y = by_year(&p);
+        assert_eq!(y.len(), 2);
+        assert_eq!((y[0].0, y[0].1), (2024, 2));
+        assert!((y[0].2 - 7.0).abs() < 1e-9 && y[0].3 == 6.0 && y[0].4 == 8.0);
+        assert_eq!((y[1].0, y[1].1), (2025, 1));
+    }
 
     #[test]
     fn fill_months_one_gap_only() {

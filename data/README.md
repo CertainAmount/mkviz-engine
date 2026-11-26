@@ -10,6 +10,10 @@
 | [bond-fund-calculator](https://mkviz.com/bond-fund-calculator/) | [bond-yield-recent](bond-fund-calculator/bond-yield-recent.csv) | recent | fred_DGS7.csv |
 | [bond-fund-calculator](https://mkviz.com/bond-fund-calculator/) | [bond-fund-underwater](bond-fund-calculator/bond-fund-underwater.csv) | underwater | fred_DGS7.csv |
 | [bond-fund-calculator](https://mkviz.com/bond-fund-calculator/) | [bond-fund-recovery](bond-fund-calculator/bond-fund-recovery.csv) | recover | fred_DGS7.csv |
+| [gold-price-history](https://mkviz.com/gold-price-history/) | [gold-price-history](gold-price-history/gold-price-history.csv) | tracker |  |
+| [gold-price-history](https://mkviz.com/gold-price-history/) | [gold-real-history](gold-price-history/gold-real-history.csv) | tracker |  |
+| [gold-price-history](https://mkviz.com/gold-price-history/) | [gold-vs-stocks](gold-price-history/gold-vs-stocks.csv) | tracker |  |
+| [gold-price-history](https://mkviz.com/gold-price-history/) | [gold-real-yield](gold-price-history/gold-real-yield.csv) | quad |  |
 | [inflation-rate-tracker](https://mkviz.com/inflation-rate-tracker/) | [inflation-recent](inflation-rate-tracker/inflation-recent.csv) | recent | fred_CPIAUCSL.csv |
 | [inflation-rate-tracker](https://mkviz.com/inflation-rate-tracker/) | [inflation-tracker](inflation-rate-tracker/inflation-tracker.csv) | tracker | fred_CPIAUCSL.csv |
 | [mortgage-rates-history](https://mkviz.com/mortgage-rates-history/) | [mortgage-rate-recent](mortgage-rates-history/mortgage-rate-recent.csv) | recent | fred_MORTGAGE30US.csv |
@@ -41,12 +45,15 @@
 | [first-time-home-buyers](https://mkviz.com/first-time-home-buyers/) | [home-payment-spells](first-time-home-buyers/home-payment-spells.csv) | spells | fred_MEHOINUSA646N.csv, fred_MORTGAGE30US.csv, fred_MSPUS.csv |
 | [fuel-prices](https://mkviz.com/fuel-prices/) | [gas-calendar](fuel-prices/gas-calendar.csv) | calendar | fred_GASREGW.csv |
 | [fuel-prices](https://mkviz.com/fuel-prices/) | [gas-year-rules](fuel-prices/gas-year-rules.csv) | timeline |  |
+| [fuel-prices](https://mkviz.com/fuel-prices/) | [gas-after-drops](fuel-prices/gas-after-drops.csv) | fan |  |
 | [oil-prices-falling](https://mkviz.com/oil-prices-falling/) | [gas-after-oil-moves](oil-prices-falling/gas-after-oil-moves.csv) |  |  |
 | [gold-price](https://mkviz.com/gold-price/) | [gold-underwater](gold-price/gold-underwater.csv) | underwater |  |
 | [gold-price](https://mkviz.com/gold-price/) | [gold-after-peaks](gold-price/gold-after-peaks.csv) | paths |  |
 | [how-bond-funds-lose-money](https://mkviz.com/how-bond-funds-lose-money/) | [bond-fund-split](how-bond-funds-lose-money/bond-fund-split.csv) | split | fred_DGS7.csv |
 | [how-long-do-corrections-last](https://mkviz.com/how-long-do-corrections-last/) | [sp-intrayear](how-long-do-corrections-last/sp-intrayear.csv) | intrayear | index_gspc_long.csv |
 | [how-long-do-recessions-last](https://mkviz.com/how-long-do-recessions-last/) | [recession-aftermath](how-long-do-recessions-last/recession-aftermath.csv) | aftermath | fred_PAYEMS.csv, fred_UNRATE.csv, fred_USREC.csv |
+| [is-inflation-going-down](https://mkviz.com/is-inflation-going-down/) | [inflation-rebound-outcomes](is-inflation-going-down/inflation-rebound-outcomes.csv) | arrows | fred_CPIAUCSL.csv |
+| [is-inflation-going-down](https://mkviz.com/is-inflation-going-down/) | [inflation-rebounds](is-inflation-going-down/inflation-rebounds.csv) | rebounds | fred_CPIAUCSL.csv, fred_CPILFESL.csv |
 | [jobs-report-revisions](https://mkviz.com/jobs-report-revisions/) | [jobs-revisions-years](jobs-report-revisions/jobs-revisions-years.csv) | years | bls_ces_first.csv, bls_ces_third.csv, fred_USREC.csv |
 | [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [nasdaq-after-midterms](stocks-after-midterm-elections/nasdaq-after-midterms.csv) | fan | fred_NASDAQCOM.csv |
 | [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [midterm-cases](stocks-after-midterm-elections/midterm-cases.csv) | cases |  |

@@ -6,15 +6,15 @@ The calculation engine and chart data behind [MKViz](https://mkviz.com), a blog 
 
 Every number in an MKViz article that comes from our own calculation is produced by this engine, and every chart's data is published here so anyone can check it.
 
-![Bonds Go Up When Stocks Go Down 15 Times in 18. Not in 2022](data/do-bonds-go-up-when-stocks-go-down/bonds-in-stock-falls.svg)
+![Is Inflation Going Down? Only 2 of 6 Past Rebounds Faded](data/is-inflation-going-down/inflation-rebound-outcomes.svg)
 
 **Latest articles**
 
+- [Is Inflation Going Down? Only 2 of 6 Past Rebounds Faded](https://mkviz.com/is-inflation-going-down/) · [data](data/is-inflation-going-down/)
+- [Gold Price History Since 1971: Is Gold Expensive Now?](https://mkviz.com/gold-price-history/) · [data](data/gold-price-history/)
 - [Bonds Go Up When Stocks Go Down 15 Times in 18. Not in 2022](https://mkviz.com/do-bonds-go-up-when-stocks-go-down/) · [data](data/do-bonds-go-up-when-stocks-go-down/)
 - [Why Bond Funds Lose Money in a Year Like 2026](https://mkviz.com/how-bond-funds-lose-money/) · [data](data/how-bond-funds-lose-money/)
 - [Stock Market Recovery Usually Takes 2 Years. After Inflation, Up to 13](https://mkviz.com/stock-market-recovery-time/) · [data](data/stock-market-recovery-time/)
-- [How Long Do Recessions Last? 10 Months. The Jobs Take Longer](https://mkviz.com/how-long-do-recessions-last/) · [data](data/how-long-do-recessions-last/)
-- [How Often Do Stock Market Corrections Happen? More Years Than Not](https://mkviz.com/how-long-do-corrections-last/) · [data](data/how-long-do-corrections-last/)
 
 ## What's here
 

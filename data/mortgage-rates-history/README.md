@@ -14,6 +14,7 @@
 - Gap = the weekly mortgage rate minus the 10-year yield averaged over the seven days before the Thursday release, the week Freddie Mac's survey covers (https://www.freddiemac.com/pmms/about-pmms). Changed Nov. 14, 2026 from the release-day close, which counted Treasury moves after the survey closed as changes in the gap; the long-run median was 1.67 points either way.
 - Position = the share of all weekly observations since April 1971 (and, separately, since January 2000) below this week's value; median and the 10th and 90th percentiles over the same weeks.
 - Decade medians are taken over the weekly gaps in each calendar decade (the 2020s run through Nov. 12, 2026).
+- Yearly table (added Nov. 25, 2026): for each calendar year, the mean, lowest and highest weekly rate, and the mean of the weekly gaps defined above. 1971 starts in April; 2026 runs to the latest week.
 - The cost of the gap above its median is the monthly principal and interest on a $400,000, 30-year loan at this week's rate minus the gap's excess over its median (0.51 points points). The loan size is illustrative.
 
 ```
@@ -21,7 +22,9 @@
 ./engine/target/release/mkviz-engine position data/macro/fred_MORTGAGE30US.csv
 ./engine/target/release/mkviz-engine figure tracker data/macro/fred_MORTGAGE30US.csv --minus data/macro/fred_DGS10.csv --minus-window 7 --suffix " pt" --years 1980,2008,2022 --mid 0.5 --out mortgage-gap-history.svg
 ./engine/target/release/mkviz-engine figure tracker data/macro/fred_MORTGAGE30US.csv --suffix % --years 1981,low:2021 --mid 0.5 --out mortgage-rate-history.svg
+./engine/target/release/mkviz-engine yearly data/macro/fred_MORTGAGE30US.csv --minus data/macro/fred_DGS10.csv --minus-window 7
 ```
+(`yearly` was added to the engine for the yearly table.)
 
 ### Results
 
@@ -42,6 +45,8 @@ Share of weeks below this week: rate 51% since 1971 and 95% since 2000; gap 83% 
 | 2020s (to Nov. 2026) | 2.33 points |
 
 On a $400,000 loan, this week's rate means $2,737 a month in principal and interest; at the median gap it would be $2,600, a difference of $137.
+
+By year (table on the page): over the last ten full years (2016-2025) the yearly average ranged from 2.96% (2021) to 6.81% (2023). The widest yearly average gaps were 1982 (3.05 points), 2023 (2.85 points) and 1981 (2.75 points).
 
 The 10-year minus 2-year Treasury spread (FRED: T10Y2Y, daily since 1976) has had a median of 0.37 points point in the 2020s, the lowest of any decade in that series (2010s: 1.45; 2000s: 1.38).
 

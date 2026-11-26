@@ -43,6 +43,21 @@ Each series against its six-month high, latest month: payroll jobs 0.0% (October
 - Yield-curve model: a 9% chance of recession within 12 months, from a probit on the monthly 10-year minus 3-month spread fitted on 1982-2025 (`recession-prob`, spread 0.71 points so far in November).
 - How often each warning has been right before: see the [Recession Watch note](https://mkviz.com/recession-watch/).
 
+Which measure turns first (added Nov. 26, 2026; `breadth … --names jobs,household,income,spending,sales,output --window 6 --drop 0.005 --lead 12`, field first_turn): for each recession, the first month of the down run that spans the start month (up to 12 months back), or else the first later down month (up to 12 months on). Months from the start (negative = before):
+
+| Start | Payroll jobs | Household employment | Income | Spending | Sales | Production |
+|---|---|---|---|---|---|---|
+| Jan. 1970 | 5 | 5 | 3 | 2 | -2 | -2 |
+| Dec. 1973 | 12 | 11 | 1 | -2 | 0 | 1 |
+| Feb. 1980 | 3 | 2 | 0 | 0 | 0 | 2 |
+| Aug. 1981 | 4 | 1 | 5 | 1 | -5 | 1 |
+| Aug. 1990 | 3 | 1 | 0 | 2 | 1 | 2 |
+| Apr. 2001 | 4 | 1 | 1 | 5 | -6 | -4 |
+| Jan. 2008 | 6 | 7 | 3 | 6 | -1 | 1 |
+| Mar. 2020 | 0 | 0 | 0 | 0 | -5 | -5 |
+
+Down by the start month: sales seven of 8, payroll jobs one (2020). Medians: sales -1.5, payroll jobs four. A first rule (first down month anywhere in the 12 months before) was tried and dropped: it picked up unrelated dips a year earlier.
+
 ### Limits
 - These series are revised, sometimes a lot; the counts use today's revised data, not what was known at the time.
 - The 0.5% and six-month settings are our choices. A smaller drop counts more noise; a longer window counts slow declines.
