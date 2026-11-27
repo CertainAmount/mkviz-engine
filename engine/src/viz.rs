@@ -260,6 +260,8 @@ pub fn band(pts: &[Point], title: &str, as_pct: bool, suffix: &str) -> String {
 /// 값 표기: suffix가 "$"면 달러 앞 기호·천 단위 쉼표·정수(금값 그림), 아니면 소수 d자리 + suffix
 pub fn val_label(v: f64, suffix: &str, d: usize) -> String {
     if suffix != "$" { return format!("{:.*}{suffix}", d, v); }
+    // 100달러 아래(휘발유 갤런당)는 센트까지: $3.64. 그 위(금값)는 정수와 쉼표: $3,901
+    if v.abs() < 100.0 { return format!("{}${:.*}", if v < 0.0 { "-" } else { "" }, d.max(2), v.abs()); }
     let n = format!("{:.0}", v.abs());
     let mut out = String::new();
     for (i, c) in n.chars().enumerate() { if i > 0 && (n.len() - i) % 3 == 0 { out.push(','); } out.push(c); }
@@ -311,7 +313,8 @@ pub fn tracker(all: &[Point], drawn: &[Point], title: &str, suffix: &str, peaks:
         // "low:2021"은 그해 최저값에, 이름표는 점 아래에
         picked = years.iter().filter_map(|yr| {
             let (low, yr) = match yr.strip_prefix("low:") { Some(y) => (true, y), None => (false, yr.as_str()) };
-            let it = drawn.iter().filter(|p| p.date.starts_with(yr));
+            // 이름표 값은 줄여 그린 점(달마다)이 아니라 원 자료에서 고른다: 주간 자료의 2022 최고가 달 표본보다 높았다(2026-11-26 휘발유)
+            let it = all.iter().filter(|p| p.date.starts_with(yr));
             if low { it.min_by(|a, b| a.value.partial_cmp(&b.value).unwrap()) } else { it.max_by(|a, b| a.value.partial_cmp(&b.value).unwrap()) }
         }).collect();
     }
@@ -1938,10 +1941,12 @@ pub fn lines_band(series: &[(String, Vec<(i64, f64)>)], mark: Option<(i64, &str)
     let mut s = head(title);
     // 눈금 간격: 폭이 8%p를 넘으면 2%p마다(1%p마다면 글자가 빽빽했다)
     let step = if hi - lo > 8.0 { 2.0 } else { 1.0 };
-    let mut v = (lo / step).ceil() * step;
+    let mut v = (lo / step).ceil() * step + 0.0;
+    if v.abs() < 1e-9 { v = 0.0; }
     while v <= hi + 1e-9 {
         let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"{}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"13\">{v:.0}%</text>", W - r, y(v), y(v), if v.abs() < 1e-9 && lo < 0.0 { INK } else { "#eef2f7" }, l - 4.0, y(v) + 4.0);
         v += step;
+        if v.abs() < 1e-9 { v = 0.0; } // -0% 대신 0%
     }
     if let Some((b0, b1, name)) = band {
         let _ = write!(s, "<rect x=\"{:.1}\" y=\"{t:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"{SHADE}\"/><text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"13\">{}</text>",
@@ -2534,5 +2539,14 @@ mod arrows_tests {
         let s = super::arrows(&r, &["c".to_string()], ("Lower", "Higher"), "t");
         assert!(s.contains("url(#ah-b)") && s.contains("url(#ah-o)") && s.contains("url(#ah-g)"));
         assert!(s.contains("10.0%") && s.contains("stroke-dasharray=\"4 3\""));
+    }
+}
+
+#[cfg(test)]
+mod val_label_cents_test {
+    #[test]
+    fn small_dollars_show_cents() {
+        assert_eq!(super::val_label(3.642, "$", 0), "$3.64");
+        assert_eq!(super::val_label(3901.2, "$", 0), "$3,901");
     }
 }

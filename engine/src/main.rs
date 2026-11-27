@@ -18,7 +18,7 @@
 //!   drawdowns <csv> [--threshold 0.10] [--deep 0.20] [--flag <csv>] [--forward 91,182,365]
 //!       최고점 대비 threshold 이상 하락한 사례 전부, 바닥·회복·기간, deep 이상(하락장) 갈래 요약,
 //!       flag(예: 경기침체) 겹침, 하락선을 넘은 날 이후 N일 변화율.
-//!   position <csv> [--change 12] [--from YYYY-MM-DD]
+//!   position <csv> [--change 12] [--from YYYY-MM-DD] [--to YYYY-MM-DD]
 //!       지금 값이 역사 속 어디쯤인지(순위 비율, 최저·최고와 날짜, 중앙값). --change N: N행 전 대비 변화율로 본다(월간 12 = 1년).
 //!   turning <csv> [--window 8 --censor 6 --min-phase 4 --min-cycle 16 --big 0.20]
 //!       강세·약세장 판정(Pagan & Sossounov 2003). 월말 값으로 고점·저점을 찾고 국면별 변화·기간.
@@ -222,6 +222,10 @@ fn position(path: &str, o: &HashMap<String, String>) -> Result<String, String> {
     }
     if let Some(from) = o.get("from").and_then(|d| series::day_number(d)) {
         pts.retain(|p| p.day >= from);
+    }
+    // --to YYYY-MM-DD: 그 날까지만(한 구간의 중앙값·최저를 볼 때, 예: 심리 저점 구간의 실질 소비 증가율)
+    if let Some(to) = o.get("to").and_then(|d| series::day_number(d)) {
+        pts.retain(|p| p.day <= to);
     }
     if pts.is_empty() {
         return Err("자료 없음".into());
@@ -1092,7 +1096,9 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             for p in &firsts {
                 let m = &p.date[..7];
                 // 반년이 안 되는 구간은 달마다 눈금(3달마다면 눈금이 하나뿐이었다)
-                let every = if to != i64::MAX && from != i64::MIN && to - from < 183 { 1 } else if firsts.last().map_or(false, |l| l.day - firsts[0].day < 183) { 1 } else { 3 };
+                let span = firsts.last().map_or(0, |l| l.day - firsts[0].day);
+                // 1년 반이 넘으면 반년마다, 4년이 넘으면 해마다(3달마다면 글자가 겹쳤다, 2026-11-26 전기요금)
+                let every = if to != i64::MAX && from != i64::MIN && to - from < 183 { 1 } else if span < 183 { 1 } else if span > 1460 { 12 } else if span > 548 { 6 } else { 3 };
                 if m != last_m && (m[5..7].parse::<usize>().unwrap_or(1) - 1) % every == 0 { ticks.push((p.day, format!("{} {}", MON[m[5..7].parse::<usize>().unwrap_or(1) - 1], &m[2..4]))); }
                 last_m = m.to_string();
             }
@@ -1829,7 +1835,9 @@ fn yearly_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, String>
     let pts = series::load(path)?;
     let gap = match o.get("minus") {
         Some(c) => {
-            let by = series::load(c)?;
+            // --minus-scale k: 빼는 계열에 k를 곱한다(휘발유 - 원유/42)
+            let k: f64 = o.get("minus-scale").and_then(|v| v.parse().ok()).unwrap_or(1.0);
+            let by: Vec<series::Point> = series::load(c)?.into_iter().map(|p| series::Point { value: p.value * k, ..p }).collect();
             Some(match o.get("minus-window").and_then(|v| v.parse().ok()) { Some(n) => series::minus_window(&pts, &by, n), None => series::minus(&pts, &by) })
         }
         None => None,
@@ -2144,5 +2152,18 @@ mod minus_scale_test {
         o.insert("minus-window".to_string(), "7".to_string());
         let p = super::load_with(&a.to_string_lossy(), &o).unwrap();
         assert!((p[0].value - 1.0).abs() < 1e-9); // 3.0 - 84/42
+    }
+}
+
+#[cfg(test)]
+mod position_to_test {
+    #[test]
+    fn to_limits_window() {
+        let f = std::env::temp_dir().join("pos_to.csv");
+        std::fs::write(&f, "date,v\n2020-01-01,1\n2020-02-01,5\n2020-03-01,9\n").unwrap();
+        let mut o = std::collections::HashMap::new();
+        o.insert("to".to_string(), "2020-02-15".to_string());
+        let j = super::position(&f.to_string_lossy(), &o).unwrap();
+        assert!(j.contains("\"value\":5") && j.contains("\"n\":2"), "{j}");
     }
 }

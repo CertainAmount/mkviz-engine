@@ -4,12 +4,13 @@
 |---|---|---|---|
 | [micron-technology-stock](https://mkviz.com/micron-technology-stock/) | [mu-multiples](micron-technology-stock/mu-multiples.csv) | multiples | stock_mu.csv |
 | [spacex-stock](https://mkviz.com/spacex-stock/) | [ipo-cases](spacex-stock/ipo-cases.csv) |  |  |
-| [electricity-bills-data-centers](https://mkviz.com/electricity-bills-data-centers/) | [power-underwater](electricity-bills-data-centers/power-underwater.csv) | underwater | bls_CUUR0000SEHF01.csv, fred_CPIAUCSL.csv |
-| [electricity-bills-data-centers](https://mkviz.com/electricity-bills-data-centers/) | [dc-share-pictogram](electricity-bills-data-centers/dc-share-pictogram.csv) | pictogram |  |
-| [electricity-bills-data-centers](https://mkviz.com/electricity-bills-data-centers/) | [power-states-strip](electricity-bills-data-centers/power-states-strip.csv) | strip |  |
+| [electricity-bills-data-centers](https://mkviz.com/electricity-bills-data-centers/) | [power-pjm-timing](electricity-bills-data-centers/power-pjm-timing.csv) | lines |  |
 | [bond-fund-calculator](https://mkviz.com/bond-fund-calculator/) | [bond-yield-recent](bond-fund-calculator/bond-yield-recent.csv) | recent | fred_DGS7.csv |
 | [bond-fund-calculator](https://mkviz.com/bond-fund-calculator/) | [bond-fund-underwater](bond-fund-calculator/bond-fund-underwater.csv) | underwater | fred_DGS7.csv |
 | [bond-fund-calculator](https://mkviz.com/bond-fund-calculator/) | [bond-fund-recovery](bond-fund-calculator/bond-fund-recovery.csv) | recover | fred_DGS7.csv |
+| [gas-prices-vs-oil](https://mkviz.com/gas-prices-vs-oil/) | [gas-recent](gas-prices-vs-oil/gas-recent.csv) | recent | fred_GASREGW.csv |
+| [gas-prices-vs-oil](https://mkviz.com/gas-prices-vs-oil/) | [gas-real-tracker](gas-prices-vs-oil/gas-real-tracker.csv) | tracker | fred_CPIAUCSL.csv, fred_GASREGW.csv |
+| [gas-prices-vs-oil](https://mkviz.com/gas-prices-vs-oil/) | [gas-gap-tracker](gas-prices-vs-oil/gas-gap-tracker.csv) | tracker | fred_DCOILWTICO.csv, fred_GASREGW.csv |
 | [gold-price-history](https://mkviz.com/gold-price-history/) | [gold-price-history](gold-price-history/gold-price-history.csv) | tracker |  |
 | [gold-price-history](https://mkviz.com/gold-price-history/) | [gold-real-history](gold-price-history/gold-real-history.csv) | tracker |  |
 | [gold-price-history](https://mkviz.com/gold-price-history/) | [gold-vs-stocks](gold-price-history/gold-vs-stocks.csv) | tracker |  |

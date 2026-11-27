@@ -1,0 +1,1 @@
+{"frame":"tracker","input":"data/series/fred_GASREGW.csv","params":{"deflate":"data/series/fred_CPIAUCSL.csv","suffix":"$","title":"US regular gas in today's dollars, every week since 1990","years":"2008,2022"}}

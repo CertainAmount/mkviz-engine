@@ -1,0 +1,1 @@
+{"frame":"lines","input":"data/content/figures/power-pjm-median.csv","params":{"from":"2024-01-01","mark":"2025-06-01|June 2025","name":"PJM places","series":"data/content/figures/power-other-median.csv|Rest of US","title":"Household power price, change from a year earlier, typical place (%)"}}
