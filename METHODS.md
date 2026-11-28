@@ -35,4 +35,8 @@ All inputs are files with a date column and a value column. Dates are compared a
 
 `underwater`, `paths`, `band`, `dots`, `fan`, `response`, `cases`, `during`, `pictogram`, `strip`, `multiples`, `gauge`, `calendar`, `timeline`, `spells`. Every chart also writes its data (`.csv`) and settings (`.json`) next to the SVG.
 
+## Diagrams (`figure flow`)
+
+Some questions are about how something travels, not how big it is: why a shelf price lags the exchange rate, where a dollar of import cost goes. `flow` draws 2-6 steps joined by arrows, with a short note or a sourced value under each step and an optional note on each arrow (`--rows "Step:note;..." --notes "..." --highlight <step>`). No boxes; one highlighted step. More diagram forms are added when a post's question needs one.
+
 Charts follow two findings from perception research: compare values by position on a shared axis (Cleveland and McGill 1984), and highlight only one thing, usually today (Borkin et al. 2013).
