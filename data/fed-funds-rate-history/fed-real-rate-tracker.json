@@ -1,0 +1,1 @@
+{"frame":"tracker","input":"data/series/fred_FEDFUNDS.csv","params":{"decimals":"2","fill-gaps":"","minus":"data/series/fred_CPIAUCSL.csv","minus-pct-change":"12","suffix":"%","title":"Fed funds rate minus inflation, monthly since 1954","years":"1981,low:2022"}}

@@ -51,7 +51,7 @@
 //!       선행 지표(유가)가 window개 점 안에서 threshold 이상 오른 날·내린 날마다, 후행 지표(휘발유)가 N일 뒤 얼마나 따라왔나.
 //!       오를 때와 내릴 때를 나눠 중앙값을 낸다(반영의 비대칭, '로켓과 깃털' 시험).
 //!   cycles <rate.csv>[,<newer.csv>] [--flag <usrec.csv> --within 730]
-//!       정책 금리 사이클(같은 방향 변화 묶음): 방향, 첫·마지막 변화일, 횟수, 몇 %p. --flag: 첫 변화 뒤 within일 안에 침체가 있었나.
+//!       정책 금리 사이클(같은 방향 변화 묶음): 방향, 첫·마지막 변화일, 횟수, 몇 %p, 앞 사이클 끝에서 며칠 뒤(gap_days). --flag: 첫 변화 뒤 within일 안에 침체가 있었나.
 //!       여러 파일은 이어 붙인다(DFEDTAR 1982-2008 + DFEDTARU 2008-).
 //!   events … --diff     비율 대신 수준 차이(금리: %p)로.
 //!   payment --loan 300000 --rates 6.66,7.18 [--years 30]
@@ -62,7 +62,7 @@
 //!   fit <y.csv> --x <a.csv>,<b.csv> [--change ,12 --train-from YYYY-MM --train-to YYYY-MM --from YYYY-MM]
 //!       최소제곱 회귀: 학습 기간 달들로 계수를 정하고, 달마다 예상값과 실제와의 차이(잔차). --change: x마다 n달 전 대비 변화율(빈칸은 수준).
 //!   spells <csv> --threshold x [--below]   값이 기준 이상(이하)으로 이어진 구간(시작·끝·길이·극값·진행 중).
-//!   (공통) --per <csv>: 다른 계열로 나눈 비율. --minus <csv>: 다른 계열을 뺀 차이(모기지 금리 - 10년 국채). --minus-scale k: 빼는 계열에 k를 곱한다(휘발유 - 원유/42).
+//!   (공통) --per <csv>: 다른 계열로 나눈 비율. --minus <csv>: 다른 계열을 뺀 차이(모기지 금리 - 10년 국채). --minus-scale k: 빼는 계열에 k를 곱한다(휘발유 - 원유/42). --minus-pct-change n: 빼는 계열을 n달 변화율(%)로(기준금리 - 물가 = 실질 금리).
 //!   figure stack <total.csv> --base <csv> --dates d1,d2,… --out <svg> [--labels … --typical 1.7 --names "10-year Treasury,Gap"]
 //!       쌓은 막대: 시점마다 전체(모기지 금리) = 바탕(국채 금리, 파랑) + 나머지(금리 차, 주황). --typical: 바탕 + 보통 차이 자리에 점선 눈금.
 //!   figure savings <rate.csv> --loan L --marks "이름:하락폭,..." --out <svg> [--drop 1.5 --years 30]
@@ -185,9 +185,15 @@ fn load_with(path: &str, o: &HashMap<String, String>) -> Result<Vec<series::Poin
     // --minus <csv>: 다른 계열을 뺀 차이(모기지 금리 - 10년 국채 = 금리 차, %p)
     // --minus-window n: 그날 하나 대신 그날 전 n일 평균을 뺀다(주간 조사값용)
     // --minus-scale k: 빼는 계열에 k를 곱한다(휘발유 갤런당 값 - 원유 배럴당 값 / 42 = 원유 밖의 몫)
+    // --minus-pct-change n: 빼는 계열을 n달 전 대비 변화율(%)로 바꾼 뒤 뺀다(기준금리 - 1년 물가 상승률 = 실질 기준금리)
     let scaled = |c: &str| -> Result<Vec<series::Point>, String> {
         let k: f64 = o.get("minus-scale").and_then(|v| v.parse().ok()).unwrap_or(1.0);
-        Ok(series::load(c)?.into_iter().map(|p| series::Point { value: p.value * k, ..p }).collect())
+        let by = series::load(c)?;
+        let by = match o.get("minus-pct-change").and_then(|v| v.parse().ok()) {
+            Some(n) => series::change_over(&by, n).into_iter().map(|p| series::Point { value: p.value * 100.0, ..p }).collect(),
+            None => by,
+        };
+        Ok(by.into_iter().map(|p| series::Point { value: p.value * k, ..p }).collect())
     };
     let pts = match (o.get("minus"), o.get("minus-window").and_then(|v| v.parse().ok())) {
         (Some(c), Some(n)) => series::minus_window(&pts, &scaled(c)?, n),
@@ -924,7 +930,7 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             let w = &pts[pts.len().saturating_sub(n)..];
             csv = format!("date,value\n{}", w.iter().map(|p| format!("{},{}\n", p.date, p.value)).collect::<String>());
             viz::recent(w, &title, o.get("suffix").map(String::as_str).unwrap_or(""), o.get("decimals").and_then(|v| v.parse().ok()).unwrap_or(2), o.get("now").map(String::as_str).unwrap_or("Now"), o.get("line").and_then(|v| v.split_once('|')).and_then(|(a, b)| Some((a.parse().ok()?, b)))) }
-        "tracker" => viz::tracker(&pts, &turning::monthly(&pts), &title, o.get("suffix").map(String::as_str).unwrap_or(""), o.get("peaks").and_then(|v| v.parse().ok()).unwrap_or(3), &o.get("years").map(|v| v.split(',').map(String::from).collect::<Vec<_>>()).unwrap_or_default(), o.get("note").map(String::as_str).unwrap_or(""), opt_f(o, "mid", 0.8), o.get("now").map(String::as_str).unwrap_or("Now")),
+        "tracker" => viz::tracker(&pts, &turning::monthly(&pts), &title, o.get("suffix").map(String::as_str).unwrap_or(""), o.get("peaks").and_then(|v| v.parse().ok()).unwrap_or(3), &o.get("years").map(|v| v.split(',').map(String::from).collect::<Vec<_>>()).unwrap_or_default(), o.get("note").map(String::as_str).unwrap_or(""), opt_f(o, "mid", 0.8), o.get("now").map(String::as_str).unwrap_or("Now"), o.get("decimals").and_then(|v| v.parse().ok()).unwrap_or(1)),
         "band" => viz::band(&turning::monthly(&pts), &title, o.contains_key("pct"), o.get("suffix").map(String::as_str).unwrap_or("")),
         "recover" => {
             // 하락마다 한 줄: 고점 해와 그때 금리(--rates 금리 csv), 고점에서 새 고점까지 개월(진행 중이면 지금까지, 파랑). 시작 금리 높은 순.
@@ -1109,13 +1115,13 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             if colors.is_empty() && band.is_none() { viz::lines(&sers, mark, &ticks, &title) } else { viz::lines_band(&sers, mark, &ticks, &colors, band, &title) }
         }
         "arrows" => {
-            // 줄마다 시작 → 끝 화살표: --rows "1952:0.0297,0.0026;…" (수준값 비율), --open "2026, so far" 아직 안 끝난 줄(회색 점선), --names "Lower,Higher"
+            // 줄마다 시작 → 끝 화살표: --rows "1952:0.0297,0.0026;…" (수준값 비율), --open "2026, so far" 아직 안 끝난 줄(회색 점선), --names "Lower,Higher", --decimals 2(정책 금리 0.25%p 단위)
             let rows: Vec<(String, f64, f64)> = o.get("rows").ok_or("--rows 가 필요")?.split(';').filter_map(|r| { let (n, v) = r.split_once(':')?; let (a, b) = v.split_once(',')?; Some((n.to_string(), a.trim().parse().ok()?, b.trim().parse().ok()?)) }).collect();
             let open: Vec<String> = o.get("open").map(|v| v.split(';').map(String::from).collect()).unwrap_or_default();
             csv = format!("row,from,to\n{}", rows.iter().map(|r| format!("{},{},{}\n", r.0, r.1, r.2)).collect::<String>());
             let nm = o.get("names").map(String::as_str).unwrap_or("Lower,Higher");
             let (n1, n2) = nm.split_once(',').unwrap_or((nm, ""));
-            viz::arrows(&rows, &open, (n1, n2), &title)
+            viz::arrows(&rows, &open, (n1, n2), &title, o.get("decimals").and_then(|v| v.parse().ok()).unwrap_or(1))
         }
         "rowdots" => {
             // 줄마다 이름과 값들: --rows "Computers:-0.093,0.097,-0.007;Toys:…" --marks "Usual year,This year,Holiday dip" [--unit pt: 값이 %p, --unit yr: 값이 년, --unit level: 수준값(물가 상승률처럼 + 부호 없이), --line "2|Median": 기준 점선] (입력 csv는 쓰지 않는다)
@@ -1742,13 +1748,16 @@ fn cycles_cmd(paths: &str, o: &HashMap<String, String>) -> Result<String, String
     let flag = match o.get("flag") { Some(f) => series::load(f)?, None => vec![] };
     let within = o.get("within").and_then(|v| v.parse().ok()).unwrap_or(730i64);
     let mut j = String::from("{\"cycles\":[");
-    for (k, c) in cycles::cycles(&pts).iter().enumerate() {
+    let cs = cycles::cycles(&pts);
+    for (k, c) in cs.iter().enumerate() {
         let a = series::day_number(&c.start).unwrap();
+        // gap_days: 앞 사이클의 마지막 변화부터 이 사이클 첫 변화까지(마지막 인하 뒤 몇 날 만에 다시 올렸나)
+        let gap = if k == 0 { "null".to_string() } else { (a - series::day_number(&cs[k - 1].end).unwrap()).to_string() };
         let rec = if flag.is_empty() { "null".to_string() } else {
             let last_flag = flag.last().map(|f| f.day).unwrap_or(0);
             if a + within > last_flag { "null".into() } else { flag.iter().any(|f| f.day > a && f.day <= a + within && f.value >= 1.0).to_string() }
         };
-        let _ = write!(j, "{}{{\"direction\":{},\"start\":{},\"end\":{},\"moves\":{},\"second\":{},\"from\":{},\"to\":{},\"recession_within\":{rec}}}",
+        let _ = write!(j, "{}{{\"direction\":{},\"start\":{},\"end\":{},\"moves\":{},\"second\":{},\"from\":{},\"to\":{},\"gap_days\":{gap},\"recession_within\":{rec}}}",
                        if k > 0 { "," } else { "" }, s(if c.up { "up" } else { "down" }), s(&c.start), s(&c.end), c.moves, c.second.as_deref().map_or("null".to_string(), s), num(Some(c.from)), num(Some(c.to)));
     }
     j.push_str("]}");
@@ -2165,5 +2174,26 @@ mod position_to_test {
         o.insert("to".to_string(), "2020-02-15".to_string());
         let j = super::position(&f.to_string_lossy(), &o).unwrap();
         assert!(j.contains("\"value\":5") && j.contains("\"n\":2"), "{j}");
+    }
+}
+
+#[cfg(test)]
+mod real_rate_test {
+    use std::collections::HashMap;
+    #[test]
+    fn minus_pct_change_subtracts_inflation_and_cycles_gap() {
+        // 금리 5%, 물가지수는 1년에 2% 오른다 → 실질 금리 3%. 사이클: 1월 인하, 2월 인하, 5월 인상 → 인상 사이클 gap_days = 2월 1일~5월 1일
+        let dir = std::env::temp_dir().join("mkviz_real_rate_test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let w = |name: &str, body: String| { let p = dir.join(name); std::fs::write(&p, body).unwrap(); p.to_str().unwrap().to_string() };
+        let rate = w("r.csv", "date,v\n2020-01-01,5\n2021-01-01,5\n".into());
+        let cpi = w("c.csv", "date,v\n2020-01-01,100\n2021-01-01,102\n".into());
+        let o: HashMap<String, String> = [("minus", cpi), ("minus-pct-change", "12".to_string())].into_iter().map(|(k, v)| (k.to_string(), v)).collect();
+        let pts = super::load_with(&rate, &o).unwrap();
+        assert_eq!(pts.len(), 1);
+        assert!((pts[0].value - 3.0).abs() < 1e-9);
+        let t = w("t.csv", "date,v\n2020-01-01,3\n2020-01-15,2.5\n2020-02-01,2\n2020-05-01,2.25\n".into());
+        let j = super::cycles_cmd(&t, &HashMap::new()).unwrap();
+        assert!(j.contains("\"gap_days\":null") && j.contains("\"gap_days\":90"), "{j}");
     }
 }

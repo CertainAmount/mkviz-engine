@@ -268,7 +268,7 @@ pub fn val_label(v: f64, suffix: &str, d: usize) -> String {
     format!("{}${out}", if v < 0.0 { "-" } else { "" })
 }
 
-pub fn tracker(all: &[Point], drawn: &[Point], title: &str, suffix: &str, peaks: usize, years: &[String], note: &str, mid: f64, now_label: &str) -> String {
+pub fn tracker(all: &[Point], drawn: &[Point], title: &str, suffix: &str, peaks: usize, years: &[String], note: &str, mid: f64, now_label: &str, decimals: usize) -> String {
     let (qa, qb) = ((1.0 - mid) / 2.0, 1.0 - (1.0 - mid) / 2.0); // 음영: 가운데 mid 몫(0.5면 사분위 범위)
     const HALO: &str = "stroke=\"#fff\" stroke-width=\"4\" paint-order=\"stroke\"";
     let mut vals: Vec<f64> = all.iter().map(|p| p.value).collect();
@@ -276,7 +276,7 @@ pub fn tracker(all: &[Point], drawn: &[Point], title: &str, suffix: &str, peaks:
     // 분위수는 두 이웃 값 사이를 잇는다(짝수 개 자료의 중앙값이 아래쪽 값으로 기울지 않게, 본문 중앙값 팩트와 같은 값)
     let q = |f: f64| { let x = (vals.len() - 1) as f64 * f; let (i, w) = (x.floor() as usize, x - x.floor()); vals[i] + (vals[(i + 1).min(vals.len() - 1)] - vals[i]) * w };
     let now = all.last().unwrap();
-    let lab = |v: f64| val_label(v, suffix, 1);
+    let lab = |v: f64| val_label(v, suffix, decimals);
     let left = ([q(qb), q(0.5), q(qa)].iter().map(|v| lab(*v).chars().count()).max().unwrap_or(4) as f64 * 8.4 + 12.0).max(L);
     let top = if note.is_empty() { T } else { T + 22.0 };
     let (lo, hi) = (vals[0].min(now.value), vals[vals.len() - 1].max(now.value));
@@ -2495,7 +2495,7 @@ mod rebound_grid_tests {
 
 /// 화살표 줄: 줄마다 시작 값 → 끝 값 화살표. 내려가면 파랑, 오르면 주황, 열린 줄(--open, 아직 끝나지 않은 사례)은 회색 점선.
 /// 끝에 값 글자. 눈금은 수준값 %(부호 없음). 한 줄에 점 셋을 겹치던 그림을 대신한다(물가 반등, 2026-11-26 독자: 색 셋을 읽어야 결론이 보였다)
-pub fn arrows(rows: &[(String, f64, f64)], open: &[String], names: (&str, &str), title: &str) -> String {
+pub fn arrows(rows: &[(String, f64, f64)], open: &[String], names: (&str, &str), title: &str, decimals: usize) -> String {
     let all: Vec<f64> = rows.iter().flat_map(|r| [r.1, r.2]).collect();
     let lo = all.iter().cloned().fold(0.0_f64, f64::min) - 0.01;
     let hi = all.iter().cloned().fold(0.0_f64, f64::max) + 0.015;
@@ -2521,8 +2521,11 @@ pub fn arrows(rows: &[(String, f64, f64)], open: &[String], names: (&str, &str),
         let dir = if z >= a { 1.0 } else { -1.0 };
         let x2 = if (x(*z) - x(*a)).abs() < 8.0 { x(*a) + dir * 8.0 } else { x(*z) };
         let _ = write!(s, "<line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{y:.1}\" y2=\"{y:.1}\" stroke=\"{col}\" stroke-width=\"2.5\"{} marker-end=\"url(#{mk})\"/>", x(*a), x2, if is_open { " stroke-dasharray=\"4 3\"" } else { "" });
-        let (tx, anchor) = if dir > 0.0 { (x2 + 8.0, "start") } else { (x2 - 8.0, "end") };
-        let _ = write!(s, "<text x=\"{tx:.1}\" y=\"{:.1}\" text-anchor=\"{anchor}\" fill=\"{INK}\" font-size=\"12\">{:.1}%</text>", y + 4.0, z * 100.0);
+        let lab = format!("{:.*}%", decimals, z * 100.0);
+        // 왼쪽으로 끝나는 값 글자가 줄 이름 칸을 넘으면 시작 점 오른쪽에 둔다(0.25%까지 내린 사이클)
+        let (tx, anchor) = if dir > 0.0 { (x2 + 8.0, "start") }
+            else if x2 - 8.0 - 7.0 * (lab.len() as f64) < l.max(x(0.0)) { (x(*a) + 8.0, "start") } else { (x2 - 8.0, "end") };
+        let _ = write!(s, "<text x=\"{tx:.1}\" y=\"{:.1}\" text-anchor=\"{anchor}\" fill=\"{INK}\" font-size=\"12\">{lab}</text>", y + 4.0);
     }
     let ly = H - 10.0;
     let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#2563eb\" stroke-width=\"2.5\" marker-end=\"url(#ah-b)\"/><text x=\"{:.1}\" y=\"{ly:.1}\" fill=\"{INK}\" font-size=\"13\">{}</text><line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#eb6834\" stroke-width=\"2.5\" marker-end=\"url(#ah-o)\"/><text x=\"{:.1}\" y=\"{ly:.1}\" fill=\"{INK}\" font-size=\"13\">{}</text>",
@@ -2536,7 +2539,7 @@ mod arrows_tests {
     #[test]
     fn color_by_direction() {
         let r = vec![("a".to_string(), 0.03, 0.01), ("b".to_string(), 0.04, 0.10), ("c".to_string(), 0.038, 0.039)];
-        let s = super::arrows(&r, &["c".to_string()], ("Lower", "Higher"), "t");
+        let s = super::arrows(&r, &["c".to_string()], ("Lower", "Higher"), "t", 1);
         assert!(s.contains("url(#ah-b)") && s.contains("url(#ah-o)") && s.contains("url(#ah-g)"));
         assert!(s.contains("10.0%") && s.contains("stroke-dasharray=\"4 3\""));
     }

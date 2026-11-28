@@ -8,6 +8,9 @@
 | [bond-fund-calculator](https://mkviz.com/bond-fund-calculator/) | [bond-yield-recent](bond-fund-calculator/bond-yield-recent.csv) | recent | fred_DGS7.csv |
 | [bond-fund-calculator](https://mkviz.com/bond-fund-calculator/) | [bond-fund-underwater](bond-fund-calculator/bond-fund-underwater.csv) | underwater | fred_DGS7.csv |
 | [bond-fund-calculator](https://mkviz.com/bond-fund-calculator/) | [bond-fund-recovery](bond-fund-calculator/bond-fund-recovery.csv) | recover | fred_DGS7.csv |
+| [fed-funds-rate-history](https://mkviz.com/fed-funds-rate-history/) | [fed-funds-tracker](fed-funds-rate-history/fed-funds-tracker.csv) | tracker | fred_DFF.csv |
+| [fed-funds-rate-history](https://mkviz.com/fed-funds-rate-history/) | [fed-real-rate-tracker](fed-funds-rate-history/fed-real-rate-tracker.csv) | tracker | fred_CPIAUCSL.csv, fred_FEDFUNDS.csv |
+| [fed-funds-rate-history](https://mkviz.com/fed-funds-rate-history/) | [fed-cycles-arrows](fed-funds-rate-history/fed-cycles-arrows.csv) | arrows | fred_DFF.csv |
 | [gas-prices-vs-oil](https://mkviz.com/gas-prices-vs-oil/) | [gas-recent](gas-prices-vs-oil/gas-recent.csv) | recent | fred_GASREGW.csv |
 | [gas-prices-vs-oil](https://mkviz.com/gas-prices-vs-oil/) | [gas-real-tracker](gas-prices-vs-oil/gas-real-tracker.csv) | tracker | fred_CPIAUCSL.csv, fred_GASREGW.csv |
 | [gas-prices-vs-oil](https://mkviz.com/gas-prices-vs-oil/) | [gas-gap-tracker](gas-prices-vs-oil/gas-gap-tracker.csv) | tracker | fred_DCOILWTICO.csv, fred_GASREGW.csv |
@@ -58,6 +61,7 @@
 | [jobs-report-revisions](https://mkviz.com/jobs-report-revisions/) | [jobs-revisions-years](jobs-report-revisions/jobs-revisions-years.csv) | years | bls_ces_first.csv, bls_ces_third.csv, fred_USREC.csv |
 | [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [nasdaq-after-midterms](stocks-after-midterm-elections/nasdaq-after-midterms.csv) | fan | fred_NASDAQCOM.csv |
 | [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [midterm-cases](stocks-after-midterm-elections/midterm-cases.csv) | cases |  |
+| [stocks-after-midterm-elections](https://mkviz.com/stocks-after-midterm-elections/) | [midterm-vs-other-years](stocks-after-midterm-elections/midterm-vs-other-years.csv) | strips | index_gspc_long.csv |
 | [mortgage-rates-treasury-gap](https://mkviz.com/mortgage-rates-treasury-gap/) | [mortgage-rate-stack](mortgage-rates-treasury-gap/mortgage-rate-stack.csv) | stack | fred_DGS10.csv, fred_MORTGAGE30US.csv |
 | [mortgage-rates-treasury-gap](https://mkviz.com/mortgage-rates-treasury-gap/) | [mortgage-gap-savings](mortgage-rates-treasury-gap/mortgage-gap-savings.csv) | savings | fred_MORTGAGE30US.csv |
 | [mortgage-rates-back-to-3-percent](https://mkviz.com/mortgage-rates-back-to-3-percent/) | [m3-ten-years](mortgage-rates-back-to-3-percent/m3-ten-years.csv) | recent | fred_MORTGAGE30US.csv |
