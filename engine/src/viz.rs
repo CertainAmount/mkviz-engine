@@ -2559,3 +2559,104 @@ mod val_label_cents_test {
         assert_eq!(super::val_label(3901.2, "$", 0), "$3,901");
     }
 }
+
+/// 흐름 도식(차트가 아닌 그림): 단계 이름(굵게)과 짧은 설명 줄, 단계 사이 화살표와 그 화살표의 짧은 메모(걸리는 시간, 더해지는 것).
+/// 상자·카드 없이 글자와 간격, 가는 회색 화살표만(사이트 최소 꼴). 강조는 하나(highlight 단계만 파랑).
+/// 3단계 이하는 가로(위 메모, 가운데 점과 화살표, 아래 글자), 4단계 이상이거나 vertical이면 세로(왼쪽 점과 화살표, 오른쪽 글자, 화살표 옆 메모).
+pub fn flow(nodes: &[(String, String)], notes: &[String], highlight: &str, vertical: bool, title: &str) -> String {
+    fn wrap(t: &str, n: usize) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for w in t.split_whitespace() {
+            match out.last_mut() {
+                Some(l) if l.chars().count() + w.chars().count() < n => { l.push(' '); l.push_str(w); }
+                _ => out.push(w.to_string()),
+            }
+        }
+        out
+    }
+    let esc = |t: &str| t.replace('&', "&amp;").replace('<', "&lt;");
+    let n = nodes.len().max(1);
+    let note = |i: usize| notes.get(i).map(String::as_str).unwrap_or("");
+    let hl = |i: usize| !highlight.is_empty() && nodes[i].0 == highlight;
+    let mut body = format!("<defs><marker id=\"fl-a\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" markerWidth=\"6\" markerHeight=\"6\" orient=\"auto\"><path d=\"M0,0L10,5L0,10z\" fill=\"{GRAY}\"/></marker></defs>");
+    let dot = |s: &mut String, i: usize, x: f64, y: f64| {
+        let (c, r) = if hl(i) { (BLUE, 7.0) } else { (GRAY, 6.0) };
+        let _ = write!(s, "<circle cx=\"{x:.1}\" cy=\"{y:.1}\" r=\"{r}\" fill=\"{c}\" stroke=\"#fff\" stroke-width=\"3\"/>");
+    };
+    let arrow = |s: &mut String, x1: f64, y1: f64, x2: f64, y2: f64| {
+        let _ = write!(s, "<line x1=\"{x1:.1}\" y1=\"{y1:.1}\" x2=\"{x2:.1}\" y2=\"{y2:.1}\" stroke=\"{GRAY}\" stroke-width=\"1.5\" marker-end=\"url(#fl-a)\"/>");
+    };
+    let h;
+    if !vertical && n <= 3 {
+        // 가로: 단계마다 같은 폭의 칸, 글자는 칸 가운데
+        let cw = (W - 16.0) / n as f64;
+        let cx = |i: usize| 8.0 + cw * (i as f64 + 0.5);
+        let labs: Vec<Vec<String>> = nodes.iter().map(|nd| wrap(&nd.0, ((cw - 10.0) / 9.5) as usize)).collect();
+        let subs: Vec<Vec<String>> = nodes.iter().map(|nd| wrap(&nd.1, ((cw - 10.0) / 8.0) as usize)).collect();
+        let nls: Vec<Vec<String>> = (0..n - 1).map(|i| wrap(note(i), ((cw - 20.0) / 7.5) as usize)).collect();
+        let nh = nls.iter().map(Vec::len).max().unwrap_or(0) as f64 * 17.0;
+        let rail = 16.0 + nh + if nh > 0.0 { 6.0 } else { 0.0 };
+        for (i, ls) in nls.iter().enumerate() {
+            // 메모는 화살표 바로 위, 아래 줄을 화살표에 붙여 쌓는다
+            let mx = (cx(i) + cx(i + 1)) / 2.0;
+            for (k, l) in ls.iter().enumerate() {
+                let _ = write!(body, "<text x=\"{mx:.1}\" y=\"{:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"14\" font-style=\"italic\">{}</text>", rail - 9.0 - (ls.len() - 1 - k) as f64 * 17.0, esc(l));
+            }
+            arrow(&mut body, cx(i) + 11.0, rail, cx(i + 1) - 13.0, rail);
+        }
+        let mut bottom: f64 = rail;
+        for i in 0..n {
+            dot(&mut body, i, cx(i), rail);
+            let mut y = rail + 32.0;
+            let fill = if hl(i) { BLUE } else { "#0f172a" };
+            for l in &labs[i] { let _ = write!(body, "<text x=\"{:.1}\" y=\"{y:.1}\" text-anchor=\"middle\" fill=\"{fill}\" font-weight=\"600\">{}</text>", cx(i), esc(l)); y += 20.0; }
+            for l in &subs[i] { let _ = write!(body, "<text x=\"{:.1}\" y=\"{y:.1}\" text-anchor=\"middle\" fill=\"{INK}\" font-size=\"15\">{}</text>", cx(i), esc(l)); y += 19.0; }
+            bottom = bottom.max(y);
+        }
+        h = (bottom - 6.0).ceil();
+    } else {
+        // 세로: 왼쪽에 점과 아래로 가는 화살표, 오른쪽에 글자, 단계 사이 빈칸에 메모
+        let (xd, xt) = (14.0, 36.0);
+        let mut y0 = 14.0;
+        let mut dots: Vec<f64> = Vec::new();
+        for i in 0..n {
+            let dy = y0 + 11.0;
+            dots.push(dy);
+            let mut y = y0 + 16.0;
+            let fill = if hl(i) { BLUE } else { "#0f172a" };
+            for l in wrap(&nodes[i].0, ((W - xt - 8.0) / 9.5) as usize) { let _ = write!(body, "<text x=\"{xt}\" y=\"{y:.1}\" fill=\"{fill}\" font-weight=\"600\">{}</text>", esc(&l)); y += 20.0; }
+            for l in wrap(&nodes[i].1, ((W - xt - 8.0) / 8.0) as usize) { let _ = write!(body, "<text x=\"{xt}\" y=\"{:.1}\" fill=\"{INK}\" font-size=\"15\">{}</text>", y - 1.0, esc(&l)); y += 19.0; }
+            let last = y - 20.0;
+            if i + 1 < n {
+                let ls = wrap(note(i), ((W - xt - 8.0) / 7.5) as usize);
+                let mut ny = last + 24.0;
+                for l in &ls { let _ = write!(body, "<text x=\"{xt}\" y=\"{ny:.1}\" fill=\"{INK}\" font-size=\"14\" font-style=\"italic\">{}</text>", esc(l)); ny += 17.0; }
+                y0 = if ls.is_empty() { last + 22.0 } else { ny - 4.0 };
+            } else {
+                y0 = last;
+            }
+        }
+        for i in 0..n - 1 { arrow(&mut body, xd, dots[i] + 11.0, xd, dots[i + 1] - 13.0); }
+        for (i, &dy) in dots.iter().enumerate() { dot(&mut body, i, xd, dy); }
+        h = (y0 + 14.0).ceil();
+    }
+    let mut s = head(title).replacen(&format!("0 0 {W} {H}\" width=\"{W}\" height=\"{H}\""), &format!("0 0 {W} {h}\" width=\"{W}\" height=\"{h}\""), 1);
+    s.push_str(&body);
+    s.push_str("</svg>");
+    s
+}
+
+#[cfg(test)]
+mod flow_tests {
+    fn nodes(k: usize) -> Vec<(String, String)> { (0..k).map(|i| (format!("Step {i}"), format!("note {i}"))).collect() }
+    #[test]
+    fn arrows_between_steps_and_one_highlight() {
+        let s = super::flow(&nodes(3), &["days".into(), "months".into()], "Step 2", false, "t");
+        assert_eq!(s.matches("marker-end").count(), 2);
+        assert_eq!(s.matches("fill=\"#2563eb\"").count(), 2); // 강조 단계의 점과 이름만
+        assert!(s.contains(">days<") && s.contains(">months<") && !s.contains("<rect"));
+        let v = super::flow(&nodes(5), &[], "", false, "t");
+        assert_eq!(v.matches("marker-end").count(), 4);
+        assert!(!v.contains("r=\"7\"")); // 강조 없으면 큰 점도 없다
+    }
+}

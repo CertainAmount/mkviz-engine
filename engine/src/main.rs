@@ -13,6 +13,7 @@
 //!   rebounds <csv> --peak 5 [--rise 1 --cool 3 --forward 12,24 --also <csv>]   정점 뒤 바닥에서 rise 이상 다시 오른 첫 점(두 번째 물결), 그 뒤 n개 점과 최고, also 계열의 바닥→반등 변화
 //!   figure rebounds <csv> --peak 5 --cool 3 --also <csv> [--months 24 --names "Headline,Core" --also-short core --only-also --labels "1973:kept climbing;…"]   반등 사례마다 작은 그림(주 계열·also 계열), 칸 제목에 also의 반등 뒤 6달 변화
 //!   figure arrows --rows "이름:시작,끝;…" [--open 이름 --names "Lower,Higher"]   줄마다 시작→끝 화살표(내려가면 파랑, 오르면 주황, 열린 줄 회색 점선)
+//!   figure flow [-] --rows "단계:짧은 설명;…" [--notes "화살표 메모;…" --highlight 단계 --vertical --title …] --out <svg>   흐름 도식(2~6단계, 상자 없이 글자·화살표, 3단계 이하 가로·4단계 이상 세로, 강조 단계 파랑). 자료 csv 없음
 //!   yearly <csv> [--minus <csv> --minus-window 7]   해마다 평균·최저·최고, --minus면 그 해 평균 차이와 바탕 평균(연도별 표)
 //!   ladder <csv> [--depths 0.05,0.10,0.15,0.20,0.30,0.40,0.50]   지난 하락 중 깊이마다 간 수, 그 깊이에서 멈춘 하락의 회복 일수 중앙값. figure ladder [--labels …]
 //!   drawdowns <csv> [--threshold 0.10] [--deep 0.20] [--flag <csv>] [--forward 91,182,365]
@@ -903,7 +904,8 @@ fn seasonal_cmd(path: &str, o: &HashMap<String, String>) -> Result<String, Strin
 }
 
 fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<String, String> {
-    let mut pts = load_with(path, o)?;
+    // 도식(flow)처럼 자료를 쓰지 않는 프레임은 입력을 - 로(또는 생략)
+    let mut pts = if path == "-" { Vec::new() } else { load_with(path, o)? };
     if let Some(from) = o.get("from").and_then(|d| series::day_number(d)) {
         pts.retain(|p| p.day >= from); // 그림 기간(예: 2000년 이후)
     }
@@ -1611,6 +1613,18 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             csv = format!("row,value\n{}", rows.iter().map(|(n, v)| format!("{n},{v}\n")).collect::<String>());
             viz::hbars(&rows, line, o.get("highlight").map_or("", String::as_str), o.get("unit").map_or("", String::as_str), &title)
         }
+        "flow" => {
+            // 흐름 도식(차트가 아닌 그림): --rows "단계 이름:짧은 설명;…"(2~6단계, 설명은 없어도 된다), --notes "화살표 메모;…"(단계 사이, 빈칸 가능), --highlight 단계 이름, --vertical(4단계 이상은 저절로). 입력 csv는 쓰지 않는다(- 또는 생략)
+            let nodes: Vec<(String, String)> = o.get("rows").ok_or("--rows 가 필요")?.split(';').map(str::trim).filter(|r| !r.is_empty())
+                .map(|r| match r.split_once(':') { Some((a, b)) => (a.trim().to_string(), b.trim().to_string()), None => (r.to_string(), String::new()) }).collect();
+            if !(2..=6).contains(&nodes.len()) { return Err(format!("flow 는 단계 2~6개 (지금 {})", nodes.len())); }
+            let notes: Vec<String> = o.get("notes").map(|v| v.split(';').map(|x| x.trim().to_string()).collect()).unwrap_or_default();
+            let hl = o.get("highlight").map_or("", String::as_str);
+            if !hl.is_empty() && !nodes.iter().any(|n| n.0 == hl) { return Err(format!("--highlight {hl}: 그런 단계가 없다")); }
+            let q = |t: &str| format!("\"{}\"", t.replace('"', "\"\""));
+            csv = format!("step,label,sub,note_to_next\n{}", nodes.iter().enumerate().map(|(i, (a, b))| format!("{},{},{},{}\n", i + 1, q(a), q(b), q(if i + 1 < nodes.len() { notes.get(i).map_or("", String::as_str) } else { "" }))).collect::<String>());
+            viz::flow(&nodes, &notes, hl, o.contains_key("vertical"), &title)
+        }
         "timeline" => {
             // --items "해|사건|결과|good·mixed·bad;…" (글의 주장 장부에 출처가 있는 사실만 넣는다)
             let it: Vec<(String, String, String, String)> = o.get("items").ok_or("--items 가 필요")?.split(';').filter_map(|x| {
@@ -1943,6 +1957,7 @@ fn with_meta(j: String, cmd: &str, path: &str, o: &HashMap<String, String>) -> S
         "hbars" => "Values given on the command line, one horizontal bar per row, with an optional reference line; bars at or past the line are dark, bars short of it light, the highlighted row blue.",
         "misses" => "Every earlier month of the same calendar month (from the start date) was treated as missing and filled two ways, with the geometric mean of the months before and after it and with the month before raised by one-twelfth of the prior 12-month change; each dot is the filled n-month change minus the actual one, in percentage points. Dots to the right of zero mean the fill made that year's rate too high.",
         "arrows" => "Values given on the command line, one row per item: an arrow from the first value to the second on one percentage axis, blue when the second is lower, orange when higher, gray dashed for rows still under way.",
+        "flow" => "A diagram, not data: the steps, notes and highlight are given on the command line and drawn as a chain of labeled steps joined by arrows.",
         "rowdots" => "Values given on the command line, one row per item, drawn on one percentage axis (or, with --unit pt, an axis of percentage points) with a zero line; each row's marks are joined by a light bar from lowest to highest.",
         "intrayear" => "For each calendar year: the deepest fall from that year's highest close to a later close in the same year, and the change from the prior year's last close to the year's last close (the first year starts from its first close; the latest year is year to date).",
         "ladder" => "Every completed decline of at least the first depth from a prior record close (peak to trough, then a new record): how many reached each deeper depth, and the median days from peak to new record for declines whose trough fell between that depth and the next, and the median days from that record to the trough. The decline still under way is reported separately and not counted.",
@@ -2005,6 +2020,7 @@ fn main() {
         ("bond", _, _) => bond_cmd(&opt).map(|j| { let mut j = j; j.pop(); format!("{j},\"method\":{}}}", s("A bond fund's value drops at once by about its duration times the rise in yields (duration times the rise; no convexity), then compounds at the higher yield; the no-change path compounds at the old yield. Simplified: the fund's yield moves with the market at once and yields then stay put. Break-even is when the two paths meet.")) }),
         ("export", Some(p), _) => export_cmd(p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
         ("figure", Some(f), Some(p)) => figure_cmd(f, p, &opt).map(|j| with_meta(j, cmd, p, &opt)),
+        ("figure", Some(f), None) if f == "flow" => figure_cmd(f, "-", &opt).map(|j| with_meta(j, cmd, "-", &opt)),
         _ => Err("사용: mkviz-engine drawdowns|position|turning|sahm|events <csv> [옵션] | figure <frame> <csv> --out <svg> (main.rs 머리 주석)".into()),
     };
     match out {
