@@ -10,7 +10,7 @@
 - Election day: the Tuesday after the first Monday in November. Same calendar date in non-midterm years for the comparison set.
 - Change: index close on the trading day at or before the date, to the close 182 days (six months) or 365 days later (engine `events`, price only, no dividends).
 - Baseline: (1) any 182-day window since the index starts (engine `base_median`, `base_up_share`); (2) the same early-November start in every non-midterm year, which holds the season fixed.
-- Indexes: Nasdaq Composite (FRED NASDAQCOM, from 1971; the long file index_ixic_long matches it) and S&P 500 (Yahoo ^GSPC, from 1950).
+- Indexes: Nasdaq Composite (the long file index_ixic_long for the other-years count, 26 of 41; FRED NASDAQCOM gives 27 of 41 because of small date differences) and S&P 500 (Yahoo ^GSPC, from 1950).
 - Other definitions: the Motley Fool's S&P 500 study (1874-) uses 12 months and averages; Stock Trader's Almanac's "presidential cycle" uses calendar years. Our six-month window from election day is the question people ask in November.
 - Re-scan: every midterm from 1950 (S&P 500) and 1974 (Nasdaq; the index starts in 1971, so 1974 is the first full midterm) to 2022 is in; none dropped. Non-midterm years: 1950-2025 for the S&P 500 (57), 1972-2025 for the Nasdaq (41).
 
@@ -41,6 +41,17 @@
 
 A year after: Nasdaq higher in 12 of 13 midterms (1986 the exception, -11.5%); S&P 500 higher in 19 of 19; S&P 500 other years 39 of 57 (median 9.3%). 2026 so far (Nov. 3 to Nov. 23): Nasdaq -5.1%, S&P 500 -4.4%.
 
+**Two splits (added Nov. 28, 2026).** S&P 500 six-month change from election day (engine `events`, per-event values), sorted two ways:
+
+| Midterms since 1950 | Cases | Higher | Median |
+|---|---|---|---|
+| President's party lost control of the House or Senate (1954, 1986, 1994, 2006, 2010, 2014, 2018, 2022) | 8 | 8 | +10.7% |
+| President's party lost no chamber | 11 | 11 | +18.0% |
+| S&P 500 10% or more below its one-year high on election day (1962, 1966, 1970, 1974, 1978, 1990, 2002, 2022) | 8 | 8 | +16.4% |
+| Within 10% of its one-year high | 11 | 11 | +13.7% |
+
+Party control from the House and Senate party-division records; "lost a chamber" counts only losses by the president's party (2002, when Republicans regained the Senate under a Republican president, is in the second row). The one-year high is the highest daily close in the 365 days to election day. Four of the six weakest runs, including the last three (2014, 2018, 2022), fall in the lost-a-chamber row; the weakest, 2002, is in the other, so the gap between rows is partly a gap between eras. Without the three largest gains (1970, 1990, 1986) the median of the remaining 16 is +13.0%. S&P 500 dips of more than 10% below the election-day level within six months: three (1974, 2002, 2018).
+
 ### Limits
 - Midterms come every four years, so their six-month windows sit at the same point in the presidential term; 19 cases are fewer independent observations than they look.
 - Several post-election gains began from fall lows (1974, 1990, 2002) that came weeks before the vote.
@@ -51,6 +62,8 @@ A year after: Nasdaq higher in 12 of 13 midterms (1986 the exception, -11.5%); S
 - Yahoo Finance, S&P 500 (^GSPC) history: https://finance.yahoo.com/quote/%5EGSPC/history/
 - The Motley Fool, Midterm election year stock market history: https://www.fool.com/research/midterm-election-year-stock-market-history/
 - Brookings, What history tells us about the 2026 midterm elections: https://www.brookings.edu/articles/what-history-tells-us-about-the-2026-midterm-elections
+- US House, Party Divisions: https://history.house.gov/Institution/Party-Divisions/Party-Divisions/
+- US Senate, Party Division: https://www.senate.gov/history/partydiv.htm
 
 ### Builds on and leads to
 - [How long do stock market corrections last?](https://mkviz.com/how-long-do-corrections-last/) (what a fall after the vote looked like before).

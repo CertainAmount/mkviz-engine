@@ -45,6 +45,8 @@ Year to Nov. 20, 2026: the dollar fell 5% or more against zero of the four (yen 
 
 Per-currency changes in the year to each mark (dollar against the currency; negative = dollar weaker): 1973 yen -12%, mark -26%, pound -6%, Canadian dollar +2%; 1978 yen -28%, mark -19%, pound -11%, Canadian dollar +10%; 1986 yen -31%, mark -31%, pound -26%, Canadian dollar +3%; 2003 yen -7%, euro -19%, pound -9%, Canadian dollar -9%; 2017 yen +6%, euro -6%, pound +3%, Canadian dollar -5% (4.9%, under the line); 2020 yen -4%, euro -6%, pound -1%, Canadian dollar -0.5%; 2026 yen -1%, euro -12%, pound -9%, Canadian dollar -5.5%. (Pound and euro are quoted as dollars per unit; their changes were inverted.)
 
+**After the 9% mark (added Nov. 28, 2026).** Further fall from the level at the 9% mark to the episode low (engine `drawdowns` dates; monthly TWEXBMTH to 2003, daily DTWEXBGS from 2017): 1973 0.0%, 1978 0.0%, 1986 +6.8%, 2003 +19.8%, 2017 +1.8%, 2020 +3.5%, 2026 +0.5% so far. The five falls without both signs lost at most +6.8% more. The 3-month and 10-year rate measures gave the same yes/no answer at every mark, so the post shows one column.
+
 ### Limits
 - One long slide among seven falls: two signs that single it out after the fact are a description, not a tested forecast.
 - Three-month interbank rates are a rough stand-in for what draws money across borders; long-term yields and expected rates also matter.
