@@ -39,7 +39,8 @@
 | [core-inflation](https://mkviz.com/core-inflation/) | [core-gauge-race](core-inflation/core-gauge-race.csv) | closer | fred_CPIAUCSL.csv, fred_CPILFESL.csv, fred_MEDCPIM094SFRBCLE.csv, fred_TRMMEANCPIM094SFRBCLE.csv |
 | [do-bonds-go-up-when-stocks-go-down](https://mkviz.com/do-bonds-go-up-when-stocks-go-down/) | [bonds-in-stock-falls](do-bonds-go-up-when-stocks-go-down/bonds-in-stock-falls.csv) | catch |  |
 | [do-bonds-go-up-when-stocks-go-down](https://mkviz.com/do-bonds-go-up-when-stocks-go-down/) | [bonds-stocks-this-fall](do-bonds-go-up-when-stocks-go-down/bonds-stocks-this-fall.csv) | lines |  |
-| [dollar-weaker-2026](https://mkviz.com/dollar-weaker-2026/) | [dollar-underwater](dollar-weaker-2026/dollar-underwater.csv) | underwater | fred_DTWEXBGS.csv, fred_TWEXBMTH.csv |
+| [dollar-weaker-2026](https://mkviz.com/dollar-weaker-2026/) | [dollar-recent](dollar-weaker-2026/dollar-recent.csv) | recent | fred_DTWEXBGS.csv |
+| [dollar-weaker-2026](https://mkviz.com/dollar-weaker-2026/) | [dollar-store-goods-tariffs](dollar-weaker-2026/dollar-store-goods-tariffs.csv) | arrows | fred_CUSR0000SACL1E.csv |
 | [fed-rate-cut-mortgage-rates](https://mkviz.com/fed-rate-cut-mortgage-rates/) | [cut-around](fed-rate-cut-mortgage-rates/cut-around.csv) | around | fred_MORTGAGE30US.csv |
 | [fed-rate-cut-mortgage-rates](https://mkviz.com/fed-rate-cut-mortgage-rates/) | [cut-lines](fed-rate-cut-mortgage-rates/cut-lines.csv) | lines | fred_DFEDTARU.csv, fred_DGS10.csv, fred_MORTGAGE30US.csv |
 | [fed-interest-rates](https://mkviz.com/fed-interest-rates/) | [fed-vs-10y-mortgage](fed-interest-rates/fed-vs-10y-mortgage.csv) | rowdots | fred_DGS10.csv |

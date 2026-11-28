@@ -932,6 +932,17 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             viz::recent(w, &title, o.get("suffix").map(String::as_str).unwrap_or(""), o.get("decimals").and_then(|v| v.parse().ok()).unwrap_or(2), o.get("now").map(String::as_str).unwrap_or("Now"), o.get("line").and_then(|v| v.split_once('|')).and_then(|(a, b)| Some((a.parse().ok()?, b)))) }
         "tracker" => viz::tracker(&pts, &turning::monthly(&pts), &title, o.get("suffix").map(String::as_str).unwrap_or(""), o.get("peaks").and_then(|v| v.parse().ok()).unwrap_or(3), &o.get("years").map(|v| v.split(',').map(String::from).collect::<Vec<_>>()).unwrap_or_default(), o.get("note").map(String::as_str).unwrap_or(""), opt_f(o, "mid", 0.8), o.get("now").map(String::as_str).unwrap_or("Now"), o.get("decimals").and_then(|v| v.parse().ok()).unwrap_or(1)),
         "band" => viz::band(&turning::monthly(&pts), &title, o.contains_key("pct"), o.get("suffix").map(String::as_str).unwrap_or("")),
+        "comeback" => {
+            // 하락마다 한 줄: 고점 해, 고점에서 다시 그 고점까지 걸린 해(진행 중이면 지금까지, 열린 줄). 'recover'와 달리 금리 없이(2026-11-28 달러 글: 긴 추락은 깊이가 아니라 기간)
+            let last = pts.last().ok_or("자료 없음")?.day;
+            let rows: Vec<(String, f64, bool)> = episodes::drawdowns(&pts, opt_f(o, "threshold", 0.09)).iter().filter_map(|e| {
+                let pk = series::day_number(&e.peak)?;
+                let days = e.days_to_recover.map(|d| d as f64).unwrap_or((last - pk) as f64);
+                Some((format!("{}", &e.peak[..4]), days / 30.4375, e.recovered.is_some()))
+            }).collect();
+            csv = format!("peak_year,years_to_regain_peak,recovered\n{}", rows.iter().map(|r| format!("{},{:.2},{}\n", r.0, r.1 / 12.0, r.2 as u8)).collect::<String>());
+            viz::lead(&rows, "", -1.0, o.get("axis").map(String::as_str).unwrap_or("Years from peak back to peak"), &title)
+        }
         "recover" => {
             // 하락마다 한 줄: 고점 해와 그때 금리(--rates 금리 csv), 고점에서 새 고점까지 개월(진행 중이면 지금까지, 파랑). 시작 금리 높은 순.
             // "시작 금리가 낮을수록 회복이 길었나"를 한 그림으로(채권 펀드: 이자가 낙폭을 메우는 속도)
@@ -1503,6 +1514,16 @@ fn figure_cmd(frame: &str, path: &str, o: &HashMap<String, String>) -> Result<St
             let rows = cond_rows(path, o)?;
             csv = format!("month,x_change,y_change\n{}", rows.iter().map(|r| format!("{},{:.3},{:.4}\n", r.0, r.1, r.2)).collect::<String>());
             viz::quad(&rows, opt_f(o, "at", 1.0), o.get("xlabel").map(String::as_str).unwrap_or("x"), o.get("ylabel").map(String::as_str).unwrap_or(""), o.get("xunit").map(String::as_str).unwrap_or(""), &title)
+        }
+        "yearchange" => {
+            // 해마다 연말 대비 변화율 x --scale(예: 해외 40% 펀드에 달러가 더하고 뺀 몫 = -0.4), 마지막 해는 지금까지(2026-11-28 달러 글)
+            let scale = opt_f(o, "scale", 1.0);
+            let mut ends: Vec<(i32, f64)> = Vec::new();
+            for p in &pts { let y: i32 = p.date[..4].parse().unwrap_or(0); if let Some(l) = ends.last_mut() { if l.0 == y { l.1 = p.value; continue; } } ends.push((y, p.value)); }
+            let from: i32 = o.get("from").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let ys: Vec<(i32, f64, bool)> = ends.windows(2).filter(|w| w[1].0 >= from).map(|w| (w[1].0, (w[1].1 / w[0].1 - 1.0) * scale * 100.0, false)).collect();
+            csv = format!("year,value_pct\n{}", ys.iter().map(|(y, v, _)| format!("{y},{v:.2}\n")).collect::<String>());
+            viz::years(&ys, o.get("suffix").map(String::as_str).unwrap_or("%"), o.get("marks").and_then(|v| v.parse().ok()).unwrap_or(3), &title)
         }
         "years" => {
             // revisions 명령과 같은 해마다 평균 수정치, 경기침체 해 음영(--flag), 가장 낮은 해 --marks개 이름표

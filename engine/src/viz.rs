@@ -1001,7 +1001,9 @@ pub fn lead(rows: &[(String, f64, bool)], zero: &str, mark: f64, axis: &str, tit
     for (k, (year, m, done)) in rows.iter().enumerate() {
         let y = T + k as f64 * row + 6.0;
         let color = if !*done { BLUE } else if *m <= mark { "#ea580c" } else { GRAY };
-        let lab = match (*done, m.round()) { (false, _) => format!("{:.0} mo so far", m), (true, z) if z == 0.0 => zero.to_string(), _ => format!("{:.0} mo", m) };
+        // 눈금이 해 단위면(긴 기간) 막대 값도 해로: '178 mo'보다 '14.8 yrs'가 읽힌다(2026-11-28 달러 글)
+        let unit = |m: f64| if step >= 12.0 { format!("{:.1} yrs", m / 12.0) } else { format!("{:.0} mo", m) };
+        let lab = match (*done, m.round()) { (false, _) => format!("{} so far", unit(*m)), (true, z) if z == 0.0 => zero.to_string(), _ => unit(*m) };
         let _ = write!(s, "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{INK}\" font-size=\"14\">{year}</text><rect x=\"{l}\" y=\"{y:.1}\" width=\"{:.1}\" height=\"12\" rx=\"2\" fill=\"{color}\"/><text x=\"{:.1}\" y=\"{:.1}\" fill=\"{}\" font-size=\"13\"{}>{lab}</text>",
                        l - 8.0, y + 11.0, (x(*m) - l).max(2.0), x(*m) + 6.0, y + 11.0, if *done { INK } else { BLUE }, if *done { "" } else { " font-weight=\"600\"" });
     }
@@ -1095,7 +1097,7 @@ pub fn years(rows: &[(i32, f64, bool)], suffix: &str, marks: usize, title: &str)
     const ORANGE: &str = "#eb6834";
     let lo = rows.iter().map(|r| r.1).fold(0.0, f64::min);
     let hi = rows.iter().map(|r| r.1).fold(0.0, f64::max);
-    let step = [10.0, 20.0, 25.0, 50.0, 100.0].into_iter().find(|st| (hi - lo) / st <= 6.0).unwrap_or(200.0);
+    let step = [1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 100.0].into_iter().find(|st| (hi - lo) / st <= 6.0).unwrap_or(200.0);
     let (lo, hi) = ((lo / step).floor() * step, (hi / step).ceil() * step);
     let n = rows.len() as f64;
     let bw = (W - L - R) / n;
@@ -2528,8 +2530,12 @@ pub fn arrows(rows: &[(String, f64, f64)], open: &[String], names: (&str, &str),
         let _ = write!(s, "<text x=\"{tx:.1}\" y=\"{:.1}\" text-anchor=\"{anchor}\" fill=\"{INK}\" font-size=\"12\">{lab}</text>", y + 4.0);
     }
     let ly = H - 10.0;
+    // 범례는 두 방향이 다 있을 때만(모두 내린 그림에 'Higher' 주황 범례가 떠 독자 둘이 헷갈림, 2026-11-28)
+    let (down, up) = (rows.iter().any(|r| r.2 < r.1), rows.iter().any(|r| r.2 > r.1));
+    if down && up {
     let _ = write!(s, "<line x1=\"{l}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#2563eb\" stroke-width=\"2.5\" marker-end=\"url(#ah-b)\"/><text x=\"{:.1}\" y=\"{ly:.1}\" fill=\"{INK}\" font-size=\"13\">{}</text><line x1=\"{:.1}\" x2=\"{:.1}\" y1=\"{:.1}\" y2=\"{:.1}\" stroke=\"#eb6834\" stroke-width=\"2.5\" marker-end=\"url(#ah-o)\"/><text x=\"{:.1}\" y=\"{ly:.1}\" fill=\"{INK}\" font-size=\"13\">{}</text>",
         l + 18.0, ly - 4.0, ly - 4.0, l + 24.0, names.0.replace('&', "&amp;"), l + 150.0, l + 168.0, ly - 4.0, ly - 4.0, l + 174.0, names.1.replace('&', "&amp;"));
+    }
     s.push_str("</svg>");
     s
 }
